@@ -15,6 +15,20 @@ profiling. Every answer shows which source columns it read; ask questions in
 plain language or serve the whole thing to an AI agent over [MCP](docs/mcp.md),
 with PII masked from the model — all on your machine.
 
+## What you can do
+
+- **Drop a file, query it instantly.** Drag a CSV, Parquet, or JSON onto the window and run SQL on it right away — no import, no schema setup.
+- **Join across sources — no pipelines.** Query and JOIN a Postgres table, a Parquet file, and a Snowflake table in a *single* SQL statement. No ETL, no copying everything into a warehouse first.
+- **Connect all your data.** Postgres, MySQL, SQLite, SQL Server, BigQuery, Snowflake, files on S3/GCS/Azure, and Iceberg/Delta tables — all through one engine.
+- **See answers as you type.** Live results preview while you write SQL, one-click auto-charts, and a profiling panel (missing values, distributions, outliers) — no separate BI tool.
+- **Ask in plain English (optional).** Turn a question into SQL and an answer with the built-in agent — bring your own model, or run one fully local with no API key.
+- **Keep sensitive data away from the AI.** Mark PII columns once; the agent and any connected AI see masked values (`•••`) while you still see the real data locally. Flip **Agent view** to see exactly what the model sees.
+- **Safe by design.** The engine is read-only by construction — no query can write, delete, or touch the filesystem — so pointing an AI (or a teammate) at your real databases can't do damage.
+- **Point AI tools at your data, safely.** A governed MCP server exposes read-only, PII-masked query tools to Cursor, Cline, or your own agent.
+- **Trust every answer.** Each result shows exactly which source columns it read — so you always know where a number came from.
+- **Save, reuse, export.** Snapshot a result as a reusable local table; export to CSV, Parquet, JSON, or XLSX.
+- **Governance you can automate.** Catch schema/PII drift in CI, auto-detect PII columns, diff data across sources, and define certified metrics — from the command line.
+
 ![DataCharter — live SQL preview, auto-charts, per-query provenance, and PII masking](https://raw.githubusercontent.com/datacharter/datacharter/main/brand/demo.gif)
 
 **Status: pre-release.** V1 in development.
