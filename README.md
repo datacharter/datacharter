@@ -57,38 +57,25 @@ datacharter serve --local   # uses Ollama (qwen3:8b by default)
 
 Drop a CSV, Parquet, or JSON file onto the window to query it instantly.
 
-## Why
+## Why DataCharter
 
 - **Your contracts are the catalog.** `charter.yaml` describes sources, tables,
-  and PII fields — the same contract spec your data team already writes.
-- **One engine, every source.** Postgres, MySQL, SQLite, BigQuery, SQL Server,
-  S3/GCS/Azure files, Iceberg, Delta — federated joins across all of them, with
-  filters and projections pushed down where the data lives — even across a
-  cross-source join, each leg is filtered at its source. Snowflake is supported
-  via connector extract (`datacharter[snowflake]`) with filters/projections
-  pushed into the extract. Every source's tables are exposed under one flat
-  `source__table` naming scheme.
-- **Local-first.** One process, your machine, no cloud dependency. Optional
-  `--local` agent mode runs a small open model via Ollama — no API key, no data
-  leaves your machine.
+  and PII fields — the same contract spec your data team already writes, so
+  there's no separate metadata store to maintain.
+- **Real federation, not just a shared connection.** Filters and projections are
+  pushed down to each source — even across a cross-source join, every leg is
+  filtered where its data lives. (Snowflake runs via connector extract,
+  `datacharter[snowflake]`, with the same pushdown into the extract.)
+- **Local-first.** One process, your machine, no cloud dependency. The optional
+  `--local` agent runs a small open model via Ollama — no API key, no data leaves
+  your machine.
 - **The workspace is a directory.** `charter.yaml` + `queries/*.sql` +
   `.env.example` — commit it, clone it, `datacharter serve`. Your team's whole
   exploration environment travels as a repo; secrets and local state never do.
 
-## More than a viewer
-
-DataCharter governs and audits your data, not just displays it — see the
-[CLI reference](docs/cli.md) for the full command set:
-
-- **Governed MCP server** — `datacharter mcp` exposes read-only, PII-masked query
-  tools to any MCP client (Cursor, Cline, or your own agent).
-- **Contracts you can check** — `datacharter drift` exits non-zero when a declared
-  table or PII column disappears; `datacharter scan` detects PII columns to add.
-- **Answers that show their work** — every result reports the source columns it
-  read; `datacharter diff` compares relations across sources; `datacharter metric`
-  runs governed metric definitions.
-- **Privacy-first** — `serve --offline` runs with no outbound network, and the
-  model never sees raw PII (flip **Agent view** in the UI to see exactly what it does).
+DataCharter governs and audits your data, not just displays it. The full command
+set (`drift`, `scan`, `diff`, `metric`, `mcp`, and more) is in the
+[CLI reference](docs/cli.md); the security model is in [security](docs/security.md).
 
 ## Built on
 
