@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DataCharter — Charter your data</title>
+<meta name="description" content="Contract-governed local data exploration, powered by DuckDB. Explore all your data locally, in one place.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20128%20128'%3E%3Ccircle%20cx='64'%20cy='64'%20r='56'%20fill='none'%20stroke='%233B82C4'%20stroke-width='7'/%3E%3Cpath%20d='M30%2084%20L52%2060%20L66%2072%20L92%2042'%20fill='none'%20stroke='%233B82C4'%20stroke-width='11'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3Cpath%20d='M78%2038%20L96%2038%20L96%2056'%20fill='none'%20stroke='%233B82C4'%20stroke-width='11'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --accent: #3B82C4;
+    --accent-strong: #2f6da8;
+    --bg: #ffffff;
+    --surface: #f6f8fa;
+    --surface-2: #eef2f6;
+    --text: #14202b;
+    --muted: #566575;
+    --border: #e2e8f0;
+    --code-bg: #0d1117;
+    --code-text: #e6edf3;
+    --radius: 14px;
+    --maxw: 1080px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface-2: #1c232d;
+      --text: #e6edf3;
+      --muted: #9aa5b1;
+      --border: #262d36;
+      --code-bg: #010409;
+      --code-text: #e6edf3;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+  img { max-width: 100%; height: auto; }
+
+  /* Header */
+  header {
+    position: sticky; top: 0; z-index: 10;
+    backdrop-filter: saturate(140%) blur(8px);
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav { display: flex; align-items: center; gap: 16px; height: 60px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.1rem; letter-spacing: -0.01em; }
+  .brand svg { width: 26px; height: 26px; color: var(--text); }
+  .nav .spacer { flex: 1; }
+  .nav a { color: var(--muted); font-size: 0.94rem; font-weight: 500; }
+  .nav a:hover { color: var(--text); text-decoration: none; }
+  .nav .ghlink { color: var(--text); }
+
+  /* Hero */
+  .hero { position: relative; overflow: hidden; }
+  .hero::before {
+    content: ""; position: absolute; inset: 0;
+    background:
+      radial-gradient(720px 360px at 78% 12%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%),
+      radial-gradient(600px 420px at 10% 90%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 70%);
+    pointer-events: none;
+  }
+  .hero-grid {
+    position: relative;
+    display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 40px; align-items: center;
+    padding: 72px 0 64px;
+  }
+  .eyebrow {
+    display: inline-block; font-size: 0.8rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent);
+    padding: 5px 12px; border-radius: 999px; margin-bottom: 18px;
+  }
+  h1 { font-size: clamp(2.3rem, 5vw, 3.4rem); line-height: 1.08; letter-spacing: -0.025em; margin: 0 0 8px; }
+  h1 .accent { color: var(--accent); }
+  .lede { font-size: clamp(1.05rem, 2.2vw, 1.2rem); color: var(--muted); max-width: 40ch; margin: 12px 0 28px; }
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 11px 20px; border-radius: 10px; font-weight: 600; font-size: 0.97rem;
+    border: 1px solid transparent; cursor: pointer;
+  }
+  .btn:hover { text-decoration: none; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-strong); }
+  .btn-ghost { background: transparent; color: var(--text); border-color: var(--border); }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .hero-badge { text-align: center; }
+  .hero-badge img { width: min(360px, 80%); filter: drop-shadow(0 18px 40px rgba(0,0,0,0.18)); }
+  .status { margin-top: 22px; font-size: 0.85rem; color: var(--muted); }
+  .status b { color: var(--text); font-weight: 600; }
+
+  /* Sections */
+  section { padding: 56px 0; }
+  section.alt { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  h2 { font-size: clamp(1.5rem, 3vw, 2rem); letter-spacing: -0.02em; margin: 0 0 8px; }
+  .section-sub { color: var(--muted); margin: 0 0 32px; max-width: 60ch; }
+
+  /* Quick start */
+  .quick { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+  pre {
+    background: var(--code-bg); color: var(--code-text);
+    padding: 20px 22px; border-radius: var(--radius); overflow-x: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9rem; line-height: 1.7; margin: 0;
+    border: 1px solid var(--border);
+  }
+  pre .c { color: #7d8ea3; }
+  pre .p { color: #6cb6ff; }
+  .steps { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+  .steps li { position: relative; padding: 0 0 20px 44px; }
+  .steps li::before {
+    counter-increment: step; content: counter(step);
+    position: absolute; left: 0; top: 0;
+    width: 28px; height: 28px; border-radius: 50%;
+    background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent);
+    display: grid; place-items: center; font-weight: 700; font-size: 0.85rem;
+  }
+  .steps li:last-child { padding-bottom: 0; }
+  .steps h3 { margin: 2px 0 2px; font-size: 1.02rem; }
+  .steps p { margin: 0; color: var(--muted); font-size: 0.94rem; }
+  code.inline {
+    background: var(--surface-2); padding: 1px 6px; border-radius: 5px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.88em;
+  }
+
+  /* Features */
+  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .card {
+    background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 22px 20px;
+  }
+  section.alt .card { background: var(--bg); }
+  .card .ico {
+    width: 38px; height: 38px; border-radius: 9px; margin-bottom: 14px;
+    display: grid; place-items: center;
+    background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent);
+  }
+  .card .ico svg { width: 20px; height: 20px; }
+  .card h3 { margin: 0 0 6px; font-size: 1.03rem; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.92rem; }
+
+  /* Screenshot */
+  .shot {
+    border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.22); margin-top: 8px;
+  }
+  .shot img { display: block; width: 100%; }
+
+  /* Built-on */
+  .builton { display: flex; flex-wrap: wrap; gap: 12px; margin: 4px 0 24px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    border: 1px solid var(--border); border-radius: 999px; padding: 8px 16px;
+    font-size: 0.9rem; font-weight: 500; background: var(--bg);
+  }
+  .note { color: var(--muted); font-size: 0.88rem; max-width: 70ch; }
+
+  /* Footer */
+  footer { border-top: 1px solid var(--border); padding: 32px 0; color: var(--muted); font-size: 0.9rem; }
+  .foot { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+  .foot .spacer { flex: 1; }
+  .foot a { color: var(--muted); }
+  .foot a:hover { color: var(--text); }
+
+  @media (max-width: 860px) {
+    .hero-grid { grid-template-columns: 1fr; gap: 24px; padding: 48px 0 44px; }
+    .hero-badge { order: -1; }
+    .hero-badge img { width: 200px; }
+    .quick { grid-template-columns: 1fr; }
+    .features { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap nav">
+    <span class="brand">
+      <svg viewBox="0 0 128 128" role="img" aria-label="DataCharter">
+        <circle cx="64" cy="64" r="56" fill="none" stroke="currentColor" stroke-width="7"/>
+        <path d="M30 84 L52 60 L66 72 L92 42" fill="none" stroke="#3B82C4" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M78 38 L96 38 L96 56" fill="none" stroke="#3B82C4" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      DataCharter
+    </span>
+    <span class="spacer"></span>
+    <a href="#quickstart">Quick start</a>
+    <a href="quickstart.html">Docs</a>
+    <a href="faq.html">FAQ</a>
+    <a class="ghlink" href="https://github.com/datacharter/datacharter">GitHub</a>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow">Pre-release &middot; V1 in development</span>
+      <h1>Charter <span class="accent">your data.</span></h1>
+      <p class="lede">Explore all your data locally, in one place — contract-governed data exploration, powered by DuckDB.</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="#quickstart">Get started</a>
+        <a class="btn btn-ghost" href="https://github.com/datacharter/datacharter">View on GitHub</a>
+      </div>
+      <p class="status"><b>One process, your machine, no cloud dependency.</b> Zero telemetry. Optional fully-local natural-language agent.</p>
+    </div>
+    <div class="hero-badge">
+      <img src="assets/hero.png" alt="DataCharter badge — a rising chart arrow inside a ring" width="360">
+    </div>
+  </div>
+</section>
+
+<section id="quickstart" class="alt">
+  <div class="wrap">
+    <h2>Up and running in 60 seconds</h2>
+    <p class="section-sub">No global install, no config, nothing to sign up for. If you have <code class="inline">uv</code>, you have a workspace.</p>
+    <div class="quick">
+      <pre><span class="c"># Try it instantly on generated demo data:</span>
+uvx datacharter serve
+<span class="c"># &rarr; opens http://127.0.0.1:8321</span>
+
+<span class="c"># Or install it:</span>
+pip install datacharter
+
+<span class="c"># Start a real workspace:</span>
+datacharter init     <span class="c"># scaffolds charter.yaml, queries/, .env.example</span>
+datacharter serve    <span class="c"># explore in your browser</span></pre>
+      <ol class="steps">
+        <li>
+          <h3>Run one command</h3>
+          <p><code class="inline">uvx datacharter serve</code> launches a local workspace on generated demo data. The engine, API, and web UI all run in one process.</p>
+        </li>
+        <li>
+          <h3>Explore in your browser</h3>
+          <p>Browse the source tree, write SQL in the editor, chart and profile results, and drag a CSV, Parquet, or JSON file onto the window to query it instantly.</p>
+        </li>
+        <li>
+          <h3>Make it yours</h3>
+          <p><code class="inline">datacharter init</code> scaffolds a workspace: <code class="inline">charter.yaml</code> + <code class="inline">queries/*.sql</code> + <code class="inline">.env.example</code>. Commit it, clone it, <code class="inline">serve</code> it. The whole environment travels as a repo.</p>
+        </li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>What you get</h2>
+    <p class="section-sub">A single local tool for querying, charting, and understanding every source your data team already describes.</p>
+    <div class="features">
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v4H4zM4 10h16v4H4zM4 16h10v4H4z" stroke-linejoin="round"/></svg></div>
+        <h3>Your contracts are the catalog</h3>
+        <p><code class="inline">charter.yaml</code> describes sources, tables, and PII fields: the same ODCS-compatible contract spec your data team already writes.</p>
+      </div>
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.5 2.5 15 0 18M12 3c-2.5 2.5-2.5 15 0 18"/></svg></div>
+        <h3>One engine, every source</h3>
+        <p>Postgres, MySQL, SQLite, BigQuery, SQL Server, files, Iceberg, Delta, and Snowflake. Federated joins across all of them, with filters and projections pushed down to each source.</p>
+      </div>
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z" stroke-linejoin="round"/></svg></div>
+        <h3>Local-first, zero telemetry</h3>
+        <p>One process on your machine, no cloud dependency, no phone-home of any kind. Binds to localhost by default; the engine is read-only.</p>
+      </div>
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h6l2 2h10v10H3z" stroke-linejoin="round"/></svg></div>
+        <h3>The workspace is a directory</h3>
+        <p>Contract, queries, and example env travel together as a repo. Secrets and local state never do; <code class="inline">git clone &amp;&amp; datacharter serve</code> reproduces the whole environment.</p>
+      </div>
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5m0 14h16M8 15l3-4 3 3 4-6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h3>Charts, profiling, SQL editor</h3>
+        <p>A Monaco SQL editor with catalog autocomplete, a virtualized results grid, Vega-Lite charts, a profiling panel, an EXPLAIN viewer, and CSV/Parquet/JSON/XLSX export.</p>
+      </div>
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l-1 3 3-1M4 5h16v11H8z" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="10" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r="1" fill="currentColor" stroke="none"/></svg></div>
+        <h3>Optional local agent</h3>
+        <p>Ask questions in plain language against any OpenAI-compatible endpoint, or run <code class="inline">--local</code> with Ollama so no API key is needed and no data leaves your machine.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap">
+    <h2>A workspace, not a dashboard</h2>
+    <p class="section-sub">Source tree, SQL editor, results, charts, profiling, and an optional chat rail: one local window over all your data.</p>
+    <div class="shot">
+      <img src="assets/screenshot.png" alt="The DataCharter workspace: a source tree on the left, a SQL editor, and Results, Chart, Profile, and Plan tabs">
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Built on</h2>
+    <p class="section-sub">DataCharter stands on excellent open-source foundations.</p>
+    <div class="builton">
+      <a class="chip" href="https://duckdb.org">DuckDB, the analytical engine at our core</a>
+      <a class="chip" href="https://bitol-io.github.io/open-data-contract-standard/">Open Data Contract Standard</a>
+      <a class="chip" href="https://vega.github.io/vega-lite/">Vega-Lite</a>
+      <a class="chip" href="https://microsoft.github.io/monaco-editor/">Monaco Editor</a>
+    </div>
+    <p class="note">DuckDB is a trademark of the DuckDB Foundation. DataCharter is an independent project and is not affiliated with or endorsed by the DuckDB Foundation.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <span>&copy; DataCharter &middot; <a href="https://github.com/datacharter/datacharter/blob/main/LICENSE">Apache-2.0</a></span>
+    <span class="spacer"></span>
+    <a href="quickstart.html">Quick start</a>
+    <a href="charter-yaml.html">charter.yaml</a>
+    <a href="sources.html">Sources</a>
+    <a href="agent.html">Agent</a>
+    <a href="cli.html">CLI</a>
+    <a href="mcp.html">MCP</a>
+    <a href="faq.html">FAQ</a>
+    <a href="https://github.com/datacharter/datacharter">GitHub</a>
+  </div>
+</footer>
+</body>
+</html>

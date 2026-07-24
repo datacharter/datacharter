@@ -1,0 +1,26 @@
+name: banned-terms
+
+# Release-hygiene gate: certain terms must never appear in this codebase,
+# in any file, on any branch. The patterns below use single-character
+# classes (e.g. "[p]attern") so this workflow file never contains the
+# literal terms it bans — meaning the check can ship in the public repo
+# without flagging itself.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Scan for banned terms
+        run: |
+          set -e
+          PATTERN='[p]anasonic|[k]anpai|[a]idp|[g]aai|[p]rdca|[y]ohana|[p]well'
+          if grep -riE "$PATTERN" --exclude-dir=.git .; then
+            echo "::error::Banned term found — see matches above."
+            exit 1
+          fi
+          echo "Clean."

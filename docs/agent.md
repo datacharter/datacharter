@@ -1,0 +1,78 @@
+---
+title: Agent modes
+description: Bring your own endpoint, run fully local, or skip the agent entirely.
+---
+
+[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
+
+DataCharter has an optional natural-language agent that turns a plain-language
+question into SQL against your sources. It is genuinely optional.
+
+## The product is fully usable without any LLM
+
+The engine, the source tree, the SQL editor with catalog autocomplete, the
+results grid, charts, the profiling panel, the EXPLAIN viewer, exports, and
+drag-and-drop file querying all work with no model configured and no network
+access. The agent adds a chat panel on top; nothing else depends on it.
+
+There is no bundled or fine-tuned model. The agent is grounded: it inspects your
+schema through tools, scopes to your contract, and retries on SQL errors, which
+is the regime where existing models already do text-to-SQL well.
+
+## Mode 1: bring your own endpoint
+
+Point the agent at any OpenAI-compatible `/chat/completions` endpoint (a hosted
+API, a self-hosted server such as vLLM, or a local runtime that speaks the same
+protocol). Set the endpoint and key in the environment, then serve:
+
+```sh
+export OPENAI_BASE_URL=https://api.example.com/v1   # any OpenAI-compatible API
+export OPENAI_API_KEY=...
+datacharter serve
+```
+
+- `OPENAI_BASE_URL` defaults to `https://api.openai.com/v1` if unset.
+- `DATACHARTER_MODEL` selects the model (default `gpt-4o-mini`).
+- The client is a dependency-free `httpx` wrapper; there is no vendor SDK.
+
+## Mode 2: fully local with `--local`
+
+Run the agent against a local [Ollama](https://ollama.com) instance. No API key,
+no data leaves your machine:
+
+```sh
+datacharter serve --local              # uses qwen3:8b by default
+datacharter serve --local --model ...  # choose another Ollama model
+```
+
+- `--local` targets Ollama at `http://127.0.0.1:11434/v1`.
+- The default model is `qwen3:8b`; override with `--model`.
+- DataCharter never auto-installs third-party software. If Ollama is not
+  reachable, it prints an install hint (and the `ollama pull` command for your
+  chosen model) and serves without the agent. The UI still works; the chat is
+  simply disabled.
+
+## How the agent works
+
+The agent runs a short tool loop over a small set of **read-only** tools:
+
+| Tool | What it does |
+| --- | --- |
+| `list_sources` | List configured sources and their types. |
+| `list_tables` | List queryable tables with their relation names. |
+| `describe_table` | Show columns and types for one relation. |
+| `query` | Run a read-only SQL query and return rows. |
+
+- **PII is masked.** Columns listed under a source's `pii` in `charter.yaml` are
+  masked in tool results, so those values are never sent to the model.
+- **Read-only is enforced in the engine**, not just the prompt: a statement
+  allowlist rejects anything but queries (the only write path is `local.*` DDL
+  for snapshots). The agent cannot modify your data.
+- **Charts inline.** The agent can emit a Vega-Lite spec that renders directly in
+  the results panel.
+- **Streaming.** Answers stream to the chat panel over Server-Sent Events
+  (`/api/agent/ask`). `/api/agent/available` reports whether an endpoint is
+  configured and which model is in use.
+
+See the [quick-start guide](quickstart.html) to get a workspace running first,
+then turn the agent on with either mode above.

@@ -1,0 +1,383 @@
+import MonacoEditor from "@monaco-editor/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { api, type QueryResult, type SourceInfo, type TableInfo } from "./api";
+import ChartPanel from "./components/ChartPanel";
+import ChatPanel from "./components/ChatPanel";
+import QueryFiles from "./components/QueryFiles";
+import ResultsGrid from "./components/ResultsGrid";
+import SourceTree from "./components/SourceTree";
+import SourcesView from "./components/SourcesView";
+import HelpModal from "./components/HelpModal";
+import { useResize } from "./lib/useResize";
+import Tutorial, { hasSeenTutorial } from "./components/Tutorial";
+import { registerCompletions } from "./monaco";
+
+const STARTER = "-- Cmd/Ctrl+Enter to run\nSELECT 42 AS answer;\n";
+const EXAMPLE_SQL =
+  "SELECT customer_id, count(*) AS orders, round(sum(total), 2) AS revenue\n" +
+  "FROM store.orders\nGROUP BY customer_id\nORDER BY revenue DESC;\n";
+
+type Tab = "results" | "chart" | "profile" | "plan";
+
+export default function App() {
+  const [sources, setSources] = useState<SourceInfo[]>([]);
+  const [tables, setTables] = useState<TableInfo[]>([]);
+  const [sql, setSql] = useState(STARTER);
+  const [result, setResult] = useState<QueryResult | null>(null);
+  const [profileResult, setProfileResult] = useState<QueryResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
+  const [tab, setTab] = useState<Tab>("results");
+  const [agentView, setAgentView] = useState(false);
+  const [exportFormat, setExportFormat] = useState("csv");
+  const [planText, setPlanText] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(() => !hasSeenTutorial());
+  const [view, setView] = useState<"explorer" | "sources">("explorer");
+  const [showHelp, setShowHelp] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">(
+    () => (localStorage.getItem("dc-theme") as "light" | "dark") || "light",
+  );
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("dc-theme", theme);
+  }, [theme]);
+  const dark = theme === "dark";
+  // PII columns declared across all sources — masked in "Agent view" (what a model sees).
+  const piiColumns = useMemo(() => {
+    const set = new Set<string>();
+    for (const src of sources)
+      for (const cols of Object.values(src.pii ?? {})) for (const c of cols) set.add(c.toLowerCase());
+    return set;
+  }, [sources]);
+  const sidebarW = useResize("dc-sidebar-w", 260, "x", false, 160);
+  const chatW = useResize("dc-chat-w", 340, "x", true, 240);
+  const editorH = useResize("dc-editor-h", 300, "y", false, 120);
+  const sqlRef = useRef(sql);
+  sqlRef.current = sql;
+  const tablesRef = useRef(tables);
+  tablesRef.current = tables;
+
+  const refreshCatalog = useCallback(() => {
+    api.sources().then((b) => setSources(b.sources)).catch(() => {});
+    api.tables().then((b) => setTables(b.tables)).catch(() => {});
+  }, []);
+
+  useEffect(refreshCatalog, [refreshCatalog]);
+
+  const run = useCallback(
+    async (sqlText?: string) => {
+      setRunning(true);
+      setError(null);
+      setProfileResult(null);
+      try {
+        setResult(await api.query(sqlText ?? sqlRef.current));
+        setTab("results");
+        refreshCatalog();
+      } catch (e) {
+        setResult(null);
+        setError((e as Error).message);
+      } finally {
+        setRunning(false);
+      }
+    },
+    [refreshCatalog],
+  );
+
+  const loadAndRunExample = useCallback(() => {
+    setSql(EXAMPLE_SQL);
+    run(EXAMPLE_SQL);
+  }, [run]);
+
+  // Instant preview: a beat after you stop typing, auto-run the query (row-capped,
+  // silent on error) so results update live without pressing Run.
+  useEffect(() => {
+    const body = sql.replace(/--[^\n]*/g, "").trim();
+    if (!body) return;
+    const timer = setTimeout(() => {
+      api
+        .query(sql, 200)
+        .then((preview) => {
+          setResult(preview);
+          setError(null);
+        })
+        .catch(() => {});
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [sql]);
+
+  const profile = useCallback(async () => {
+    setTab("profile");
+    if (profileResult) return;
+    try {
+      const body = sqlRef.current.trim().replace(/;\s*$/, "");
+      setProfileResult(await api.query(`SUMMARIZE ${body}`));
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }, [profileResult]);
+
+  const snapshot = useCallback(async () => {
+    const name = window.prompt("Snapshot as local.<name>", "snap");
+    if (!name) return;
+    const resp = await fetch("/api/snapshot", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sql: sqlRef.current, name }),
+    });
+    if (resp.ok) refreshCatalog();
+    else setError((await resp.json()).error?.message ?? "Snapshot failed");
+  }, [refreshCatalog]);
+
+  const exportResult = useCallback(async () => {
+    const resp = await fetch("/api/export", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sql: sqlRef.current, format: exportFormat }),
+    });
+    if (!resp.ok) {
+      setError((await resp.json()).error?.message ?? "Export failed");
+      return;
+    }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `datacharter-export.${exportFormat}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [exportFormat]);
+
+  const pickRelation = useCallback((relation: string) => {
+    setSql(`SELECT * FROM ${relation} LIMIT 100;`);
+  }, []);
+
+  const explain = useCallback(async () => {
+    setTab("plan");
+    try {
+      const body = sqlRef.current.trim().replace(/;\s*$/, "");
+      const res = await api.query(`EXPLAIN ANALYZE ${body}`);
+      setPlanText(res.rows.map((r) => r.join("\n")).join("\n"));
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }, []);
+
+  const onDrop = useCallback(
+    async (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragging(false);
+      for (const file of Array.from(e.dataTransfer.files)) {
+        const form = new FormData();
+        form.append("file", file);
+        const resp = await fetch("/api/upload", { method: "POST", body: form });
+        const body = await resp.json();
+        if (!resp.ok) {
+          setError(body.error?.message ?? "Upload failed");
+          return;
+        }
+        setSql(`SELECT * FROM ${body.table} LIMIT 100;`);
+      }
+      refreshCatalog();
+    },
+    [refreshCatalog],
+  );
+
+  return (
+    <div
+      className={dragging ? "app dragging" : "app"}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget === e.target) setDragging(false);
+      }}
+      onDrop={onDrop}
+    >
+      {dragging && <div className="drop-overlay">Drop csv / parquet / json to query it</div>}
+      {showTutorial && (
+        <Tutorial
+          actions={{
+            loadAndRunExample,
+            showChart: () => setTab("chart"),
+            showProfile: profile,
+          }}
+          onClose={() => setShowTutorial(false)}
+        />
+      )}
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+      <header className="topbar">
+        <svg className="logo" viewBox="0 0 128 128" aria-hidden="true">
+          <circle cx="64" cy="64" r="56" fill="none" stroke="currentColor" strokeWidth="7" />
+          <path
+            d="M30 84 L52 60 L66 72 L92 42"
+            fill="none"
+            stroke="#3B82C4"
+            strokeWidth="11"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M78 38 L96 38 L96 56"
+            fill="none"
+            stroke="#3B82C4"
+            strokeWidth="11"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <span className="name">DataCharter</span>
+        <span className="tagline">charter your data</span>
+        <span className="spacer" />
+        <button
+          className="topbar-btn"
+          onClick={() => setTheme(dark ? "light" : "dark")}
+          title={dark ? "Switch to day" : "Switch to night"}
+        >
+          {dark ? "☀" : "🌙"}
+        </button>
+        <button className="topbar-btn" onClick={() => setShowHelp(true)} title="About & FAQ">
+          Docs
+        </button>
+        <button
+          className="topbar-btn"
+          onClick={() => setView(view === "sources" ? "explorer" : "sources")}
+          title="Manage data sources"
+        >
+          {view === "sources" ? "Explorer" : "Sources"}
+        </button>
+        <button
+          className="help-btn"
+          onClick={() => setShowTutorial(true)}
+          title="Getting started"
+          aria-label="Getting started"
+        >
+          ?
+        </button>
+      </header>
+      <div className="layout">
+        <aside className="sidebar" style={{ width: sidebarW.size }}>
+          <SourceTree sources={sources} tables={tables} onPick={pickRelation} />
+        </aside>
+        <div className="resizer-x" onMouseDown={sidebarW.onMouseDown} />
+        <main className="main">
+          {view === "sources" ? (
+            <SourcesView onChange={refreshCatalog} />
+          ) : (
+          <>
+          <section className="editor-pane" style={{ height: editorH.size }}>
+            <div className="toolbar">
+              <button
+                className="primary"
+                onClick={() => run()}
+                disabled={running}
+                title="Run the query (⌘/Ctrl+Enter)"
+              >
+                {running ? "Running…" : "Run"}
+              </button>
+              <QueryFiles currentSql={() => sqlRef.current} onLoad={setSql} />
+              <button
+                onClick={snapshot}
+                title="Save this result as a reusable local.<name> table"
+              >
+                Snapshot
+              </button>
+              <span className="spacer" />
+              <select
+                value={exportFormat}
+                onChange={(e) => setExportFormat(e.target.value)}
+                title="Export format (CSV, Parquet, JSON, XLSX)"
+              >
+                {["csv", "parquet", "json", "xlsx"].map((f) => (
+                  <option key={f}>{f}</option>
+                ))}
+              </select>
+              <button onClick={exportResult} title="Download the result in the selected format">
+                Export
+              </button>
+              <button onClick={explain} title="Show the query plan (EXPLAIN ANALYZE)">
+                Explain
+              </button>
+            </div>
+            <MonacoEditor
+              language="sql"
+              theme={dark ? "vs-dark" : "vs"}
+              value={sql}
+              onChange={(v) => setSql(v ?? "")}
+              onMount={(editor, monaco) => {
+                editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => run());
+                registerCompletions(monaco, () => tablesRef.current);
+              }}
+              options={{
+                minimap: { enabled: false },
+                fontSize: 13,
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+              }}
+            />
+          </section>
+          <div className="resizer-y" onMouseDown={editorH.onMouseDown} />
+          <section className="results-pane">
+            <div className="tabs">
+              <button
+                className={tab === "results" ? "tab active" : "tab"}
+                onClick={() => setTab("results")}
+              >
+                Results
+              </button>
+              <button
+                className={tab === "chart" ? "tab active" : "tab"}
+                onClick={() => setTab("chart")}
+                disabled={!result}
+              >
+                Chart
+              </button>
+              <button className={tab === "profile" ? "tab active" : "tab"} onClick={profile}>
+                Profile
+              </button>
+              <button
+                className={tab === "plan" ? "tab active" : "tab"}
+                onClick={() => setTab("plan")}
+                disabled={!planText}
+              >
+                Plan
+              </button>
+              <label
+                className="agent-view-toggle"
+                title="Show what the agent and MCP server see — PII columns masked"
+              >
+                <input
+                  type="checkbox"
+                  checked={agentView}
+                  onChange={(e) => setAgentView(e.target.checked)}
+                />
+                Agent view
+              </label>
+            </div>
+            <div className="tab-body">
+              {error && <div className="error-box">{error}</div>}
+              {!error && tab === "results" && result && (
+                <ResultsGrid result={result} maskColumns={agentView ? piiColumns : undefined} />
+              )}
+              {!error && tab === "chart" && result && <ChartPanel result={result} dark={dark} />}
+              {!error && tab === "profile" && profileResult && (
+                <ResultsGrid result={profileResult} />
+              )}
+              {!error && tab === "plan" && planText && <pre className="plan">{planText}</pre>}
+              {!error && !result && tab !== "profile" && (
+                <div className="empty-state">Run a query to see results.</div>
+              )}
+            </div>
+          </section>
+          </>
+          )}
+        </main>
+        <div className="resizer-x" onMouseDown={chatW.onMouseDown} />
+        <aside className="chat-dock" style={{ width: chatW.size }}>
+          <ChatPanel dark={dark} />
+        </aside>
+      </div>
+    </div>
+  );
+}

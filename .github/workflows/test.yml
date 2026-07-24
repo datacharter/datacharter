@@ -1,0 +1,104 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+      - name: Install
+        run: uv venv && uv pip install -e ".[dev]"
+      - name: Lint
+        run: .venv/bin/ruff check .
+      - name: Unit tests
+        run: .venv/bin/pytest -q
+
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: charter
+          POSTGRES_PASSWORD: charter_test_pw
+          POSTGRES_DB: demo
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U charter -d demo"
+          --health-interval 2s --health-timeout 2s --health-retries 30
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root_test_pw
+          MYSQL_USER: charter
+          MYSQL_PASSWORD: charter_test_pw
+          MYSQL_DATABASE: demo
+        ports:
+          - 53306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -pcharter_test_pw -ucharter"
+          --health-interval 2s --health-timeout 2s --health-retries 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+      - name: Install
+        run: uv venv && uv pip install -e ".[dev]"
+      - name: Seed databases
+        run: |
+          sudo apt-get install -y -q postgresql-client mysql-client >/dev/null
+          PGPASSWORD=charter_test_pw psql -h 127.0.0.1 -p 55432 -U charter -d demo \
+            -f tests/integration/seed/postgres.sql
+          mysql -h 127.0.0.1 -P 53306 -ucharter -pcharter_test_pw demo \
+            < tests/integration/seed/mysql.sql
+      - name: Integration tests
+        run: .venv/bin/pytest -m integration -q
+
+  ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Install
+        run: cd ui && npm ci
+      - name: Typecheck + build
+        run: cd ui && npm run build
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - uses: astral-sh/setup-uv@v7
+      - name: Build UI into package
+        run: ./scripts/build_ui.sh
+      - name: Fetch VidaiMock (e2e mock LLM; Apache-2.0, checksum-pinned)
+        run: |
+          ver=v0.2.9
+          base="https://github.com/vidaiUK/VidaiMock/releases/download/$ver"
+          curl -fsSL -o vm.tar.gz "$base/vidaimock-linux-x64.tar.gz"
+          curl -fsSL -o vm.sha256 "$base/vidaimock-linux-x64.sha256"
+          got=$(sha256sum vm.tar.gz | awk '{print $1}')
+          want=$(awk '{print $1}' vm.sha256)
+          test "$got" = "$want" || { echo "VidaiMock checksum mismatch: $got != $want"; exit 1; }
+          mkdir -p vidaimock-bin && tar -xzf vm.tar.gz -C vidaimock-bin
+          bin=$(find "$PWD/vidaimock-bin" -type f -name vidaimock | head -1)
+          chmod +x "$bin"
+          echo "VIDAIMOCK_BIN=$bin" >> "$GITHUB_ENV"
+      - name: Install + e2e
+        run: |
+          uv venv
+          uv pip install -e ".[dev]"
+          .venv/bin/pytest -m e2e -q

@@ -1,0 +1,80 @@
+[project]
+name = "datacharter"
+dynamic = ["version"]
+description = "Charter your data — contract-governed local data exploration, powered by DuckDB"
+keywords = ["duckdb", "data-contracts", "sql", "data-exploration", "federation", "local-first"]
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+authors = [{ name = "DataCharter" }]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "Environment :: Web Environment",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Database",
+    "Topic :: Database :: Front-Ends",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+dependencies = [
+    "duckdb>=1.5",
+    "pyyaml>=6.0",
+    "pydantic>=2.7",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "httpx>=0.27",
+    "python-dotenv>=1.0",
+    "keyring>=25.0",
+    "python-multipart>=0.0.9",
+    "ruamel.yaml>=0.18",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "ruff>=0.6"]
+snowflake = ["snowflake-connector-python>=3.12"]
+
+[project.scripts]
+datacharter = "datacharter.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/datacharter/datacharter"
+Repository = "https://github.com/datacharter/datacharter"
+Documentation = "https://datacharter.github.io/datacharter/"
+Changelog = "https://github.com/datacharter/datacharter/blob/main/CHANGELOG.md"
+Issues = "https://github.com/datacharter/datacharter/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/datacharter/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/datacharter"]
+artifacts = ["src/datacharter/server/static/**/*"]
+
+[tool.hatch.build.targets.sdist]
+# Ship the built UI in the sdist too, so a source install needs no Node.
+artifacts = ["src/datacharter/server/static/**/*"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-m 'not integration and not e2e'"
+markers = [
+    "integration: requires live databases (compose.yaml)",
+    "e2e: builds and installs the wheel (slow)",
+]

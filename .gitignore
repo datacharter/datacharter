@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+
+# Node
+node_modules/
+*.local
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# DuckDB local artifacts
+*.duckdb
+*.duckdb.wal
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# UI build output (built in CI / at release)
+ui/dist/
+ui/*.tsbuildinfo
+src/datacharter/server/static/
+.claude/

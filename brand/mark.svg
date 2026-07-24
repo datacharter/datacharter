@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="DataCharter">
+  <!-- Flat derivative of brand/hero.png: ring + rising chart-arrow.
+       Currentcolor-friendly ring so the mark works on light/dark;
+       accent blue matches the hero render. -->
+  <circle cx="64" cy="64" r="56" fill="none" stroke="currentColor" stroke-width="7"/>
+  <!-- zigzag rising arrow -->
+  <path d="M30 84 L52 60 L66 72 L92 42"
+        fill="none" stroke="#3B82C4" stroke-width="11"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- arrowhead -->
+  <path d="M78 38 L96 38 L96 56" fill="none" stroke="#3B82C4" stroke-width="11"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

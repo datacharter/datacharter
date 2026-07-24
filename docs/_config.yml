@@ -1,0 +1,20 @@
+# GitHub Pages (Jekyll) configuration for the DataCharter docs site.
+# Serve from this /docs folder: repo Settings -> Pages -> "Deploy from a
+# branch" -> branch + /docs. index.html is the landing page (passed through
+# untouched); the Markdown pages render with the theme below.
+title: DataCharter
+description: Contract-governed local data exploration, powered by DuckDB.
+theme: jekyll-theme-cayman
+show_downloads: false
+
+# Dev-internal docs live in this folder but must never be published.
+exclude:
+  - DESIGN.md
+  - PLAN.md
+  - PROGRESS.md
+  - README.md
+  - SECURITY_AUDIT.md
+  - TUTORIAL_MODE.md
+  - ROADMAP-strategy.md
+  - LAUNCH.md
+  - superpowers

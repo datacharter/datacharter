@@ -1,0 +1,51 @@
+# Publishes to PyPI via Trusted Publishing (OIDC) — no stored token.
+#
+# One-time PyPI setup (Project → Publishing → Add a pending publisher):
+#   PyPI Project name: datacharter
+#   Owner:             datacharter
+#   Repository name:   datacharter
+#   Workflow filename: release.yml
+#   Environment name:  pypi
+# Then create a GitHub Release (tag like v0.1.0) to trigger this workflow.
+name: release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - uses: astral-sh/setup-uv@v7
+      - name: Build UI into the package
+        run: ./scripts/build_ui.sh
+      - name: Build sdist + wheel
+        run: uv build
+      - name: Validate metadata and README rendering
+        run: uvx twine check dist/*
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/datacharter/
+    permissions:
+      id-token: write # OIDC token for PyPI Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

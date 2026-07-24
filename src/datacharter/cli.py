@@ -1,0 +1,701 @@
+"""Command-line entrypoint: init (workspace scaffolding), serve, secrets."""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+from datacharter import __version__
+
+CHARTER_TEMPLATE = """\
+# DataCharter workspace — https://github.com/datacharter/datacharter
+# Sources are data contracts: connection shape here, secrets NEVER here.
+# Credentials must be ${NAME} references resolved from your environment,
+# .env, or the OS keyring (`datacharter secrets set NAME`).
+version: 1
+
+sources: {}
+"""
+
+DEMO_CHARTER = """\
+# DataCharter demo workspace. Run: datacharter serve
+version: 1
+
+# One contract, many tables: the `store` database groups customers and orders,
+# so the sidebar reads store -> table -> columns.
+sources:
+  store:
+    type: sqlite
+    path: demo/store.db
+    pii:
+      customers: [email]
+
+# A governed metric. Try: datacharter metric revenue
+metrics:
+  revenue:
+    relation: store.orders
+    expression: round(sum(total), 2)
+    dimensions: [customer_id]
+"""
+
+ENV_EXAMPLE = """\
+# Copy to .env and fill in real values. .env is gitignored.
+# EXAMPLE_DB_PASSWORD=change-me
+"""
+
+GITIGNORE_BLOCK = """\
+# DataCharter local state (never commit)
+.env
+.datacharter/
+"""
+
+
+def _open_engine(workspace: Path, sources: list):
+    """Start an engine that opens the local state DB with the same key `serve` uses."""
+    from datacharter.engine.session import Engine
+    from datacharter.engine.statekey import resolve_state_key
+
+    return Engine(workspace, sources, local_key=resolve_state_key()).start()
+
+
+def _cmd_init(args: argparse.Namespace) -> int:
+    ws = Path(args.directory).resolve()
+    ws.mkdir(parents=True, exist_ok=True)
+    charter = ws / "charter.yaml"
+    if charter.exists() and not args.force:
+        print(f"charter.yaml already exists in {ws} (use --force to overwrite).")
+        return 1
+
+    charter.write_text(DEMO_CHARTER if args.demo else CHARTER_TEMPLATE)
+    (ws / ".env.example").write_text(ENV_EXAMPLE)
+    (ws / "queries").mkdir(exist_ok=True)
+    _ensure_gitignore(ws)
+    if args.demo:
+        _write_demo_data(ws)
+    print(f"Workspace initialized in {ws}.")
+    if args.demo:
+        print("Demo data in demo/ — try: datacharter serve")
+    return 0
+
+
+def _ensure_gitignore(ws: Path) -> None:
+    gi = ws / ".gitignore"
+    existing = gi.read_text() if gi.exists() else ""
+    if ".datacharter/" not in existing:
+        joiner = "\n" if existing and not existing.endswith("\n") else ""
+        gi.write_text(existing + joiner + GITIGNORE_BLOCK)
+
+
+def _write_demo_data(ws: Path) -> None:
+    import sqlite3
+
+    demo = ws / "demo"
+    demo.mkdir(exist_ok=True)
+    con = sqlite3.connect(str(demo / "store.db"))
+    try:
+        con.execute("CREATE TABLE customers (id INTEGER, email TEXT, tier TEXT)")
+        con.executemany(
+            "INSERT INTO customers VALUES (?, ?, ?)",
+            [
+                (1, "ada@example.com", "pro"),
+                (2, "grace@example.com", "free"),
+                (3, "edsger@example.com", "pro"),
+            ],
+        )
+        con.execute("CREATE TABLE orders (customer_id INTEGER, total REAL, placed_on TEXT)")
+        con.executemany(
+            "INSERT INTO orders VALUES (?, ?, ?)",
+            [
+                ((i % 3) + 1, round((i * 37 % 200) + i * 0.5, 2), f"2026-01-{(i % 28) + 1:02d}")
+                for i in range(90)
+            ],
+        )
+        con.commit()
+    finally:
+        con.close()
+
+
+def _resolve_serve_workspace(directory: str) -> Path:
+    """Workspace for serve; ephemeral demo when no charter.yaml (D3, no surprise writes)."""
+    ws = Path(directory).resolve()
+    if (ws / "charter.yaml").exists():
+        return ws
+    import tempfile
+
+    demo_ws = Path(tempfile.mkdtemp(prefix="datacharter-demo-"))
+    (demo_ws / "charter.yaml").write_text(DEMO_CHARTER)
+    _write_demo_data(demo_ws)
+    print(f"No charter.yaml in {ws} — serving an ephemeral demo workspace ({demo_ws}).")
+    print("Run `datacharter init` here to start a real workspace.")
+    return demo_ws
+
+
+LOCAL_BASE_URL = "http://127.0.0.1:11434/v1"
+LOCAL_DEFAULT_MODEL = "qwen3:8b"
+
+
+def _local_llm(model: str | None):
+    """Point the agent at a local Ollama; verify it's reachable, hint if not."""
+    import httpx
+
+    from datacharter.agent.llm import LLMClient
+
+    chosen = model or LOCAL_DEFAULT_MODEL
+    try:
+        httpx.get("http://127.0.0.1:11434/api/tags", timeout=2.0).raise_for_status()
+    except Exception:
+        print("Ollama not reachable at 127.0.0.1:11434.")
+        print("Install from https://ollama.com, then: ollama pull " + chosen)
+        print("Serving without a local agent (the UI still works; chat will be disabled).")
+        return None
+    print(f"Local agent: Ollama model '{chosen}'. Pull it with: ollama pull {chosen}")
+    return LLMClient(base_url=LOCAL_BASE_URL, api_key="ollama", model=chosen)
+
+
+def _print_attestation(workspace: Path, host: str, port: int) -> None:
+    import datetime
+    import json
+
+    started = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+    note = (
+        "File sources stay local; any explicitly-configured remote source "
+        "(s3/gcs/azure, attached databases) still connects to its host."
+    )
+    record = {
+        "mode": "offline",
+        "started": started,
+        "bind": f"{host}:{port}",
+        "llm": "disabled",
+        "note": note,
+    }
+    state = workspace / ".datacharter"
+    state.mkdir(parents=True, exist_ok=True)
+    (state / "attestation.json").write_text(json.dumps(record, indent=2))
+    print("OFFLINE MODE — no-egress attestation")
+    print(f"  started: {started}")
+    print(f"  bind:    {host}:{port} (localhost only)")
+    print("  LLM agent: DISABLED — no data is sent to any model endpoint")
+    print(f"  note: {note}")
+    print("  written to .datacharter/attestation.json")
+
+
+def _cmd_serve(args: argparse.Namespace) -> int:
+    import uvicorn
+
+    from datacharter.server import create_app
+
+    ws = _resolve_serve_workspace(args.directory)
+    llm = None if args.offline else (_local_llm(args.model) if args.local else None)
+    app = create_app(
+        ws, allow_spill=not args.no_spill, llm=llm, host=args.host, offline=args.offline
+    )
+    if args.offline:
+        _print_attestation(ws, args.host, args.port)
+    print(f"DataCharter serving {ws} on http://{args.host}:{args.port}")
+    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
+    return 0
+
+
+def _cmd_secrets(args: argparse.Namespace) -> int:
+    import getpass
+
+    from datacharter.contracts import secrets as secretstore
+
+    if args.action == "set":
+        value = args.value
+        if value is None:
+            value = getpass.getpass(f"Value for {args.name}: ")
+        if not value:
+            print("No value provided; nothing stored.", file=sys.stderr)
+            return 1
+        try:
+            secretstore.store_secret(args.name, value)
+        except Exception as exc:
+            print(f"Could not store secret (no keyring backend?): {exc}", file=sys.stderr)
+            return 1
+        print(f"Stored '{args.name}' in the OS keyring.")
+        return 0
+    if args.action == "rm":
+        secretstore.delete_secret(args.name)
+        print(f"Removed '{args.name}'.")
+        return 0
+    names = secretstore.list_secrets()
+    if names:
+        print("\n".join(names))
+    else:
+        print("No secrets stored via datacharter (env and .env are not listed here).")
+    return 0
+
+
+def _cmd_mcp(args: argparse.Namespace) -> int:
+    import asyncio
+
+    from datacharter.agent.tools import ToolBox
+    from datacharter.contracts import load_charter
+    from datacharter.mcp.server import serve_stdio
+
+    ws = Path(args.directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+    charter = load_charter(ws)
+    engine = _open_engine(ws, charter.sources)
+    toolbox = ToolBox(engine, charter.sources)
+    # stdout is the MCP protocol channel; diagnostics go to stderr.
+    print(f"datacharter MCP server on stdio ({ws})", file=sys.stderr)
+    try:
+        asyncio.run(serve_stdio(toolbox))
+    finally:
+        engine.close()
+    return 0
+
+
+def _cmd_diff(args: argparse.Namespace) -> int:
+    import asyncio
+
+    from datacharter.contracts import load_charter
+    from datacharter.engine.session import EngineError
+
+    ws = Path(args.directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+    charter = load_charter(ws)
+    key = [k.strip() for k in args.key.split(",")] if args.key else None
+    engine = _open_engine(ws, charter.sources)
+    try:
+        result = asyncio.run(engine.diff(args.left, args.right, key=key))
+    except EngineError as exc:
+        print(f"Diff failed: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        engine.close()
+    print(f"{args.left}  vs  {args.right}")
+    print(f"  only in {args.left}: {result.left_only_count:,}")
+    print(f"  only in {args.right}: {result.right_only_count:,}")
+    print(f"  in both: {result.common_count:,}")
+    if result.changed_count is not None:
+        print(f"  changed (same key, different values): {result.changed_count:,}")
+    return 0
+
+
+async def _scan_pii(engine) -> dict[str, list[str]]:
+    """Suggest PII columns per relation: by name, then by sampled values."""
+    from datacharter.contracts.pii import classify_pii, detect_value_pii
+
+    tables = await engine.query("SHOW ALL TABLES", timeout_s=30)
+    idx = {c: i for i, c in enumerate(tables.columns)}
+    suggestions: dict[str, list[str]] = {}
+    for row in tables.rows:
+        db = row[idx["database"]]
+        if db in ("system", "temp"):
+            continue
+        table = row[idx["name"]]
+        relation = table if db == "memory" else f"{db}.{table}"
+        columns = list(row[idx["column_names"]])
+        flagged = set(classify_pii(columns))
+        remaining = [c for c in columns if c not in flagged]
+        if remaining and all(ch.isalnum() or ch in "._" for ch in relation):
+            sample = await engine.query(f"SELECT * FROM {relation} LIMIT 25", timeout_s=30)
+            pos = {c: i for i, c in enumerate(sample.columns)}
+            for col in remaining:
+                if col in pos and detect_value_pii([r[pos[col]] for r in sample.rows]):
+                    flagged.add(col)
+        if flagged:
+            suggestions[relation] = [c for c in columns if c in flagged]
+    return suggestions
+
+
+def _cmd_scan(args: argparse.Namespace) -> int:
+    import asyncio
+
+    from datacharter.contracts import load_charter
+
+    ws = Path(args.directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+    charter = load_charter(ws)
+    engine = _open_engine(ws, charter.sources)
+    try:
+        suggestions = asyncio.run(_scan_pii(engine))
+    finally:
+        engine.close()
+    if not suggestions:
+        print("No likely-PII columns detected. Review your columns manually.")
+        return 0
+    if args.write:
+        return _write_pii(ws, charter, suggestions)
+    print("# Suggested PII columns (heuristic — review before adding to charter.yaml):")
+    for relation, cols in sorted(suggestions.items()):
+        print(f"{relation}:")
+        for col in cols:
+            print(f"  - {col}")
+    return 0
+
+
+def _write_pii(workspace: Path, charter, suggestions: dict) -> int:
+    from datacharter.contracts.writer import ContractWriteError, set_pii
+
+    names = {s.name for s in charter.sources}
+    skipped = []
+    for relation, cols in sorted(suggestions.items()):
+        parts = relation.split(".")
+        source, table = (parts[0], parts[-1]) if len(parts) > 1 else (relation, relation)
+        if source not in names:
+            skipped.append(relation)
+            continue
+        try:
+            set_pii(workspace, source, table, cols)
+            print(f"charter.yaml: {source}.{table} pii += {', '.join(cols)}")
+        except ContractWriteError as exc:
+            print(f"Skipped {relation}: {exc}", file=sys.stderr)
+            skipped.append(relation)
+    if skipped:
+        print(f"Not written (no matching charter source): {', '.join(skipped)}", file=sys.stderr)
+    return 0
+
+
+def _valid_name(name: str) -> bool:
+    return bool(name) and all(ch.isalnum() or ch == "_" for ch in name)
+
+
+def _is_relation(name: str) -> bool:
+    parts = name.split(".")
+    return 1 <= len(parts) <= 3 and all(
+        p and all(c.isalnum() or c == "_" for c in p) for p in parts
+    )
+
+
+def _cmd_snapshot(args: argparse.Namespace) -> int:
+    from datacharter.contracts import load_charter
+    from datacharter.engine.session import EngineError
+
+    ws = Path(args.directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+    if not _valid_name(args.name):
+        print(f"Invalid snapshot name: {args.name!r}", file=sys.stderr)
+        return 1
+    charter = load_charter(ws)
+    engine = _open_engine(ws, charter.sources)
+    try:
+        engine.query_sync(f"CREATE OR REPLACE TABLE local.{args.name} AS {args.sql}")
+    except EngineError as exc:
+        print(f"Snapshot failed: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        engine.close()
+    snapshots = ws / ".datacharter" / "snapshots"
+    snapshots.mkdir(parents=True, exist_ok=True)
+    (snapshots / f"{args.name}.sql").write_text(args.sql)
+    print(f"Saved snapshot 'local.{args.name}'. Re-check with: datacharter recheck {args.name}")
+    return 0
+
+
+def _cmd_recheck(args: argparse.Namespace) -> int:
+    import asyncio
+
+    from datacharter.contracts import load_charter
+    from datacharter.engine.session import EngineError
+
+    ws = Path(args.directory).resolve()
+    if not _valid_name(args.name):
+        print(f"Invalid snapshot name: {args.name!r}", file=sys.stderr)
+        return 1
+    sql_file = ws / ".datacharter" / "snapshots" / f"{args.name}.sql"
+    if not sql_file.exists():
+        print(
+            f"No snapshot 'local.{args.name}'. Create one with "
+            f"`datacharter snapshot {args.name} <sql>` first.",
+            file=sys.stderr,
+        )
+        return 1
+    sql = sql_file.read_text()
+    charter = load_charter(ws)
+    engine = _open_engine(ws, charter.sources)
+    tmp = f"_recheck_{args.name}"
+    try:
+        engine.query_sync(f"CREATE OR REPLACE TABLE local.{tmp} AS {sql}")
+        result = asyncio.run(engine.diff(f"local.{args.name}", f"local.{tmp}"))
+        engine.query_sync(f"DROP TABLE IF EXISTS local.{tmp}")
+    except EngineError as exc:
+        print(f"Recheck failed: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        engine.close()
+    if result.left_only_count == 0 and result.right_only_count == 0:
+        print(f"local.{args.name}: unchanged since snapshot.")
+        return 0
+    print(
+        f"local.{args.name}: CHANGED since snapshot — "
+        f"{result.left_only_count} row(s) gone, {result.right_only_count} new."
+    )
+    return 1
+
+
+def _cmd_drift(args: argparse.Namespace) -> int:
+    import asyncio
+
+    from datacharter.contracts import load_charter
+
+    ws = Path(args.directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+    charter = load_charter(ws)
+    engine = _open_engine(ws, charter.sources)
+    try:
+        catalog = asyncio.run(engine.query("SHOW ALL TABLES", timeout_s=30))
+    finally:
+        engine.close()
+    idx = {c: i for i, c in enumerate(catalog.columns)}
+    live_columns: dict[str, set[str]] = {}
+    for row in catalog.rows:
+        if row[idx["database"]] in ("system", "temp"):
+            continue
+        live_columns[row[idx["name"]]] = set(row[idx["column_names"]])
+
+    problems: list[str] = []
+    for src in charter.sources:
+        for table in src.tables:
+            if table not in live_columns:
+                problems.append(
+                    f"{src.name}: declared table '{table}' not found in the live source"
+                )
+        for table, cols in src.pii.items():
+            live = live_columns.get(table)
+            if live is None:
+                problems.append(f"{src.name}: PII table '{table}' not found in the live source")
+                continue
+            for col in cols:
+                if col not in live:
+                    problems.append(
+                        f"{src.name}: PII column '{table}.{col}' no longer exists (masking gap)"
+                    )
+    if not problems:
+        print("No schema drift: all declared tables and PII columns are present.")
+        return 0
+    print("Schema drift detected:")
+    for problem in problems:
+        print(f"  - {problem}")
+    return 1
+
+
+def _cmd_explain(args: argparse.Namespace) -> int:
+    import asyncio
+
+    from datacharter.contracts import load_charter
+    from datacharter.engine.guard import QueryNotAllowed
+    from datacharter.engine.session import EngineError
+
+    ws = Path(args.directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+    charter = load_charter(ws)
+    engine = _open_engine(ws, charter.sources)
+    try:
+        result = asyncio.run(engine.query(f"EXPLAIN {args.sql}"))
+    except (EngineError, QueryNotAllowed) as exc:
+        print(f"Explain failed: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        engine.close()
+    for row in result.rows:  # EXPLAIN yields (key, plan-text); print the plan
+        print(row[-1])
+    return 0
+
+
+def _cmd_sample(args: argparse.Namespace) -> int:
+    import asyncio
+    import csv
+
+    from datacharter.agent.tools import MASKED
+    from datacharter.contracts import load_charter
+    from datacharter.engine.session import EngineError
+
+    ws = Path(args.directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+    if not _is_relation(args.relation):
+        print(f"Invalid relation name: {args.relation!r}", file=sys.stderr)
+        return 1
+    charter = load_charter(ws)
+    pii = {c.lower() for s in charter.sources for cols in s.pii.values() for c in cols}
+    engine = _open_engine(ws, charter.sources)
+    try:
+        result = asyncio.run(
+            engine.query(f"SELECT * FROM {args.relation}", row_limit=args.rows)
+        )
+    except EngineError as exc:
+        print(f"Sample failed: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        engine.close()
+    mask = {i for i, c in enumerate(result.columns) if c.lower() in pii}
+    writer = csv.writer(sys.stdout)
+    writer.writerow(result.columns)
+    for row in result.rows:
+        writer.writerow(
+            [MASKED if i in mask else ("" if v is None else v) for i, v in enumerate(row)]
+        )
+    return 0
+
+
+def _cmd_metric(args: argparse.Namespace) -> int:
+    import asyncio
+
+    from datacharter.contracts import load_charter
+    from datacharter.contracts.metrics import MetricError, metric_sql
+    from datacharter.engine.session import EngineError
+
+    ws = Path(args.directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+    charter = load_charter(ws)
+    metric = next((m for m in charter.metrics if m.name == args.name), None)
+    if metric is None:
+        available = ", ".join(m.name for m in charter.metrics) or "(none defined)"
+        print(f"No metric '{args.name}'. Available: {available}", file=sys.stderr)
+        return 1
+    by = [c.strip() for c in args.by.split(",")] if args.by else None
+    try:
+        sql = metric_sql(metric, by=by)
+    except MetricError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    engine = _open_engine(ws, charter.sources)
+    try:
+        result = asyncio.run(engine.query(sql))
+    except EngineError as exc:
+        print(f"Metric failed: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        engine.close()
+    print(" | ".join(result.columns))
+    for row in result.rows:
+        print(" | ".join("" if v is None else str(v) for v in row))
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="datacharter", description="Charter your data.")
+    parser.add_argument("--version", action="version", version=f"datacharter {__version__}")
+    sub = parser.add_subparsers(dest="command")
+
+    p_init = sub.add_parser(
+        "init", help="Scaffold a workspace (charter.yaml, queries/, .env.example)"
+    )
+    p_init.add_argument("directory", nargs="?", default=".")
+    p_init.add_argument("--demo", action="store_true", help="Include a generated demo dataset")
+    p_init.add_argument("--force", action="store_true", help="Overwrite an existing charter.yaml")
+    p_init.set_defaults(func=_cmd_init)
+
+    p_serve = sub.add_parser("serve", help="Start the local server")
+    p_serve.add_argument("directory", nargs="?", default=".")
+    p_serve.add_argument(
+        "--host", default="127.0.0.1", help="Bind address (default: localhost only)"
+    )
+    p_serve.add_argument("--port", type=int, default=8321)
+    p_serve.add_argument(
+        "--no-spill", action="store_true", help="Fail queries instead of spilling to disk"
+    )
+    p_serve.add_argument(
+        "--local", action="store_true", help="Use a local Ollama model for the agent"
+    )
+    p_serve.add_argument("--model", help="Model name (with --local; default qwen3:8b)")
+    p_serve.add_argument(
+        "--offline",
+        action="store_true",
+        help="No-egress mode: disable the LLM agent and print a no-egress attestation",
+    )
+    p_serve.set_defaults(func=_cmd_serve)
+
+    p_secrets = sub.add_parser("secrets", help="Manage ${NAME} secrets in the OS keyring")
+    sec_sub = p_secrets.add_subparsers(dest="action")
+    p_set = sec_sub.add_parser("set", help="Store a secret (prompts if --value omitted)")
+    p_set.add_argument("name")
+    p_set.add_argument("--value", help="Value (omit to be prompted without echo)")
+    sec_sub.add_parser("rm", help="Remove a secret").add_argument("name")
+    sec_sub.add_parser("list", help="List secret names stored via datacharter")
+    p_secrets.set_defaults(func=_cmd_secrets)
+
+    p_mcp = sub.add_parser(
+        "mcp", help="Run an MCP server over stdio exposing the governed query tools"
+    )
+    p_mcp.add_argument("directory", nargs="?", default=".")
+    p_mcp.set_defaults(func=_cmd_mcp)
+
+    p_diff = sub.add_parser("diff", help="Diff two relations (rows only in each + common count)")
+    p_diff.add_argument("left")
+    p_diff.add_argument("right")
+    p_diff.add_argument("directory", nargs="?", default=".")
+    p_diff.add_argument("--key", help="Comma-separated key columns for changed-row detection")
+    p_diff.set_defaults(func=_cmd_diff)
+
+    p_scan = sub.add_parser("scan", help="Scan sources and suggest PII columns for charter.yaml")
+    p_scan.add_argument("directory", nargs="?", default=".")
+    p_scan.add_argument(
+        "--write", action="store_true", help="Merge suggested PII into charter.yaml"
+    )
+    p_scan.set_defaults(func=_cmd_scan)
+
+    p_drift = sub.add_parser(
+        "drift", help="Report schema drift: declared tables/PII vs the live sources"
+    )
+    p_drift.add_argument("directory", nargs="?", default=".")
+    p_drift.set_defaults(func=_cmd_drift)
+
+    p_explain = sub.add_parser(
+        "explain", help="Show a query's plan and row estimates without running it"
+    )
+    p_explain.add_argument("sql")
+    p_explain.add_argument("directory", nargs="?", default=".")
+    p_explain.set_defaults(func=_cmd_explain)
+
+    p_sample = sub.add_parser(
+        "sample", help="Print a PII-masked CSV sample of a relation (safe to share)"
+    )
+    p_sample.add_argument("relation")
+    p_sample.add_argument("--rows", type=int, default=10, help="Rows to sample (default 10)")
+    p_sample.add_argument("directory", nargs="?", default=".")
+    p_sample.set_defaults(func=_cmd_sample)
+
+    p_metric = sub.add_parser(
+        "metric", help="Run a contract-defined metric (charter.yaml metrics:)"
+    )
+    p_metric.add_argument("name")
+    p_metric.add_argument("--by", help="Comma-separated dimensions to group by")
+    p_metric.add_argument("directory", nargs="?", default=".")
+    p_metric.set_defaults(func=_cmd_metric)
+
+    p_snap = sub.add_parser("snapshot", help="Save a query result as local.<name> plus its SQL")
+    p_snap.add_argument("name")
+    p_snap.add_argument("sql")
+    p_snap.add_argument("directory", nargs="?", default=".")
+    p_snap.set_defaults(func=_cmd_snapshot)
+
+    p_recheck = sub.add_parser(
+        "recheck", help="Re-run a snapshot's query and diff vs the saved result"
+    )
+    p_recheck.add_argument("name")
+    p_recheck.add_argument("directory", nargs="?", default=".")
+    p_recheck.set_defaults(func=_cmd_recheck)
+
+    args = parser.parse_args(argv)
+    if args.command == "secrets" and not getattr(args, "action", None):
+        p_secrets.print_help()
+        return 1
+    if not hasattr(args, "func"):
+        parser.print_help()
+        return 1
+    return args.func(args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

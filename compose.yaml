@@ -1,0 +1,35 @@
+# Local integration-test databases. Usage:
+#   docker compose up -d && pytest -m integration && docker compose down -v
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: charter
+      POSTGRES_PASSWORD: charter_test_pw
+      POSTGRES_DB: demo
+    ports:
+      - "55432:5432"
+    volumes:
+      - ./tests/integration/seed/postgres.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U charter -d demo"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: root_test_pw
+      MYSQL_USER: charter
+      MYSQL_PASSWORD: charter_test_pw
+      MYSQL_DATABASE: demo
+    ports:
+      - "53306:3306"
+    volumes:
+      - ./tests/integration/seed/mysql.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-pcharter_test_pw", "-ucharter"]
+      interval: 2s
+      timeout: 2s
+      retries: 60

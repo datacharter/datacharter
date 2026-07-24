@@ -1,0 +1,30 @@
+{
+  "name": "datacharter-ui",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "tsc -b --noEmit || tsc -b",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
+    "@tanstack/react-table": "^8.20.0",
+    "@tanstack/react-virtual": "^3.10.0",
+    "monaco-editor": "^0.56.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "vega": "^6.3.1",
+    "vega-embed": "^7.1.0",
+    "vega-lite": "^6.4.3"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.5.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.3.0"
+  }
+}
