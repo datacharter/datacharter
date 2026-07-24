@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-24
+
 ### Added
 
 - Agent view: a toggle on the results grid that masks the contract's PII columns
@@ -12,18 +14,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   sees raw PII) — right in the SQL editor, no LLM required.
 - Source tree: collapsible `+`/`−` disclosure on every source and table, and
   expand a table to see its columns inline.
-
-### Changed
-
-- Toolbar: **Snapshot** moved next to the query actions (away from the export
-  format menu); hover tooltips on Run/Snapshot/Export/Explain.
-- Demo workspace: bundled as one sqlite `store` contract holding `customers`
-  and `orders`, so the sidebar reads contract → table → columns.
-
-## [0.3.0] - 2026-07-24
-
-### Added
-
 - Instant SQL preview: results update live a beat after you stop typing (row-capped,
   and errors stay silent until you press Run) — no Run click needed to see output.
 - Chart captions: auto-detected charts (results) and agent-emitted charts (chat)
@@ -76,6 +66,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and credential scrubbing are inherited from the same toolbox the agent uses, so
   an external agent can explore your data without seeing raw PII or being able to
   write. Hand-rolled JSON-RPC 2.0, no new dependency.
+
+### Changed
+
+- Toolbar: **Snapshot** moved next to the query actions (away from the export
+  format menu); hover tooltips on Run/Snapshot/Export/Explain.
+- Demo workspace: bundled as one sqlite `store` contract holding `customers`
+  and `orders`, so the sidebar reads contract → table → columns.
 
 ## [0.2.0] - 2026-07-24
 
