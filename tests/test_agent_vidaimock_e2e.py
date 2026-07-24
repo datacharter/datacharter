@@ -137,6 +137,6 @@ def test_agent_loop_roundtrips_through_vidaimock(serve_url):
     assert "text" in kinds, kinds  # synthesis streamed back
     assert kinds[-1] == "done"
 
-    # the tool ran against the real demo workspace (customers/orders), not a stub
+    # the tool ran against the real demo workspace (the store contract), not a stub
     payloads = " ".join(json.dumps(d) for _, d in events)
-    assert "customers" in payloads
+    assert "store" in payloads
