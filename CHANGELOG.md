@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-07-24
+
+### Changed
+
+- Internal: extracted the origin/host request guard (DC-SEC-006) from the
+  server into an importable `datacharter.server.security` module. No behavior
+  change; the existing anti-DNS-rebinding / cross-origin protections are intact.
+
 ## [0.3.0] - 2026-07-24
 
 ### Added

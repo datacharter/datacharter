@@ -9,7 +9,6 @@ import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from urllib.parse import urlparse
 
 from fastapi import FastAPI, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
@@ -27,14 +26,11 @@ from datacharter.engine.guard import QueryNotAllowed
 from datacharter.engine.session import DEFAULT_ROW_LIMIT, Engine, EngineError, QueryTimeout
 from datacharter.engine.statekey import resolve_state_key
 from datacharter.models import QueryResult, Source, SourceType
-from datacharter.server import llm_admin, source_admin
+from datacharter.server import llm_admin, security, source_admin
 
 HEARTBEAT_S = 1.0
 DEFAULT_TIMEOUT_S = 60.0
 
-# Hostnames that always denote this machine (anti-DNS-rebinding allowlist).
-_LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
-_ALL_INTERFACES = frozenset({"0.0.0.0", "::"})
 _MAX_UPLOAD_BYTES = 512 * 1024 * 1024  # 512 MB cap on a single upload
 
 
@@ -90,7 +86,7 @@ def create_app(
     """
     workspace = Path(workspace).resolve()
     loaded = charter if charter is not None else load_charter(workspace)
-    allowed_hosts = _allowed_hosts(host)
+    allowed = security.allowed_hosts(host)
     state_key = _state_key()
 
     @asynccontextmanager
@@ -114,21 +110,15 @@ def create_app(
     @app.middleware("http")
     async def _origin_guard(request: Request, call_next):
         """Reject DNS-rebinding (bad Host) and cross-site browser requests (CSRF)."""
-        host_name = (request.headers.get("host") or "").rsplit(":", 1)[0].strip("[]").lower()
-        if allowed_hosts is not None and host_name and host_name not in allowed_hosts:
+        if not security.host_allowed(request, allowed):
             return _error(403, "forbidden_host", "Host not allowed.")
         path = request.url.path
-        if path.startswith("/api/") and path != "/api/health":
-            origin = request.headers.get("origin")
-            if origin:
-                origin_host = (urlparse(origin).hostname or "").lower()
-                if origin_host not in (allowed_hosts or _LOOPBACK_HOSTS):
-                    return _error(403, "forbidden_origin", "Cross-origin request rejected.")
-            if (request.headers.get("sec-fetch-site") or "").lower() in (
-                "cross-site",
-                "cross-origin",
-            ):
-                return _error(403, "forbidden_origin", "Cross-site request rejected.")
+        if (
+            path.startswith("/api/")
+            and path != "/api/health"
+            and not security.origin_allowed(request, allowed)
+        ):
+            return _error(403, "forbidden_origin", "Cross-origin request rejected.")
         return await call_next(request)
 
     @app.exception_handler(QueryNotAllowed)
@@ -362,13 +352,6 @@ def create_app(
         app.mount("/", StaticFiles(directory=ui_dist, html=True), name="ui")
 
     return app
-
-
-def _allowed_hosts(host: str) -> frozenset[str] | None:
-    """Host-header allowlist for the bind address; None = all interfaces (skip)."""
-    if host.lower() in _ALL_INTERFACES:
-        return None  # explicit network opt-in (D4) — Host allowlist can't apply
-    return _LOOPBACK_HOSTS | {host.lower()}
 
 
 def _state_key() -> str | None:
