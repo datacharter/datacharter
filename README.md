@@ -36,26 +36,37 @@ with PII masked from the model — all on your machine.
 ## Quick start
 
 ```sh
-# Try it instantly on generated demo data — no config, nothing to install globally:
-uvx datacharter serve
-# → opens a local workspace on http://127.0.0.1:8321
+# Try it instantly on generated demo data — no install, no config:
+uvx datacharter serve          # needs `uv` → https://astral.sh/uv
+# → serves at http://127.0.0.1:8321 (open it in your browser)
 
 # Or install it:
-pip install datacharter
+pip install datacharter        # Python 3.11+
 
-# Start a real workspace:
-datacharter init            # scaffolds charter.yaml, queries/, .env.example
-datacharter serve           # explore in your browser
-
-# Natural-language agent — bring your own endpoint…
-export OPENAI_BASE_URL=...  # any OpenAI-compatible API
-export OPENAI_API_KEY=...
-datacharter serve
-# …or run fully local (no API key, no data leaves your machine):
-datacharter serve --local   # uses Ollama (qwen3:8b by default)
+# Start your own workspace:
+datacharter init               # scaffolds charter.yaml, queries/, .env.example
+# → add a source: edit charter.yaml, or use the "Sources" panel in the UI
+datacharter serve              # → http://127.0.0.1:8321
 ```
 
-Drop a CSV, Parquet, or JSON file onto the window to query it instantly.
+Then, once it's running, **drag a CSV, Parquet, or JSON file onto the window** to
+query it instantly — no config needed.
+
+**Optional natural-language agent** — point it at any OpenAI-compatible endpoint:
+
+```sh
+export OPENAI_BASE_URL=...     # any OpenAI-compatible API
+export OPENAI_API_KEY=...
+datacharter serve
+```
+
+…or run **fully local** — no API key, no data leaves your machine (requires
+[Ollama](https://ollama.com)):
+
+```sh
+ollama pull qwen3:8b           # once
+datacharter serve --local      # qwen3:8b by default (--model to change)
+```
 
 ## Why DataCharter
 
