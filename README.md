@@ -15,7 +15,7 @@ profiling. Every answer shows which source columns it read; ask questions in
 plain language or serve the whole thing to an AI agent over [MCP](docs/mcp.md),
 with PII masked from the model — all on your machine.
 
-![DataCharter — live SQL preview, auto-charts, per-query provenance, and PII masking](brand/demo.gif)
+![DataCharter — live SQL preview, auto-charts, per-query provenance, and PII masking](https://raw.githubusercontent.com/datacharter/datacharter/main/brand/demo.gif)
 
 **Status: pre-release.** V1 in development.
 
