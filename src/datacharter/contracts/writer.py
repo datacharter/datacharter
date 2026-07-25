@@ -64,6 +64,31 @@ def remove_source(workspace: Path, name: str) -> None:
     _write(path, y, data)
 
 
+def set_agent_access(
+    workspace: Path, source: str, table: str | None, column: str | None, value: bool
+) -> None:
+    """Persist one agent-access override (on=real, off=masked) at field/table/source level.
+
+    Touches only the source's `agent_access` block; everything else is preserved verbatim."""
+    path = workspace / CHARTER_FILE
+    y, data = _load(path)
+    sources = data.get("sources") or {}
+    if source not in sources:
+        raise ContractWriteError(f"Source '{source}' is not in the charter.")
+    entry = sources[source]
+    aa = entry.get("agent_access")
+    if aa is None:
+        aa = {}
+        entry["agent_access"] = aa
+    if column is not None and table is not None:
+        aa.setdefault("columns", {})[f"{table}.{column}"] = value
+    elif table is not None:
+        aa.setdefault("tables", {})[table] = value
+    else:
+        aa["source"] = value
+    _write(path, y, data)
+
+
 def set_pii(workspace: Path, source: str, table: str, columns: list[str]) -> None:
     """Merge PII column names into one source's pii map (round-trip).
 

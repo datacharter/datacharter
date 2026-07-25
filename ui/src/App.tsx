@@ -12,7 +12,7 @@ import EmptyState from "./components/EmptyState";
 import { useResize } from "./lib/useResize";
 import Tutorial, { hasSeenTutorial } from "./components/Tutorial";
 import { registerCompletions } from "./monaco";
-import { STARTER, exampleFor, shouldShowTour } from "./onboarding";
+import { STARTER, exampleFor, shouldShowLaunchpad, shouldShowTour } from "./onboarding";
 
 type Tab = "results" | "chart" | "profile" | "plan";
 
@@ -42,12 +42,14 @@ export default function App() {
   }, [theme]);
   const dark = theme === "dark";
   // PII columns declared across all sources — masked in "Agent view" (what a model sees).
-  const piiColumns = useMemo(() => {
+  // What the agent sees masked: the effective agent-access map (declared PII, auto-detected,
+  // and any field/table/source toggles) — so "Agent view" mirrors the toggles, not just PII.
+  const maskedColumns = useMemo(() => {
     const set = new Set<string>();
-    for (const src of sources)
-      for (const cols of Object.values(src.pii ?? {})) for (const c of cols) set.add(c.toLowerCase());
+    for (const t of tables)
+      for (const [col, a] of Object.entries(t.access ?? {})) if (a.masked) set.add(col.toLowerCase());
     return set;
-  }, [sources]);
+  }, [tables]);
   const sidebarW = useResize("dc-sidebar-w", 260, "x", false, 160);
   const chatW = useResize("dc-chat-w", 340, "x", true, 240);
   const editorH = useResize("dc-editor-h", 300, "y", false, 120);
@@ -190,6 +192,30 @@ export default function App() {
     refreshCatalog();
   }, [refreshCatalog]);
 
+  const removeObject = useCallback(
+    async (kind: "snapshot" | "upload", name: string) => {
+      try {
+        await (kind === "snapshot" ? api.deleteSnapshot(name) : api.deleteUpload(name));
+        refreshCatalog();
+      } catch (e) {
+        setError((e as Error).message);
+      }
+    },
+    [refreshCatalog],
+  );
+
+  const setAccess = useCallback(
+    async (a: { source: string; table?: string; column?: string; value: boolean }) => {
+      try {
+        await api.setAgentAccess(a);
+        refreshCatalog();
+      } catch (e) {
+        setError((e as Error).message);
+      }
+    },
+    [refreshCatalog],
+  );
+
   const onDrop = useCallback(
     async (e: React.DragEvent) => {
       e.preventDefault();
@@ -274,13 +300,19 @@ export default function App() {
       </header>
       <div className="layout">
         <aside className="sidebar" style={{ width: sidebarW.size }}>
-          <SourceTree sources={sources} tables={tables} onPick={pickRelation} />
+          <SourceTree
+            sources={sources}
+            tables={tables}
+            onPick={pickRelation}
+            onRemove={removeObject}
+            onSetAccess={setAccess}
+          />
         </aside>
         <div className="resizer-x" onMouseDown={sidebarW.onMouseDown} />
         <main className="main">
           {view === "sources" ? (
             <SourcesView onChange={refreshCatalog} />
-          ) : catalogLoaded && sources.length === 0 ? (
+          ) : shouldShowLaunchpad(catalogLoaded, sources.length, tables.length) ? (
             <EmptyState
               onAddSource={() => setView("sources")}
               onUpload={uploadFile}
@@ -380,7 +412,7 @@ export default function App() {
             <div className="tab-body">
               {error && <div className="error-box">{error}</div>}
               {!error && tab === "results" && result && (
-                <ResultsGrid result={result} maskColumns={agentView ? piiColumns : undefined} />
+                <ResultsGrid result={result} maskColumns={agentView ? maskedColumns : undefined} />
               )}
               {!error && tab === "chart" && result && <ChartPanel result={result} dark={dark} />}
               {!error && tab === "profile" && profileResult && (

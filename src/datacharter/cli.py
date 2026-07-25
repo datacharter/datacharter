@@ -160,7 +160,8 @@ def _cmd_serve(args: argparse.Namespace) -> int:
     ws = _resolve_serve_workspace(args.directory)
     llm = None if args.offline else (_local_llm(args.model) if args.local else None)
     app = create_app(
-        ws, allow_spill=not args.no_spill, llm=llm, host=args.host, offline=args.offline
+        ws, allow_spill=not args.no_spill, llm=llm, host=args.host, port=args.port,
+        offline=args.offline,
     )
     if args.offline:
         _print_attestation(ws, args.host, args.port)
@@ -203,9 +204,17 @@ def _cmd_secrets(args: argparse.Namespace) -> int:
 def _cmd_mcp(args: argparse.Namespace) -> int:
     import asyncio
 
+    from datacharter.mcp.server import serve_stdio
+
+    if args.serve_url:
+        from datacharter.agent.remote_tools import RemoteToolBox
+
+        print(f"datacharter MCP proxy → {args.serve_url}", file=sys.stderr)
+        asyncio.run(serve_stdio(RemoteToolBox(args.serve_url)))
+        return 0
+
     from datacharter.agent.tools import ToolBox
     from datacharter.contracts import load_charter
-    from datacharter.mcp.server import serve_stdio
 
     ws = Path(args.directory).resolve()
     if not (ws / "charter.yaml").exists():
@@ -254,29 +263,9 @@ def _cmd_diff(args: argparse.Namespace) -> int:
 
 async def _scan_pii(engine) -> dict[str, list[str]]:
     """Suggest PII columns per relation: by name, then by sampled values."""
-    from datacharter.contracts.pii import classify_pii, detect_value_pii
+    from datacharter.contracts.pii import detect_pii
 
-    tables = await engine.query("SHOW ALL TABLES", timeout_s=30)
-    idx = {c: i for i, c in enumerate(tables.columns)}
-    suggestions: dict[str, list[str]] = {}
-    for row in tables.rows:
-        db = row[idx["database"]]
-        if db in ("system", "temp"):
-            continue
-        table = row[idx["name"]]
-        relation = table if db == "memory" else f"{db}.{table}"
-        columns = list(row[idx["column_names"]])
-        flagged = set(classify_pii(columns))
-        remaining = [c for c in columns if c not in flagged]
-        if remaining and all(ch.isalnum() or ch in "._" for ch in relation):
-            sample = await engine.query(f"SELECT * FROM {relation} LIMIT 25", timeout_s=30)
-            pos = {c: i for i, c in enumerate(sample.columns)}
-            for col in remaining:
-                if col in pos and detect_value_pii([r[pos[col]] for r in sample.rows]):
-                    flagged.add(col)
-        if flagged:
-            suggestions[relation] = [c for c in columns if c in flagged]
-    return suggestions
+    return await detect_pii(engine)
 
 
 def _cmd_scan(args: argparse.Namespace) -> int:
@@ -601,6 +590,11 @@ def main(argv: list[str] | None = None) -> int:
         "mcp", help="Run an MCP server over stdio exposing the governed query tools"
     )
     p_mcp.add_argument("directory", nargs="?", default=".")
+    p_mcp.add_argument(
+        "--serve-url",
+        default=None,
+        help="Proxy tools to a running `datacharter serve` instead of opening a local engine",
+    )
     p_mcp.set_defaults(func=_cmd_mcp)
 
     p_diff = sub.add_parser("diff", help="Diff two relations (rows only in each + common count)")

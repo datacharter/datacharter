@@ -5,6 +5,7 @@ assumptions ship — the loader rejecting empty `sources`, and the onboarding ru
 hardcoded `store.orders` query. This guards the whole class at the integration level.
 """
 
+import json
 import sqlite3
 
 import keyring
@@ -48,6 +49,26 @@ def test_empty_workspace_serves_with_no_sources(empty_client):
     assert c.get("/api/sources").json()["sources"] == []
 
 
+def test_api_tool_runs_governed_query(empty_client):
+    # the loopback bridge for the Claude Code agent: only the governed toolbox, PII masked.
+    c, _ = empty_client
+    c.post("/api/demo")
+    r = c.post(
+        "/api/tool",
+        json={"name": "query", "arguments": '{"sql":"SELECT email FROM store.customers LIMIT 1"}'},
+    )
+    assert r.status_code == 200
+    data = json.loads(r.json()["result"])   # result is a JSON string from the governed toolbox
+    assert data["rows"][0][0] == "•••" and "@example.com" not in r.json()["result"]
+
+
+def test_api_tool_lists_tables(empty_client):
+    c, _ = empty_client
+    c.post("/api/demo")
+    r = c.post("/api/tool", json={"name": "list_tables", "arguments": "{}"})
+    assert r.status_code == 200 and "orders" in r.json()["result"]
+
+
 def test_query_works_on_empty_workspace(empty_client):
     # what the fixed first-run tutorial runs when there are no tables yet.
     c, _ = empty_client
@@ -83,3 +104,52 @@ def test_load_demo_is_idempotent(empty_client):
     r2 = c.post("/api/demo")
     assert r2.status_code == 200
     assert len([s for s in r2.json()["sources"] if s["name"] == "store"]) == 1
+
+
+def test_demo_tables_not_duplicated_as_uploads(empty_client):
+    # the engine's flat compat-alias views (store__customers) must not appear in the
+    # catalog listing — they duplicate store.customers and leak into the "uploads" group.
+    c, _ = empty_client
+    c.post("/api/demo")
+    names = {t["table"] for t in c.get("/api/tables").json()["tables"]}
+    assert "customers" in names and "orders" in names
+    assert "store__customers" not in names and "store__orders" not in names
+
+
+def test_delete_snapshot_removes_it(empty_client):
+    c, ws = empty_client
+    c.post("/api/demo")
+    snap = c.post("/api/snapshot", json={"sql": "SELECT * FROM store.orders", "name": "snap"})
+    assert snap.status_code == 200
+    assert any(t["table"] == "snap" for t in c.get("/api/tables").json()["tables"])
+    assert c.delete("/api/snapshot/snap").status_code == 200
+    assert not any(t["table"] == "snap" for t in c.get("/api/tables").json()["tables"])
+    assert not (ws / ".datacharter" / "snapshots" / "snap.sql").exists()
+
+
+def test_delete_upload_removes_it(empty_client):
+    c, ws = empty_client
+    (ws / "u.csv").write_text("a,b\n1,2\n")
+    with (ws / "u.csv").open("rb") as fh:
+        assert c.post("/api/upload", files={"file": ("u.csv", fh, "text/csv")}).status_code == 200
+    assert any(t["table"] == "u" for t in c.get("/api/tables").json()["tables"])
+    assert c.delete("/api/uploads/u").status_code == 200
+    assert not any(t["table"] == "u" for t in c.get("/api/tables").json()["tables"])
+
+
+def test_delete_uploads_refuses_charter_source(empty_client):
+    c, _ = empty_client
+    c.post("/api/demo")  # `store` is a charter source
+    assert c.delete("/api/uploads/store").status_code == 404
+
+
+def test_load_demo_after_delete_reloads(empty_client):
+    # deleting the source leaves demo/store.db on disk; reloading must not choke on it.
+    c, _ = empty_client
+    assert c.post("/api/demo").status_code == 200
+    assert c.delete("/api/sources/store").status_code == 200
+    r = c.post("/api/demo")
+    assert r.status_code == 200
+    assert any(s["name"] == "store" for s in r.json()["sources"])
+    q = c.post("/api/query", json={"sql": "SELECT count(*) AS n FROM store.orders"})
+    assert q.status_code == 200 and q.json()["rows"] == [[90]]

@@ -467,6 +467,14 @@ class Engine:
                 if staged is not None:
                     conn.execute(f"DROP TABLE IF EXISTS {staged}")
 
+    def drop_local(self, name: str) -> None:
+        """Drop a persisted snapshot table `local.<name>`."""
+        if not re.fullmatch(r"[a-z][a-z0-9_]{0,62}", name):
+            raise EngineError("Snapshot name must be lowercase letters, digits, underscores.")
+        conn = self._require_conn()
+        with self._exec_lock:
+            conn.execute(f"DROP TABLE IF EXISTS local.{name}")
+
     # -- internals ----------------------------------------------------------
 
     def _attach_local(self, state: Path) -> None:

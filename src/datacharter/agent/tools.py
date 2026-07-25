@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from datacharter.contracts.access import resolve_masked
 from datacharter.engine.session import Engine
 from datacharter.models import QueryResult, Source
 
@@ -63,13 +64,18 @@ _MAX_TOOL_ROWS = 50
 class ToolBox:
     """Executes tool calls against the engine; masks PII columns in returned data."""
 
-    def __init__(self, engine: Engine, sources: list[Source]) -> None:
+    def __init__(
+        self, engine: Engine, sources: list[Source], *, auto_pii: set[str] | None = None
+    ) -> None:
         self._engine = engine
         # Column names flagged PII in any source's contract, matched case-insensitively.
         self._pii: set[str] = set()
         for src in sources:
             for cols in src.pii.values():
                 self._pii.update(c.lower() for c in cols)
+        self._auto_pii = auto_pii or set()
+        # Per-source agent-access overrides (on=real, off=masked).
+        self._overrides = {s.name: s.agent_access for s in sources if s.agent_access}
 
     async def run(self, name: str, arguments: str) -> str:
         try:
@@ -111,17 +117,51 @@ class ToolBox:
         if not _is_safe_relation(relation):
             return "Error: invalid relation name."
         result = await self._engine.query(f"DESCRIBE {relation}", timeout_s=30)
-        return self._render(result)
+        return self._render(result, set())  # schema is always visible; values masked only in query
 
     async def _query(self, args: dict) -> str:
         sql = str(args.get("sql", ""))
         result = await self._engine.query(sql, row_limit=_MAX_TOOL_ROWS)
-        return self._render(result)
+        return self._render(result, self._mask_indices(result))
 
-    def _render(self, result: QueryResult) -> str:
-        mask_idx = {
-            i for i, col in enumerate(result.columns) if col.lower() in self._pii
-        }
+    def _masked(self, source: str, table: str, column: str) -> bool:
+        return resolve_masked(
+            source, table, column,
+            declared_pii=self._pii, auto_pii=self._auto_pii, overrides=self._overrides,
+        )
+
+    def _mask_indices(self, result: QueryResult) -> set[int]:
+        """Which output columns to mask. Prefer per-column lineage; when it's missing
+        (e.g. SELECT *), resolve each column against the query's touched relations so
+        agent-access overrides still apply; last resort is a name-based PII check."""
+        prov = result.provenance or {}
+        lineage = prov.get("lineage") or {}
+        rels = []
+        for r in prov.get("relations") or []:
+            parts = str(r).split(".")
+            if len(parts) >= 2:
+                rels.append((parts[-2], parts[-1]))  # (source, table)
+        idx = set()
+        for i, outcol in enumerate(result.columns):
+            srcs = lineage.get(outcol)
+            if srcs:
+                if any(self._lineage_masked(s) for s in srcs):
+                    idx.add(i)
+            elif rels:
+                if any(self._masked(s, t, outcol) for (s, t) in rels):
+                    idx.add(i)
+            elif outcol.lower() in self._pii or outcol.lower() in self._auto_pii:
+                idx.add(i)
+        return idx
+
+    def _lineage_masked(self, qualified: str) -> bool:
+        parts = qualified.split(".")
+        if len(parts) >= 3:
+            return self._masked(parts[-3], parts[-2], parts[-1])
+        name = parts[-1].lower()
+        return name in self._pii or name in self._auto_pii
+
+    def _render(self, result: QueryResult, mask_idx: set[int]) -> str:
         rows = [
             [MASKED if i in mask_idx else v for i, v in enumerate(row)]
             for row in result.rows

@@ -5,6 +5,30 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-25
+
+### Added
+
+- **Connect Claude Code:** run the chat agent on your local Claude Code subscription (no
+  API key) instead of an OpenAI-wire LLM — surfaced beside "Connect an LLM". Data stays
+  governed (Claude reaches it only through datacharter's read-only, PII-masked tools via a
+  loopback bridge), and the connection is refused, fail-closed, unless the tool sandbox
+  verifies (auto-denying any non-governed tools). Requires a Claude Pro/Max subscription +
+  Claude Code installed.
+- **Per-field agent-access toggles (left panel):** control per field / table / source
+  whether the agent sees real values or masked (`•••`) ones, persisted to the contract
+  (`agent_access:`). PII (declared or auto-detected) defaults to masked; everything else to
+  real; an explicit toggle wins. Enforced on the agent surface only (agent, MCP, Claude
+  Code) — the human SQL editor is never masked. "Agent view" mirrors the toggles.
+- Remove snapshots and uploaded tables directly from the sidebar (a ✕ on `local.*` and
+  uploaded rows), via `DELETE /api/snapshot/{name}` and `DELETE /api/uploads/{name}`.
+
+### Fixed
+
+- The sidebar listed each attached-source table twice — once correctly and once as a fake
+  "upload" — because the engine's internal `<source>__<table>` compatibility views were
+  included in the catalog listing. They're now hidden.
+
 ## [0.3.4] - 2026-07-24
 
 ### Added

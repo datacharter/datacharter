@@ -19,11 +19,17 @@ export interface SourceFormData {
   max_rows?: number;
 }
 
+export interface ColumnAccess {
+  masked: boolean;
+  pii: boolean;
+}
+
 export interface TableInfo {
   source: string;
   schema: string;
   table: string;
   columns: string[];
+  access?: Record<string, ColumnAccess>;
 }
 
 export interface Provenance {
@@ -87,6 +93,16 @@ export const api = {
     request<{ removed: string }>(`/api/sources/${name}`, { method: "DELETE" }),
   loadDemo: () =>
     request<{ sources: SourceInfo[] }>("/api/demo", { method: "POST" }),
+  setAgentAccess: (a: { source: string; table?: string; column?: string; value: boolean }) =>
+    request<{ ok: boolean }>("/api/agent-access", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(a),
+    }),
+  deleteSnapshot: (name: string) =>
+    request<{ removed: string }>(`/api/snapshot/${name}`, { method: "DELETE" }),
+  deleteUpload: (name: string) =>
+    request<{ removed: string }>(`/api/uploads/${name}`, { method: "DELETE" }),
   testSource: (f: SourceFormData) =>
     request<{ ok: boolean }>("/api/sources/test", {
       method: "POST",
@@ -101,6 +117,14 @@ export const api = {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(c),
     }),
+  connectClaudeCode: () =>
+    request<{ backend: string }>("/api/agent/claude-code/connect", { method: "POST" }),
+  setAgentBackend: (backend: string) =>
+    request<{ backend: string }>("/api/agent/backend", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ backend }),
+    }),
 };
 
 export interface AgentStatus {
@@ -108,4 +132,6 @@ export interface AgentStatus {
   model: string | null;
   base_url: string | null;
   has_key: boolean;
+  backend?: string;
+  claude_code_available?: boolean;
 }

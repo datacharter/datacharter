@@ -25,8 +25,8 @@ from datacharter.contracts import Charter, CharterError, load_charter
 from datacharter.engine.guard import QueryNotAllowed
 from datacharter.engine.session import DEFAULT_ROW_LIMIT, Engine, EngineError, QueryTimeout
 from datacharter.engine.statekey import resolve_state_key
-from datacharter.models import QueryResult, Source, SourceType
-from datacharter.server import llm_admin, security, source_admin
+from datacharter.models import ATTACH_TYPES, QueryResult, Source, SourceType
+from datacharter.server import agent_backend, llm_admin, security, source_admin
 
 HEARTBEAT_S = 1.0
 DEFAULT_TIMEOUT_S = 60.0
@@ -63,6 +63,22 @@ class AskRequest(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
 
 
+class ToolRequest(BaseModel):
+    name: str
+    arguments: str = "{}"
+
+
+class BackendForm(BaseModel):
+    backend: str
+
+
+class AgentAccessForm(BaseModel):
+    source: str
+    table: str | None = None
+    column: str | None = None
+    value: bool
+
+
 _QUERY_NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_\-]{0,62}$")
 
 
@@ -77,6 +93,7 @@ def create_app(
     allow_spill: bool = True,
     llm: LLMClient | None = None,
     host: str = "127.0.0.1",
+    port: int = 8321,
     offline: bool = False,
 ) -> FastAPI:
     """Build the app for a workspace; charter may be preloaded (demo mode).
@@ -95,15 +112,26 @@ def create_app(
             workspace, loaded.sources, allow_spill=allow_spill, local_key=state_key
         ).start()
         app.state.engine = engine
-        app.state.toolbox = ToolBox(engine, loaded.sources)
+        try:
+            from datacharter.contracts.pii import detect_pii
+
+            detected = await detect_pii(engine)
+            app.state.auto_pii = {c.lower() for cols in detected.values() for c in cols}
+        except Exception:  # detection must never break serving
+            app.state.auto_pii = set()
+        app.state.toolbox = ToolBox(engine, loaded.sources, auto_pii=app.state.auto_pii)
         try:
             yield
         finally:
             engine.close()
 
     app = FastAPI(title="DataCharter", version=__version__, lifespan=lifespan)
+    app.state.auto_pii = set()  # populated at lifespan startup
     app.state.charter = loaded
     app.state.offline = offline
+    app.state.port = port  # for the loopback serve_url the Claude Code agent proxies through
+    app.state.cc_session = {}  # holds the active Claude Code chat session id
+    app.state.cc_deny = None  # effective tool deny-list from the connect-time assertion
     # Offline mode: no LLM is ever constructed, so no data can reach a model.
     app.state.llm = None if offline else llm_admin.load_llm(workspace, llm)
 
@@ -142,9 +170,11 @@ def create_app(
         return {"status": "ok", "version": __version__}
 
     def _refresh_charter() -> None:
-        # Re-read the contract so the catalog/PII map reflect a source edit.
+        # Re-read the contract so the catalog/PII map + agent-access reflect an edit.
         app.state.charter = load_charter(workspace)
-        app.state.toolbox = ToolBox(app.state.engine, app.state.charter.sources)
+        app.state.toolbox = ToolBox(
+            app.state.engine, app.state.charter.sources, auto_pii=app.state.auto_pii
+        )
 
     def _sources_payload() -> dict:
         # Credentials intentionally omitted — this payload reaches the browser.
@@ -173,6 +203,28 @@ def create_app(
         await asyncio.to_thread(source_admin.create_source, app.state.engine, workspace, form)
         _refresh_charter()
         return {"name": form.name}
+
+    @app.post("/api/agent-access")
+    async def set_agent_access(body: AgentAccessForm) -> dict:
+        from datacharter.contracts.writer import ContractWriteError
+        from datacharter.contracts.writer import set_agent_access as write_access
+
+        if not any(s.name == body.source for s in app.state.charter.sources):
+            return _error(404, "not_found", f"Source '{body.source}' does not exist.")
+        try:
+            write_access(workspace, body.source, body.table, body.column, body.value)
+        except ContractWriteError as exc:
+            return _error(400, "write_error", str(exc))
+        _refresh_charter()
+        app.state.cc_session = {}  # a governance change starts a fresh Claude Code turn
+        return {"ok": True}
+
+    @app.post("/api/tool")
+    async def run_tool(body: ToolRequest) -> dict:
+        # Loopback bridge for the Claude Code agent: runs ONLY the governed toolbox
+        # (same masking / read-only / scrubbing as /api/query).
+        result = await app.state.toolbox.run(body.name, body.arguments)
+        return {"result": result}
 
     @app.post("/api/demo")
     async def load_demo() -> dict:
@@ -217,18 +269,42 @@ def create_app(
 
     @app.get("/api/tables")
     async def tables() -> dict:
+        from datacharter.contracts.access import resolve_masked
+
         result = await app.state.engine.query("SHOW ALL TABLES", timeout_s=30)
         idx = {c: i for i, c in enumerate(result.columns)}
-        listing = [
-            {
-                "source": row[idx["database"]],
-                "schema": row[idx["schema"]],
-                "table": row[idx["name"]],
-                "columns": list(row[idx["column_names"]]),
+        sources = app.state.charter.sources
+        # Hide the engine's flat `<source>__<table>` compat views — they duplicate the
+        # real qualified tables and otherwise leak into the sidebar's "uploads" group.
+        aliases = {
+            f"{s.name}__{t}".lower() for s in sources if s.type in ATTACH_TYPES for t in s.tables
+        }
+        declared_pii = {c.lower() for s in sources for cols in s.pii.values() for c in cols}
+        auto_pii = app.state.auto_pii
+        overrides = {s.name: s.agent_access for s in sources if s.agent_access}
+        pii_set = declared_pii | auto_pii
+        listing = []
+        for row in result.rows:
+            db, name = row[idx["database"]], row[idx["name"]]
+            if db in ("system", "temp"):
+                continue
+            if db == "memory" and str(name).lower() in aliases:
+                continue
+            cols = list(row[idx["column_names"]])
+            access = {
+                c: {
+                    "masked": resolve_masked(
+                        db, name, c,
+                        declared_pii=declared_pii, auto_pii=auto_pii, overrides=overrides,
+                    ),
+                    "pii": c.lower() in pii_set,
+                }
+                for c in cols
             }
-            for row in result.rows
-            if row[idx["database"]] not in ("system", "temp")
-        ]
+            listing.append(
+                {"source": db, "schema": row[idx["schema"]], "table": name,
+                 "columns": cols, "access": access}
+            )
         return {"tables": listing}
 
     @app.post("/api/query")
@@ -284,6 +360,27 @@ def create_app(
     async def snapshot(body: SnapshotRequest) -> dict:
         await asyncio.to_thread(app.state.engine.snapshot_sync, body.sql, body.name)
         return {"snapshot": f"local.{body.name}"}
+
+    @app.delete("/api/snapshot/{name}")
+    async def delete_snapshot(name: str):
+        if not re.fullmatch(r"[a-z][a-z0-9_]{0,62}", name):
+            return _error(400, "bad_name", "Invalid snapshot name.")
+        await asyncio.to_thread(app.state.engine.drop_local, name)
+        (workspace / ".datacharter" / "snapshots" / f"{name}.sql").unlink(missing_ok=True)
+        return {"removed": f"local.{name}"}
+
+    @app.delete("/api/uploads/{name}")
+    async def delete_upload(name: str):
+        # Engine-only uploaded tables (never charter sources — those use the Sources tab).
+        if any(s.name == name for s in app.state.charter.sources):
+            return _error(404, "not_found", f"'{name}' is a contract source; edit it in Sources.")
+        src = next((s for s in app.state.engine.sources if s.name == name), None)
+        if src is None:
+            return _error(404, "not_found", f"No uploaded table '{name}'.")
+        await asyncio.to_thread(app.state.engine.remove_source, name)
+        if src.path and ".datacharter" in Path(src.path).parts:
+            Path(src.path).unlink(missing_ok=True)
+        return {"removed": name}
 
     @app.post("/api/upload")
     async def upload(file: UploadFile) -> dict:
@@ -342,7 +439,12 @@ def create_app(
 
     @app.get("/api/agent/available")
     async def agent_available() -> dict:
-        return llm_admin.llm_status(app.state.llm)
+        from datacharter.agent.claude_code import claude_available
+
+        status = llm_admin.llm_status(app.state.llm)
+        status["backend"] = agent_backend.get_backend(workspace)
+        status["claude_code_available"] = claude_available()
+        return status
 
     @app.post("/api/agent/config")
     async def agent_config(form: llm_admin.LLMConfigForm):
@@ -352,8 +454,66 @@ def create_app(
         app.state.llm = llm_admin.load_llm(workspace)
         return llm_admin.llm_status(app.state.llm)
 
+    @app.post("/api/agent/backend")
+    async def set_agent_backend(form: BackendForm) -> dict:
+        try:
+            agent_backend.set_backend(workspace, form.backend)
+        except ValueError:
+            return _error(400, "bad_backend", f"Unknown backend: {form.backend}")
+        return {"backend": form.backend}
+
+    @app.post("/api/agent/claude-code/connect")
+    async def claude_code_connect():
+        if app.state.offline:
+            return _error(403, "offline", "Offline mode: connecting an agent is disabled.")
+        from datacharter.agent import claude_code as cc
+
+        if not cc.claude_available():
+            return _error(400, "no_claude", "Claude Code CLI not found on PATH.")
+        serve_url = f"http://127.0.0.1:{app.state.port}"
+        try:
+            app.state.cc_deny = await cc.assert_tool_surface(serve_url)
+        except cc.ClaudeGovernanceError as exc:
+            return _error(400, "governance", str(exc))
+        agent_backend.set_backend(workspace, "claude-code")
+        app.state.cc_session = {}
+        return {"backend": "claude-code"}
+
     @app.post("/api/agent/ask")
     async def ask(body: AskRequest):
+        if agent_backend.get_backend(workspace) == "claude-code":
+            from datacharter.agent import claude_code as cc
+
+            serve_url = f"http://127.0.0.1:{app.state.port}"
+            if app.state.cc_deny is None:  # lost to a restart — re-verify the sandbox
+                try:
+                    app.state.cc_deny = await cc.assert_tool_surface(serve_url)
+                except cc.ClaudeGovernanceError as exc:
+
+                    async def refuse(msg: str = str(exc)) -> AsyncIterator[str]:
+                        yield _sse("error", {"detail": msg})
+
+                    return StreamingResponse(refuse(), media_type="text/event-stream")
+
+            async def cc_events() -> AsyncIterator[str]:
+                got_text = False
+                sid = app.state.cc_session.get("id")
+                async for ev in cc.run_turn(body.question, serve_url, sid, deny=app.state.cc_deny):
+                    if ev["kind"] in ("session", "result") and ev.get("session_id"):
+                        app.state.cc_session["id"] = ev["session_id"]
+                    if ev["kind"] == "text":
+                        got_text = True
+                        yield _sse("text", {"text": ev["text"]})
+                    elif ev["kind"] == "tool_call":
+                        yield _sse("tool_call", {"tool": ev["tool"]})
+                    elif ev["kind"] == "result":
+                        if ev.get("is_error"):
+                            yield _sse("error", {"detail": ev.get("text") or "Claude Code error"})
+                        elif not got_text and ev.get("text"):
+                            yield _sse("text", {"text": ev["text"]})
+
+            return StreamingResponse(cc_events(), media_type="text/event-stream")
+
         if app.state.llm is None:
             return _error(400, "no_llm", "No LLM is configured. Connect one to use the chat.")
         cache = AnswerCache(

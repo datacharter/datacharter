@@ -58,6 +58,8 @@ class Source(BaseModel):
     path: str | None = None
     tables: list[str] = Field(default_factory=list)
     pii: dict[str, list[str]] = Field(default_factory=dict)
+    #: Agent-access overrides (on=real, off=masked) at source/table/column level.
+    agent_access: dict = Field(default_factory=dict)
     #: Connector-extract cap (Snowflake). Overrides the engine default; ignored
     #: for ATTACH/file sources, which stream and are not row-capped.
     max_rows: int | None = Field(default=None, gt=0)

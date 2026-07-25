@@ -19,3 +19,10 @@ export function exampleFor(tables: TableInfo[]): string {
 export function shouldShowTour(seen: boolean, sourceCount: number, loaded: boolean): boolean {
   return loaded && !seen && sourceCount > 0;
 }
+
+// The launchpad shows only when there is nothing to explore. An uploaded CSV registers a
+// queryable table without a charter source, so gate on tables too — else the launchpad
+// would trap the user after an upload.
+export function shouldShowLaunchpad(loaded: boolean, sourceCount: number, tableCount: number): boolean {
+  return loaded && sourceCount === 0 && tableCount === 0;
+}

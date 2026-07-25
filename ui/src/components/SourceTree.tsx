@@ -5,6 +5,13 @@ interface Props {
   sources: SourceInfo[];
   tables: TableInfo[];
   onPick: (relation: string) => void;
+  onRemove?: (kind: "snapshot" | "upload", name: string) => void;
+  onSetAccess?: (a: { source: string; table?: string; column?: string; value: boolean }) => void;
+}
+
+interface Remove {
+  label: string;
+  run: () => void;
 }
 
 const FILE_TYPES = ["csv", "parquet", "json", "iceberg", "delta"];
@@ -23,7 +30,24 @@ function systemLabel(s: SourceInfo): string {
 
 /** Sidebar catalog: system → source (contract) → tables → columns. Sources expand by
  *  default; tables expand on the +/- to reveal columns. Clicking a name inserts a query. */
-export default function SourceTree({ sources, tables, onPick }: Props) {
+export default function SourceTree({ sources, tables, onPick, onRemove, onSetAccess }: Props) {
+  const anyReal = (ts: TableInfo[]) =>
+    ts.some((t) => Object.values(t.access ?? {}).some((a) => !a.masked));
+
+  const accessToggle = (label: string, masked: boolean, onClick: () => void) => (
+    <button
+      type="button"
+      className={masked ? "tree-access masked" : "tree-access"}
+      aria-label={label}
+      title={masked ? "Masked from agent — click to allow real values" : "Visible to agent — click to mask"}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+    >
+      {masked ? "🙈" : "👁"}
+    </button>
+  );
   const [collapsedSources, setCollapsedSources] = useState<Set<string>>(new Set());
   const [openTables, setOpenTables] = useState<Set<string>>(new Set());
 
@@ -57,7 +81,7 @@ export default function SourceTree({ sources, tables, onPick }: Props) {
   const owned = new Set(sources.map((s) => s.name));
   const uploads = (bySource.get("memory") ?? []).filter((t) => !owned.has(t.table));
 
-  const tableNode = (t: TableInfo, relation: string, source?: SourceInfo) => {
+  const tableNode = (t: TableInfo, relation: string, source?: SourceInfo, remove?: Remove) => {
     const open = openTables.has(relation);
     const hasCols = t.columns.length > 0;
     return (
@@ -75,12 +99,47 @@ export default function SourceTree({ sources, tables, onPick }: Props) {
             {t.table}
           </span>
           {source && piiFor(source, t.table) && <span className="pii">PII</span>}
+          {source &&
+            onSetAccess &&
+            t.access &&
+            Object.keys(t.access).length > 0 &&
+            accessToggle(`Toggle agent access for table ${t.table}`, !anyReal([t]), () =>
+              onSetAccess({ source: source.name, table: t.table, value: !anyReal([t]) }),
+            )}
+          {remove && (
+            <button
+              type="button"
+              className="tree-remove"
+              aria-label={remove.label}
+              title={remove.label}
+              onClick={(e) => {
+                e.stopPropagation();
+                remove.run();
+              }}
+            >
+              ×
+            </button>
+          )}
         </div>
         {open && (
           <div className="tree-columns">
             {t.columns.map((c) => (
-              <div className="tree-column" key={c} onClick={() => onPick(relation)}>
-                {c}
+              <div className="tree-column" key={c}>
+                <span className="tree-column-name" onClick={() => onPick(relation)}>
+                  {c}
+                </span>
+                {t.access?.[c]?.pii && <span className="pii-dot" title="PII">•</span>}
+                {source &&
+                  onSetAccess &&
+                  t.access?.[c] &&
+                  accessToggle(`Toggle agent access for ${c}`, t.access[c].masked, () =>
+                    onSetAccess({
+                      source: source.name,
+                      table: t.table,
+                      column: c,
+                      value: t.access![c].masked,
+                    }),
+                  )}
               </div>
             ))}
           </div>
@@ -102,6 +161,11 @@ export default function SourceTree({ sources, tables, onPick }: Props) {
             {tbls.length ? (open ? "−" : "+") : ""}
           </span>
           <span>{source.name}</span>
+          {onSetAccess &&
+            tbls.some((t) => t.access && Object.keys(t.access).length > 0) &&
+            accessToggle(`Toggle agent access for source ${source.name}`, !anyReal(tbls), () =>
+              onSetAccess({ source: source.name, value: !anyReal(tbls) }),
+            )}
         </div>
         {open &&
           tbls.map((t) =>
@@ -125,7 +189,14 @@ export default function SourceTree({ sources, tables, onPick }: Props) {
           <div className="tree-system-label">
             uploads <span className="type">session</span>
           </div>
-          <div className="tree-group">{uploads.map((t) => tableNode(t, t.table))}</div>
+          <div className="tree-group">
+            {uploads.map((t) =>
+              tableNode(t, t.table, undefined, {
+                label: `Remove ${t.table}`,
+                run: () => onRemove?.("upload", t.table),
+              }),
+            )}
+          </div>
         </div>
       )}
 
@@ -135,7 +206,12 @@ export default function SourceTree({ sources, tables, onPick }: Props) {
         </div>
         <div className="tree-group">
           {locals.length === 0 && <div className="hint tree-empty">empty</div>}
-          {locals.map((t) => tableNode(t, `local.${t.table}`))}
+          {locals.map((t) =>
+            tableNode(t, `local.${t.table}`, undefined, {
+              label: `Remove local.${t.table}`,
+              run: () => onRemove?.("snapshot", t.table),
+            }),
+          )}
         </div>
       </div>
     </nav>

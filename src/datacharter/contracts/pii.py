@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 
-__all__ = ["classify_pii", "detect_value_pii", "PII_TOKENS"]
+__all__ = ["classify_pii", "detect_value_pii", "detect_pii", "PII_TOKENS"]
 
 # High-precision value patterns only — distinctive enough that matching most of a
 # column's sampled values is strong evidence, without the false positives a loose
@@ -79,3 +79,28 @@ def detect_value_pii(values: list, *, threshold: float = 0.6) -> str | None:
         if sum(1 for s in samples if pattern.match(s)) / len(samples) >= threshold:
             return kind
     return None
+
+
+async def detect_pii(engine) -> dict[str, list[str]]:
+    """Suggest PII columns per relation: by name, then by sampled values."""
+    tables = await engine.query("SHOW ALL TABLES", timeout_s=30)
+    idx = {c: i for i, c in enumerate(tables.columns)}
+    suggestions: dict[str, list[str]] = {}
+    for row in tables.rows:
+        db = row[idx["database"]]
+        if db in ("system", "temp"):
+            continue
+        table = row[idx["name"]]
+        relation = table if db == "memory" else f"{db}.{table}"
+        columns = list(row[idx["column_names"]])
+        flagged = set(classify_pii(columns))
+        remaining = [c for c in columns if c not in flagged]
+        if remaining and all(ch.isalnum() or ch in "._" for ch in relation):
+            sample = await engine.query(f"SELECT * FROM {relation} LIMIT 25", timeout_s=30)
+            pos = {c: i for i, c in enumerate(sample.columns)}
+            for col in remaining:
+                if col in pos and detect_value_pii([r[pos[col]] for r in sample.rows]):
+                    flagged.add(col)
+        if flagged:
+            suggestions[relation] = [c for c in columns if c in flagged]
+    return suggestions

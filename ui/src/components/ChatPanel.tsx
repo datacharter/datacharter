@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import embed from "vega-embed";
 import { api, type AgentStatus } from "../api";
 import { captionForSpec } from "../lib/caption";
+import ClaudeCodeConnect from "./ClaudeCodeConnect";
 import LLMConfig from "./LLMConfig";
 
 interface Msg {
@@ -18,8 +19,9 @@ export default function ChatPanel({ dark }: { dark?: boolean }) {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
-  const available = status?.available ?? null;
-  const model = status?.model ?? "";
+  const claudeCode = status?.backend === "claude-code";
+  const available = status ? status.available || claudeCode : null;
+  const model = claudeCode ? "Claude Code (your subscription)" : (status?.model ?? "");
 
   const refresh = useCallback(() => {
     api.agentStatus().then(setStatus).catch(() => setStatus({ available: false } as AgentStatus));
@@ -97,10 +99,13 @@ export default function ChatPanel({ dark }: { dark?: boolean }) {
     return (
       <div className="chat">
         <div className="chat-empty">
-          <p>No LLM connected.</p>
-          <button className="primary" onClick={() => setConfiguring(true)}>
-            Connect an LLM
-          </button>
+          <p>No agent connected.</p>
+          <div className="connect-row">
+            <button className="primary" onClick={() => setConfiguring(true)}>
+              Connect an LLM
+            </button>
+            <ClaudeCodeConnect status={status} onDone={refresh} />
+          </div>
         </div>
       </div>
     );
@@ -123,6 +128,13 @@ export default function ChatPanel({ dark }: { dark?: boolean }) {
         {messages.map((m, i) => (
           <Message key={i} msg={m} dark={dark} />
         ))}
+        {busy &&
+          messages[messages.length - 1]?.role === "assistant" &&
+          !messages[messages.length - 1]?.text && (
+            <div className="chat-typing" aria-live="polite">
+              {claudeCode ? "Claude" : "The agent"} is typing<span className="dots">…</span>
+            </div>
+          )}
       </div>
       <div className="chat-input">
         <textarea

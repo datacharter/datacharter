@@ -21,6 +21,9 @@ def write_demo_data(workspace: Path) -> None:
     demo.mkdir(exist_ok=True)
     con = sqlite3.connect(str(demo / "store.db"))
     try:
+        # Idempotent: a prior demo may have been loaded then deleted, leaving store.db.
+        con.execute("DROP TABLE IF EXISTS customers")
+        con.execute("DROP TABLE IF EXISTS orders")
         con.execute("CREATE TABLE customers (id INTEGER, email TEXT, tier TEXT)")
         con.executemany(
             "INSERT INTO customers VALUES (?, ?, ?)",
