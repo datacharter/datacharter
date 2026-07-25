@@ -44,6 +44,29 @@ def test_demo_workspace_loads_and_queries_end_to_end(tmp_path):
         assert len(result.rows) == 2
 
 
+def test_plain_init_charter_loads_as_empty(tmp_path):
+    # Regression: plain `init` scaffolds `sources: {}`; the scaffolded charter MUST
+    # load. 0.3.1 shipped an init template that `load_charter` then refused.
+    assert main(["init", str(tmp_path)]) == 0
+    charter = load_charter(tmp_path)
+    assert charter.sources == []
+
+
+def test_plain_init_workspace_serves_end_to_end(tmp_path):
+    # The real user path `init` -> `serve`: create_app must boot on a fresh empty
+    # workspace and the sources API returns an empty list (sources added later).
+    from fastapi.testclient import TestClient
+
+    from datacharter.server import create_app
+
+    assert main(["init", str(tmp_path)]) == 0
+    app = create_app(tmp_path)
+    with TestClient(app, base_url="http://127.0.0.1") as c:
+        resp = c.get("/api/sources")
+        assert resp.status_code == 200
+        assert resp.json()["sources"] == []
+
+
 def test_serve_workspace_resolution_prefers_existing_charter(tmp_path):
     from datacharter.cli import _resolve_serve_workspace, main
 

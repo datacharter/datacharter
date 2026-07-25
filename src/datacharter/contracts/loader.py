@@ -52,8 +52,10 @@ def load_charter(workspace: Path | str, filename: str = CHARTER_FILE) -> Charter
             f"{filename}: unsupported version {version!r}; expected {SUPPORTED_VERSION}."
         )
     sources_raw = raw.get("sources")
-    if not isinstance(sources_raw, dict) or not sources_raw:
-        raise CharterError(f"{filename}: 'sources' must be a non-empty mapping of name -> source.")
+    if sources_raw is None:  # a fresh `datacharter init` workspace: add sources later
+        sources_raw = {}
+    if not isinstance(sources_raw, dict):
+        raise CharterError(f"{filename}: 'sources' must be a mapping of name -> source.")
 
     resolver = SecretResolver(workspace)
     warnings: list[str] = []

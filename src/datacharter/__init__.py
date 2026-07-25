@@ -1,3 +1,3 @@
 """DataCharter — contract-governed local data exploration."""
 
-__version__ = "0.3.1"
+__version__ = "0.3.2"

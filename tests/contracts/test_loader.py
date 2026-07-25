@@ -16,6 +16,24 @@ def test_minimal_file_source_loads(tmp_path):
     assert charter.warnings == []
 
 
+def test_empty_sources_loads_as_fresh_workspace(tmp_path):
+    # `datacharter init` scaffolds `sources: {}`; a fresh workspace must be servable
+    # (sources are added later, via charter.yaml or the in-app source manager).
+    charter = load_charter(write_charter(tmp_path, "version: 1\nsources: {}\n"))
+    assert charter.sources == []
+
+
+def test_null_sources_loads_as_empty(tmp_path):
+    charter = load_charter(write_charter(tmp_path, "version: 1\nsources:\n"))
+    assert charter.sources == []
+
+
+def test_non_mapping_sources_rejected(tmp_path):
+    ws = write_charter(tmp_path, "version: 1\nsources:\n  - a\n  - b\n")
+    with pytest.raises(CharterError, match=r"'sources' must be a mapping"):
+        load_charter(ws)
+
+
 def test_env_reference_resolution(tmp_path, monkeypatch):
     monkeypatch.setenv("PG_PW", "resolved-pw-value")
     ws = write_charter(

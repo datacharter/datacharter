@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-07-24
+
+### Fixed
+
+- `datacharter init` then `datacharter serve` failed with a `CharterError`: the
+  scaffolded charter uses an empty `sources: {}`, which the loader wrongly
+  rejected as "must be a non-empty mapping". A fresh workspace is now servable —
+  add sources afterward via `charter.yaml` or the in-app source manager.
+
 ## [0.3.1] - 2026-07-24
 
 ### Changed
