@@ -1,19 +1,30 @@
 # DataCharter
 
-> Explore all your data locally, in one place — contract-governed data exploration, powered by DuckDB
+> **Query all your data locally — then hand your AI agents exactly the data you choose, and not one column more.**
 
 [![PyPI](https://img.shields.io/pypi/v/datacharter)](https://pypi.org/project/datacharter/)
 [![Python](https://img.shields.io/pypi/pyversions/datacharter)](https://pypi.org/project/datacharter/)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue)](LICENSE)
 
-Contract-governed local data exploration, **powered by [DuckDB](https://duckdb.org)**.
-Define your sources as data contracts
-([ODCS](https://bitol-io.github.io/open-data-contract-standard/)-compatible YAML),
-query them through DuckDB's SQL federation engine with real source pushdowns,
-and explore in a local web UI — SQL editor with live preview, auto-charts,
-profiling. Every answer shows which source columns it read; ask questions in
-plain language or serve the whole thing to an AI agent over [MCP](docs/mcp.md),
-with PII masked from the model — all on your machine.
+*The big-words version: a local, federated data explorer with governed, regulated
+agentic data access, powered by **[DuckDB](https://duckdb.org)**.* Here's what that
+actually means 👇
+
+**🔍 Query all your data, locally — no pipelines, no warehouse, no waiting**
+
+- Local CSV, Parquet, and JSON files
+- Postgres, MySQL, SQL Server, Snowflake, BigQuery — and more
+- JOIN a local CSV → a Snowflake table → a Parquet file in S3, in **one** SQL statement, all on your laptop
+- Yes, it's as unreasonable as it sounds. You kind of have to try it to believe it.
+
+**🤖 Connect an agent — and decide exactly what it's allowed to see**
+
+- **Claude Code** — runs on your existing subscription, no API key
+- A model running **fully local** with [Ollama](https://ollama.com)
+- Any **OpenAI-compatible** agent
+- Grant or deny access in the UI *or* right in your data contracts, at every level: whole **sources** → individual **tables** → individual **columns**
+- **PII is auto-detected and defaulted to *no agent access*** — override per field if you really mean to
+- Don't take our word for it: flip on **Agent view** and see, column by column, exactly what your agent gets back when it runs a query. *(Spoiler: the PII comes back `•••`.)*
 
 ## What you can do
 
