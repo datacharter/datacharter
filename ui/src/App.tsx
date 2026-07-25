@@ -8,24 +8,11 @@ import ResultsGrid from "./components/ResultsGrid";
 import SourceTree from "./components/SourceTree";
 import SourcesView from "./components/SourcesView";
 import HelpModal from "./components/HelpModal";
+import EmptyState from "./components/EmptyState";
 import { useResize } from "./lib/useResize";
 import Tutorial, { hasSeenTutorial } from "./components/Tutorial";
 import { registerCompletions } from "./monaco";
-
-const STARTER = "-- Cmd/Ctrl+Enter to run\nSELECT 42 AS answer;\n";
-const EXAMPLE_SQL =
-  "SELECT customer_id, count(*) AS orders, round(sum(total), 2) AS revenue\n" +
-  "FROM store.orders\nGROUP BY customer_id\nORDER BY revenue DESC;\n";
-
-// The example must reference a table that actually exists: the demo aggregation when
-// the demo `store` source is present, otherwise a plain scan of the first real table,
-// otherwise the harmless starter (a fresh `datacharter init` workspace has no sources).
-export function exampleFor(tables: TableInfo[]): string {
-  if (tables.some((t) => t.source === "store" && t.table === "orders")) return EXAMPLE_SQL;
-  const first = tables[0];
-  if (first) return `SELECT *\nFROM ${first.source}.${first.table}\nLIMIT 100;\n`;
-  return STARTER;
-}
+import { STARTER, exampleFor, shouldShowTour } from "./onboarding";
 
 type Tab = "results" | "chart" | "profile" | "plan";
 
@@ -42,7 +29,8 @@ export default function App() {
   const [exportFormat, setExportFormat] = useState("csv");
   const [planText, setPlanText] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [showTutorial, setShowTutorial] = useState(() => !hasSeenTutorial());
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [catalogLoaded, setCatalogLoaded] = useState(false);
   const [view, setView] = useState<"explorer" | "sources">("explorer");
   const [showHelp, setShowHelp] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">(
@@ -69,11 +57,18 @@ export default function App() {
   tablesRef.current = tables;
 
   const refreshCatalog = useCallback(() => {
-    api.sources().then((b) => setSources(b.sources)).catch(() => {});
-    api.tables().then((b) => setTables(b.tables)).catch(() => {});
+    Promise.allSettled([
+      api.sources().then((b) => setSources(b.sources)),
+      api.tables().then((b) => setTables(b.tables)),
+    ]).finally(() => setCatalogLoaded(true));
   }, []);
 
   useEffect(refreshCatalog, [refreshCatalog]);
+
+  // Auto-show the guided tour only on a populated workspace; empty ones get the launchpad.
+  useEffect(() => {
+    if (shouldShowTour(hasSeenTutorial(), sources.length, catalogLoaded)) setShowTutorial(true);
+  }, [catalogLoaded, sources.length]);
 
   const run = useCallback(
     async (sqlText?: string) => {
@@ -174,24 +169,34 @@ export default function App() {
     }
   }, []);
 
+  const uploadFile = useCallback(
+    async (file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      const resp = await fetch("/api/upload", { method: "POST", body: form });
+      const body = await resp.json();
+      if (!resp.ok) {
+        setError(body.error?.message ?? "Upload failed");
+        return;
+      }
+      setSql(`SELECT * FROM ${body.table} LIMIT 100;`);
+      refreshCatalog();
+    },
+    [refreshCatalog],
+  );
+
+  const loadDemo = useCallback(async () => {
+    await api.loadDemo();
+    refreshCatalog();
+  }, [refreshCatalog]);
+
   const onDrop = useCallback(
     async (e: React.DragEvent) => {
       e.preventDefault();
       setDragging(false);
-      for (const file of Array.from(e.dataTransfer.files)) {
-        const form = new FormData();
-        form.append("file", file);
-        const resp = await fetch("/api/upload", { method: "POST", body: form });
-        const body = await resp.json();
-        if (!resp.ok) {
-          setError(body.error?.message ?? "Upload failed");
-          return;
-        }
-        setSql(`SELECT * FROM ${body.table} LIMIT 100;`);
-      }
-      refreshCatalog();
+      for (const file of Array.from(e.dataTransfer.files)) await uploadFile(file);
     },
-    [refreshCatalog],
+    [uploadFile],
   );
 
   return (
@@ -275,6 +280,12 @@ export default function App() {
         <main className="main">
           {view === "sources" ? (
             <SourcesView onChange={refreshCatalog} />
+          ) : catalogLoaded && sources.length === 0 ? (
+            <EmptyState
+              onAddSource={() => setView("sources")}
+              onUpload={uploadFile}
+              onLoadDemo={loadDemo}
+            />
           ) : (
           <>
           <section className="editor-pane" style={{ height: editorH.size }}>

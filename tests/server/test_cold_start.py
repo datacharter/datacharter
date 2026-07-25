@@ -66,3 +66,20 @@ def test_add_source_then_query_it(empty_client):
     assert c.post("/api/sources", json=src).status_code == 200
     r = c.post("/api/query", json={"sql": "SELECT count(*) AS n FROM crm.accounts"})
     assert r.status_code == 200 and r.json()["rows"] == [[1]]
+
+
+def test_load_demo_populates_store(empty_client):
+    c, _ = empty_client
+    r = c.post("/api/demo")
+    assert r.status_code == 200
+    assert any(s["name"] == "store" for s in r.json()["sources"])
+    q = c.post("/api/query", json={"sql": "SELECT count(*) AS n FROM store.orders"})
+    assert q.status_code == 200 and q.json()["rows"] == [[90]]
+
+
+def test_load_demo_is_idempotent(empty_client):
+    c, _ = empty_client
+    assert c.post("/api/demo").status_code == 200
+    r2 = c.post("/api/demo")
+    assert r2.status_code == 200
+    assert len([s for s in r2.json()["sources"] if s["name"] == "store"]) == 1

@@ -71,6 +71,8 @@ jobs:
         run: cd ui && npm ci
       - name: Typecheck + build
         run: cd ui && npm run build
+      - name: Unit test UI
+        run: cd ui && npm test
 
   package:
     runs-on: ubuntu-latest

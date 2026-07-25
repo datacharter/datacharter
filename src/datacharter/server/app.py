@@ -146,8 +146,7 @@ def create_app(
         app.state.charter = load_charter(workspace)
         app.state.toolbox = ToolBox(app.state.engine, app.state.charter.sources)
 
-    @app.get("/api/sources")
-    async def sources() -> dict:
+    def _sources_payload() -> dict:
         # Credentials intentionally omitted — this payload reaches the browser.
         return {
             "warnings": app.state.charter.warnings,
@@ -165,11 +164,33 @@ def create_app(
             ],
         }
 
+    @app.get("/api/sources")
+    async def sources() -> dict:
+        return _sources_payload()
+
     @app.post("/api/sources")
     async def add_source(form: source_admin.SourceForm) -> dict:
         await asyncio.to_thread(source_admin.create_source, app.state.engine, workspace, form)
         _refresh_charter()
         return {"name": form.name}
+
+    @app.post("/api/demo")
+    async def load_demo() -> dict:
+        """Populate the workspace with the demo `store` source (idempotent)."""
+        if not any(s.name == "store" for s in app.state.charter.sources):
+            from datacharter.demo import write_demo_data
+
+            write_demo_data(workspace)
+            form = source_admin.SourceForm(
+                name="store",
+                type="sqlite",
+                path="demo/store.db",
+                tables=["customers", "orders"],
+                pii={"customers": ["email"]},
+            )
+            await asyncio.to_thread(source_admin.create_source, app.state.engine, workspace, form)
+            _refresh_charter()
+        return _sources_payload()
 
     @app.put("/api/sources/{name}")
     async def edit_source(name: str, form: source_admin.SourceForm):

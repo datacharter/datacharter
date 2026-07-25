@@ -837,3 +837,17 @@ table.grid td.rownum, table.grid th.rownum {
   background: transparent;
 }
 .resizer-x:hover, .resizer-y:hover { background: var(--accent-soft); }
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  height: 100%;
+  padding: 2rem;
+  text-align: center;
+  color: var(--muted, #64748b);
+}
+.empty-state h2 { margin: 0; }
+.empty-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }

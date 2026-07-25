@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-07-24
+
+### Added
+
+- Empty workspaces get an "add your data" first-run launchpad (add a source / drop a
+  CSV / load the demo dataset) instead of the demo feature-tour, which now auto-shows
+  only when the workspace has sources. New `POST /api/demo` loads the demo `store` as a
+  normal, deletable source.
+
 ## [0.3.3] - 2026-07-24
 
 ### Fixed

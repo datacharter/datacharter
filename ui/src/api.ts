@@ -85,6 +85,8 @@ export const api = {
     }),
   deleteSource: (name: string) =>
     request<{ removed: string }>(`/api/sources/${name}`, { method: "DELETE" }),
+  loadDemo: () =>
+    request<{ sources: SourceInfo[] }>("/api/demo", { method: "POST" }),
   testSource: (f: SourceFormData) =>
     request<{ ok: boolean }>("/api/sources/test", {
       method: "POST",

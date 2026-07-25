@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from datacharter import __version__
+from datacharter.demo import write_demo_data
 
 CHARTER_TEMPLATE = """\
 # DataCharter workspace — https://github.com/datacharter/datacharter
@@ -72,7 +73,7 @@ def _cmd_init(args: argparse.Namespace) -> int:
     (ws / "queries").mkdir(exist_ok=True)
     _ensure_gitignore(ws)
     if args.demo:
-        _write_demo_data(ws)
+        write_demo_data(ws)
     print(f"Workspace initialized in {ws}.")
     if args.demo:
         print("Demo data in demo/ — try: datacharter serve")
@@ -87,35 +88,6 @@ def _ensure_gitignore(ws: Path) -> None:
         gi.write_text(existing + joiner + GITIGNORE_BLOCK)
 
 
-def _write_demo_data(ws: Path) -> None:
-    import sqlite3
-
-    demo = ws / "demo"
-    demo.mkdir(exist_ok=True)
-    con = sqlite3.connect(str(demo / "store.db"))
-    try:
-        con.execute("CREATE TABLE customers (id INTEGER, email TEXT, tier TEXT)")
-        con.executemany(
-            "INSERT INTO customers VALUES (?, ?, ?)",
-            [
-                (1, "ada@example.com", "pro"),
-                (2, "grace@example.com", "free"),
-                (3, "edsger@example.com", "pro"),
-            ],
-        )
-        con.execute("CREATE TABLE orders (customer_id INTEGER, total REAL, placed_on TEXT)")
-        con.executemany(
-            "INSERT INTO orders VALUES (?, ?, ?)",
-            [
-                ((i % 3) + 1, round((i * 37 % 200) + i * 0.5, 2), f"2026-01-{(i % 28) + 1:02d}")
-                for i in range(90)
-            ],
-        )
-        con.commit()
-    finally:
-        con.close()
-
-
 def _resolve_serve_workspace(directory: str) -> Path:
     """Workspace for serve; ephemeral demo when no charter.yaml (D3, no surprise writes)."""
     ws = Path(directory).resolve()
@@ -125,7 +97,7 @@ def _resolve_serve_workspace(directory: str) -> Path:
 
     demo_ws = Path(tempfile.mkdtemp(prefix="datacharter-demo-"))
     (demo_ws / "charter.yaml").write_text(DEMO_CHARTER)
-    _write_demo_data(demo_ws)
+    write_demo_data(demo_ws)
     print(f"No charter.yaml in {ws} — serving an ephemeral demo workspace ({demo_ws}).")
     print("Run `datacharter init` here to start a real workspace.")
     return demo_ws
