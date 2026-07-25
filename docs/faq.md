@@ -26,17 +26,24 @@ on your machine.
 
 Query results stay local. The natural-language agent is optional. If you do not
 configure an endpoint or run `--local`, no data is sent anywhere. When the agent
-is on, columns you list under `pii` in `charter.yaml` are masked before results
-are sent to the model, and with `--local` the model runs on your own machine.
+is on, PII columns — both those you declare under `pii` in `charter.yaml` and
+those DataCharter auto-detects — are masked (`•••`) before results reach the
+model; you can adjust this per source, table, or column with
+[`agent_access`](charter-yaml.html#agent_access) or the explorer's left-panel
+toggles. With `--local` the model runs on your own machine; with a hosted
+endpoint or Claude Code, only the questions and those masked results are sent.
 
 ## Which model should I use?
 
-Any model behind an OpenAI-compatible `/chat/completions` endpoint works. You
-have two paths:
+You have three paths:
 
-- **Bring your own endpoint.** Set `OPENAI_BASE_URL` and `OPENAI_API_KEY`, and
-  choose the model with `DATACHARTER_MODEL` (default `gpt-4o-mini`). This can be a
-  hosted API or a self-hosted server such as vLLM.
+- **Your Claude Code subscription.** If you have [Claude Code](https://claude.com/claude-code)
+  installed and signed in to a Claude plan, click **Connect Claude Code** in the
+  chat panel — no API key, no per-token billing.
+- **Bring your own endpoint.** Any OpenAI-compatible `/chat/completions` endpoint:
+  set `OPENAI_BASE_URL` and `OPENAI_API_KEY`, and choose the model with
+  `DATACHARTER_MODEL` (default `gpt-4o-mini`). This can be a hosted API or a
+  self-hosted server such as vLLM.
 - **Fully local.** `datacharter serve --local` uses [Ollama](https://ollama.com)
   with `qwen3:8b` by default; override with `--model`.
 

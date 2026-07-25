@@ -36,9 +36,13 @@ Manage `${NAME}` secrets in the OS keyring. `set` prompts without echo (or pass
 
 ## Explore and govern
 
-### `mcp [directory]`
+### `mcp [directory] [--serve-url URL]`
 Run a [Model Context Protocol](mcp.html) server over stdio, exposing the four
-governed query tools to any MCP client — read-only, PII-masked.
+governed query tools to any MCP client — read-only, PII-masked. With
+`--serve-url`, the server proxies tool calls to an already-running
+`datacharter serve` instead of opening its own engine (this is how the in-app
+Claude Code integration bridges to the governed toolbox); without it, it opens
+the workspace directly.
 
 ### `diff <left> <right> [directory] [--key cols]`
 Diff two relations across sources: rows only in each side plus the common count.

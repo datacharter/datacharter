@@ -120,8 +120,8 @@ write the complete result set to CSV, Parquet, JSON, or XLSX.
 
 ## Turn on the agent (optional)
 
-Ask questions in plain language. Either bring an OpenAI-compatible endpoint or
-run fully local:
+Ask questions in plain language. Bring an OpenAI-compatible endpoint or run fully
+local:
 
 ```sh
 # Bring your own endpoint:
@@ -133,8 +133,15 @@ datacharter serve
 datacharter serve --local    # uses Ollama, qwen3:8b by default
 ```
 
-Full detail is in [Agent modes](agent.html). Everything except the chat panel
-works with no model at all.
+Or, if you have [Claude Code](https://claude.com/claude-code) installed and
+signed in to a Claude plan, just `datacharter serve` and click **Connect Claude
+Code** in the chat panel — the agent runs on your subscription, no API key
+needed.
+
+Whichever you choose, the agent only ever sees the data you allow: PII is masked
+by default, adjustable per source, table, or column. Full detail is in
+[Agent modes](agent.html). Everything except the chat panel works with no model
+at all.
 
 ## Useful flags
 

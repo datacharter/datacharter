@@ -1,6 +1,6 @@
 ---
 title: Agent modes
-description: Bring your own endpoint, run fully local, or skip the agent entirely.
+description: Run on your Claude Code subscription, bring your own endpoint, run fully local, or skip the agent entirely.
 ---
 
 [Home](index.html) &middot; [Quick start](quickstart.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
@@ -52,6 +52,25 @@ datacharter serve --local --model ...  # choose another Ollama model
   chosen model) and serves without the agent. The UI still works; the chat is
   simply disabled.
 
+## Mode 3: your Claude Code subscription
+
+If you have [Claude Code](https://claude.com/claude-code) installed and are signed
+in to a Claude Pro or Max plan, the agent can run on that subscription — no API
+key and no per-token billing. In the chat panel, click **Connect Claude Code**
+(shown next to *Connect an LLM*) and start asking questions.
+
+- Requires the `claude` CLI on your `PATH` and an active Claude subscription.
+- DataCharter drives Claude Code headlessly, one turn per question. Claude reaches
+  your data **only** through the same four read-only, access-governed tools below —
+  never your raw files or connections.
+- The connection is **fail-closed**: before enabling it, DataCharter verifies that
+  the tool sandbox exposes nothing beyond those governed tools, and refuses to
+  connect otherwise.
+- This is **not** a no-egress mode. Because Claude Code runs against Anthropic's
+  models, your questions and the (PII-masked) tool results are sent to Anthropic
+  under your Claude subscription. Use `--local` (Mode 2) if no data may leave your
+  machine.
+
 ## How the agent works
 
 The agent runs a short tool loop over a small set of **read-only** tools:
@@ -63,8 +82,14 @@ The agent runs a short tool loop over a small set of **read-only** tools:
 | `describe_table` | Show columns and types for one relation. |
 | `query` | Run a read-only SQL query and return rows. |
 
-- **PII is masked.** Columns listed under a source's `pii` in `charter.yaml` are
-  masked in tool results, so those values are never sent to the model.
+- **Access is governed and PII-safe.** By default the agent sees masked values
+  (`•••`) for any column that is declared PII in `charter.yaml` *or* auto-detected
+  as PII when you serve. Override access at the source, table, or column level —
+  from the data explorer's left panel or via the contract's
+  [`agent_access`](charter-yaml.html#agent_access) block — to unmask a
+  non-sensitive column or hide one that isn't PII. Flip **Agent view** on any
+  result to see exactly what the agent receives. The same governance applies over
+  [MCP](mcp.html) and to Claude Code.
 - **Read-only is enforced in the engine**, not just the prompt: a statement
   allowlist rejects anything but queries (the only write path is `local.*` DDL
   for snapshots). The agent cannot modify your data.

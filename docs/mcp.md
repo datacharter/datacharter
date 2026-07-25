@@ -12,8 +12,9 @@ applied to every tool call:
 
 - **Read-only** — writes and filesystem/remote functions are rejected by the
   SQL parser guard, regardless of the query the client sends.
-- **PII-masked** — columns marked PII in `charter.yaml` are masked in results, so
-  the model never sees the raw values.
+- **PII-masked** — PII columns, whether declared in `charter.yaml` or
+  auto-detected, are masked in results so the model never sees the raw values; the
+  same [`agent_access`](charter-yaml.html#agent_access) overrides apply here too.
 - **Credential-scrubbed** — connection secrets never appear in errors.
 
 Want to see exactly what a client receives before wiring one up? Open the UI

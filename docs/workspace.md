@@ -28,7 +28,8 @@ adds a small generated dataset so you can try everything immediately.
 Run a query, click **Snapshot**, and the result is saved as `local.<name>` —
 a reusable table kept in `.datacharter/` on your machine. Query it like any
 other relation; `datacharter recheck <name>` re-runs its SQL and diffs against
-the saved copy.
+the saved copy. To remove a snapshot (or a table you dragged in) later, click the
+**✕** next to it in the source tree.
 
 ![Snapshot a query result as local.top_spend, then query it](assets/snapshot.gif)
 

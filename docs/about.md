@@ -24,8 +24,10 @@ server, and a web UI, shipped as one Python package. Run one command and you
 have a workspace in your browser.
 
 - **Contract-governed.** Sources are declared in `charter.yaml`, an
-  ODCS-compatible YAML contract. PII columns are declared once and masked for the
-  agent. Secrets are never in the file; they are `${NAME}` references.
+  ODCS-compatible YAML contract. PII columns — declared, or auto-detected — are
+  masked from the agent by default, and you choose exactly what any agent may see,
+  per source, table, or column. Secrets are never in the file; they are `${NAME}`
+  references.
 - **Local-first.** One process on your machine, binding to localhost by default.
   No cloud dependency, no account, and zero telemetry of any kind.
 - **Federated.** Postgres, MySQL, SQLite, BigQuery, SQL Server, files, Iceberg,
@@ -43,9 +45,10 @@ text files. Putting the two together yields a tool that is fast, private, and
 easy to share as source.
 
 Keeping it local also makes the natural-language agent honest. The agent is
-optional and can run entirely on your machine against a local model. When you do
-use a hosted endpoint, PII columns are masked before anything is sent, and the
-engine stays read-only regardless of what the model suggests.
+optional and can run entirely on your machine against a local model, on your
+Claude Code subscription, or on any hosted endpoint. Whichever you pick, PII is
+masked before anything is sent (and you control what else the agent may see), and
+the engine stays read-only regardless of what the model suggests.
 
 ## What it is not
 

@@ -109,14 +109,39 @@ are a single relation named after the source, so they ignore `tables`.
 ### `pii`
 
 A mapping of table name to a list of column names that hold PII. These columns
-are **masked** in the natural-language agent's tool results, so sensitive values
-are never sent to a model. Masking applies to the agent path; the SQL editor
-returns real values locally.
+are **masked** (`•••`) in the agent's tool results by default, so sensitive
+values are never sent to a model. DataCharter also **auto-detects** likely PII at
+serve time and masks it the same way. Masking applies to the agent path (the
+built-in agent, [MCP](mcp.html), and Claude Code); the SQL editor returns real
+values locally. Override any column with [`agent_access`](#agent_access) below.
 
 ```yaml
 pii:
   customers: [email, phone]
 ```
+
+### `agent_access`
+
+Optional. Fine-grained control over what the **agent** may see, overriding the
+PII default. Access resolves most-specific-first — a column override beats a
+table override, which beats a source-wide override, which beats the PII default
+(masked when the column is declared or auto-detected PII, real otherwise).
+
+`true` means the agent sees real values; `false` means it sees masked (`•••`)
+values. The human SQL editor is never affected either way.
+
+```yaml
+agent_access:
+  source: true                 # whole-source default for the agent
+  tables:
+    orders: true               # every column of orders
+  columns:
+    customers.tier: false      # mask one non-PII column
+    customers.email: true      # unmask one PII column
+```
+
+The **data explorer's left panel** writes this block for you: the 👁 / 🙈
+toggles on each source, table, and column persist straight into `agent_access`.
 
 ### `max_rows`
 

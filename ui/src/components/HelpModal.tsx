@@ -17,7 +17,7 @@ const FAQ: QA[] = [
   },
   {
     q: "Where does my data go? Is anything sent to a model?",
-    a: "Query results stay local. The natural-language agent is optional; with no endpoint configured (or --local), nothing is sent anywhere. When the agent is on, columns you list under pii in charter.yaml are masked before results reach the model.",
+    a: "Query results stay local. The natural-language agent is optional; with no endpoint configured (or --local), nothing is sent anywhere. When the agent is on, PII columns — both those you declare under pii in charter.yaml and those DataCharter auto-detects — are masked (•••) before results reach the model, and you can adjust access per source, table, or column from the left panel.",
   },
   {
     q: "Can I use it fully offline?",
@@ -29,7 +29,7 @@ const FAQ: QA[] = [
   },
   {
     q: "Which model can the agent use?",
-    a: "Any OpenAI-compatible /chat/completions endpoint. Bring your own (OPENAI_BASE_URL + OPENAI_API_KEY), or run fully local with `serve --local` (Ollama, qwen3:8b by default). There is no bundled or fine-tuned model.",
+    a: "Three options: your Claude Code subscription (click Connect Claude Code — no API key), any OpenAI-compatible /chat/completions endpoint (bring your own with OPENAI_BASE_URL + OPENAI_API_KEY), or fully local with `serve --local` (Ollama, qwen3:8b by default). There is no bundled or fine-tuned model.",
   },
   {
     q: "Is it free? Can my company use it?",
