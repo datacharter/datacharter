@@ -5,6 +5,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-07-24
+
+### Fixed
+
+- First-run tutorial on a fresh (empty) workspace crashed with a `Catalog Error`:
+  its "Run the example" button ran a hardcoded demo query (`FROM store.orders`)
+  that only exists in the demo workspace. The example now adapts to the live
+  catalog — the demo aggregation when the demo `store` source is present, a scan
+  of your first real table otherwise, or a harmless `SELECT 42` when there are no
+  sources yet.
+
 ## [0.3.2] - 2026-07-24
 
 ### Fixed

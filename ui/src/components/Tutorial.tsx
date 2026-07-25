@@ -44,8 +44,8 @@ export default function Tutorial({ actions, onClose }: Props) {
       body: (
         <>
           The editor runs DuckDB SQL. Results <b>preview as you type</b>; press{" "}
-          <code>Cmd/Ctrl+Enter</code> or <b>Run</b> for the full set. Here's one over
-          the demo <code>store.orders</code> table.
+          <code>Cmd/Ctrl+Enter</code> or <b>Run</b> for the full set. Here's an
+          example over your data.
         </>
       ),
       action: { label: "Run the example", run: actions.loadAndRunExample },

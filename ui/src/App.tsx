@@ -17,6 +17,16 @@ const EXAMPLE_SQL =
   "SELECT customer_id, count(*) AS orders, round(sum(total), 2) AS revenue\n" +
   "FROM store.orders\nGROUP BY customer_id\nORDER BY revenue DESC;\n";
 
+// The example must reference a table that actually exists: the demo aggregation when
+// the demo `store` source is present, otherwise a plain scan of the first real table,
+// otherwise the harmless starter (a fresh `datacharter init` workspace has no sources).
+export function exampleFor(tables: TableInfo[]): string {
+  if (tables.some((t) => t.source === "store" && t.table === "orders")) return EXAMPLE_SQL;
+  const first = tables[0];
+  if (first) return `SELECT *\nFROM ${first.source}.${first.table}\nLIMIT 100;\n`;
+  return STARTER;
+}
+
 type Tab = "results" | "chart" | "profile" | "plan";
 
 export default function App() {
@@ -85,8 +95,9 @@ export default function App() {
   );
 
   const loadAndRunExample = useCallback(() => {
-    setSql(EXAMPLE_SQL);
-    run(EXAMPLE_SQL);
+    const example = exampleFor(tablesRef.current);
+    setSql(example);
+    run(example);
   }, [run]);
 
   // Instant preview: a beat after you stop typing, auto-run the query (row-capped,
