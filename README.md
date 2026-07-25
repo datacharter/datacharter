@@ -26,19 +26,16 @@ actually means 👇
 - **PII is auto-detected and defaulted to *no agent access*** — override per field if you really mean to
 - Don't take our word for it: flip on **Agent view** and see, column by column, exactly what your agent gets back when it runs a query. *(Spoiler: the PII comes back `•••`.)*
 
-## What you can do
+## Wait, there's more!
 
-- **Drop a file, query it instantly.** Drag a CSV, Parquet, or JSON onto the window and run SQL on it right away — no import, no schema setup.
-- **Join across sources — no pipelines.** Query and JOIN a Postgres table, a Parquet file, and a Snowflake table in a *single* SQL statement. No ETL, no copying everything into a warehouse first.
-- **Connect all your data.** Postgres, MySQL, SQLite, SQL Server, BigQuery, Snowflake, files on S3/GCS/Azure, and Iceberg/Delta tables — all through one engine.
+Beyond local federation and governed agent access, you also get:
+
 - **See answers as you type.** Live results preview while you write SQL, one-click auto-charts, and a profiling panel (missing values, distributions, outliers) — no separate BI tool.
-- **Ask in plain English (optional).** Turn a question into SQL and an answer with the built-in agent — bring your own model, or run one fully local with no API key.
-- **Keep sensitive data away from the AI.** Mark PII columns once; the agent and any connected AI see masked values (`•••`) while you still see the real data locally. Flip **Agent view** to see exactly what the model sees.
 - **Safe by design.** The engine is read-only by construction — no query can write, delete, or touch the filesystem — so pointing an AI (or a teammate) at your real databases can't do damage.
-- **Point AI tools at your data, safely.** A governed MCP server exposes read-only, PII-masked query tools to Cursor, Cline, or your own agent.
+- **Point *other* AI tools at your data, too.** A governed MCP server exposes the same read-only, PII-masked query tools to Cursor, Cline, or your own agent.
 - **Trust every answer.** Each result shows exactly which source columns it read — so you always know where a number came from.
 - **Save, reuse, export.** Snapshot a result as a reusable local table; export to CSV, Parquet, JSON, or XLSX.
-- **Governance you can automate.** Catch schema/PII drift in CI, auto-detect PII columns, diff data across sources, and define certified metrics — from the command line.
+- **Governance you can automate.** Catch schema/PII drift in CI, diff data across sources, and define certified metrics — all from the command line.
 
 ![DataCharter — live SQL preview, auto-charts, per-query provenance, and PII masking](https://raw.githubusercontent.com/datacharter/datacharter/main/brand/demo.gif)
 
