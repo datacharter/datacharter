@@ -489,9 +489,12 @@ def create_app(
             return _error(400, "no_claude", "Claude Code CLI not found on PATH.")
         serve_url = f"http://127.0.0.1:{app.state.port}"
         try:
-            app.state.cc_deny = await cc.assert_tool_surface(serve_url)
+            app.state.cc_deny = await cc.assert_tool_surface(
+                serve_url, initial_deny=cc.load_deny(workspace)
+            )
         except cc.ClaudeGovernanceError as exc:
             return _error(400, "governance", str(exc))
+        cc.save_deny(workspace, app.state.cc_deny)
         agent_backend.set_backend(workspace, "claude-code")
         app.state.cc_session = {}
         return {"backend": "claude-code"}
@@ -504,7 +507,10 @@ def create_app(
             serve_url = f"http://127.0.0.1:{app.state.port}"
             if app.state.cc_deny is None:  # lost to a restart — re-verify the sandbox
                 try:
-                    app.state.cc_deny = await cc.assert_tool_surface(serve_url)
+                    app.state.cc_deny = await cc.assert_tool_surface(
+                        serve_url, initial_deny=cc.load_deny(workspace)
+                    )
+                    cc.save_deny(workspace, app.state.cc_deny)
                 except cc.ClaudeGovernanceError as exc:
 
                     async def refuse(msg: str = str(exc)) -> AsyncIterator[str]:

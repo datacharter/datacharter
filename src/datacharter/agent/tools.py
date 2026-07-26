@@ -60,13 +60,19 @@ TOOL_SPECS: list[dict[str, Any]] = [
 
 MASKED = "•••"
 _MAX_TOOL_ROWS = 50
+_DEFAULT_TIMEOUT_S = 30.0
 
 
 class ToolBox:
     """Executes tool calls against the engine; masks PII columns in returned data."""
 
     def __init__(
-        self, engine: Engine, sources: list[Source], *, auto_pii: set[str] | None = None
+        self,
+        engine: Engine,
+        sources: list[Source],
+        *,
+        auto_pii: set[str] | None = None,
+        timeout_s: float = _DEFAULT_TIMEOUT_S,
     ) -> None:
         self._engine = engine
         # Column names flagged PII in any source's contract, matched case-insensitively.
@@ -79,6 +85,10 @@ class ToolBox:
         self._overrides = {s.name: s.agent_access for s in sources if s.agent_access}
         # Names that may be masked, for the access guard's parse-failure fallback.
         self._masked_names: set[str] = set(self._pii) | set(self._auto_pii)
+        # Query budget: a per-query statement timeout (the 50-row result cap below
+        # already bounds egress). EXPLAIN can't reliably give output cardinality —
+        # aggregate roots print no estimate — so the timeout is the robust backstop.
+        self._timeout_s = timeout_s
 
     async def run(self, name: str, arguments: str) -> str:
         try:
@@ -136,7 +146,7 @@ class ToolBox:
     async def _query(self, args: dict) -> str:
         sql = str(args.get("sql", ""))
         check_query_access(sql, is_masked=self._masked, masked_names=self._masked_names)
-        result = await self._engine.query(sql, row_limit=_MAX_TOOL_ROWS)
+        result = await self._engine.query(sql, row_limit=_MAX_TOOL_ROWS, timeout_s=self._timeout_s)
         return self._render(result, self._mask_indices(result))
 
     def _masked(self, source: str, table: str, column: str) -> bool:

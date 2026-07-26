@@ -5,6 +5,44 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-26
+
+A polish release: correctness, safety, and accessibility across the CLI, engine,
+and UI.
+
+### Added
+
+- `datacharter query "<sql>" [--format table|csv|json]` — run ad-hoc read-only
+  SQL from the command line.
+- `datacharter drift` now detects column **shape** changes (new/removed/retyped
+  columns), re-scans new columns for PII, and records a baseline you can refresh
+  with `--drift --update`. Previously it only flagged missing tables/columns.
+- PII value-detection recognizes credit-card numbers (Luhn) and formatted phone
+  numbers, without flagging bare numeric IDs.
+- The agent enforces a per-query statement timeout, so a runaway query is
+  interrupted rather than tying up the session.
+
+### Fixed
+
+- `PIVOT`/`UNPIVOT` queries now run (they were rejected because DuckDB expands
+  them into two statements internally).
+- `datacharter snapshot` uses the same pushed-aggregation path as the API, so a
+  connector-backed snapshot pulls the smaller aggregated result.
+- Source-tree table/column rows are keyboard-operable; the Help and Tutorial
+  dialogs trap focus, close on Escape, and restore focus; the remove (✕) control
+  is always reachable, not hover-only.
+- Clicking a table no longer silently discards in-progress SQL, and deleting a
+  snapshot/upload now asks first.
+- Background-action wording, live-preview parse errors (a non-destructive chip),
+  and the "truncated" note no longer reference controls that don't exist.
+- Chat auto-scrolls only when you're already at the bottom, adds clear/copy, and
+  renders fenced code blocks (e.g. the SQL the agent wrote).
+- Connection/config forms show success vs. failure distinctly; the theme's
+  `--muted` color is now defined (no more mismatched greys/reds).
+- Claude Code driver: subprocess timeouts, captured stderr on failure, and a
+  persisted deny-list that warm-starts (but never replaces) the fail-closed
+  tool-surface assertion.
+
 ## [0.4.2] - 2026-07-26
 
 ### Added

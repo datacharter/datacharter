@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
+import { useFocusTrap } from "../lib/useFocusTrap";
 
 const SEEN_KEY = "datacharter.tutorial.v2.seen";
 
@@ -99,10 +100,12 @@ export default function Tutorial({ actions, onClose }: Props) {
   const step = steps[index];
   const last = index === steps.length - 1;
 
+  const ref = useRef<HTMLElement>(null);
   const close = () => {
     markSeen();
     onClose();
   };
+  useFocusTrap(ref, close);
 
   const act = () => {
     step.action?.run();
@@ -111,7 +114,7 @@ export default function Tutorial({ actions, onClose }: Props) {
   };
 
   return (
-    <aside className="tutorial" role="dialog" aria-label="Getting started">
+    <aside className="tutorial" role="dialog" aria-modal="true" aria-label="Getting started" ref={ref} tabIndex={-1}>
       <div className="tutorial-head">
         <span className="tutorial-title">Getting started</span>
         <button className="tutorial-close" onClick={close} aria-label="Close tutorial">

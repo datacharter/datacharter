@@ -28,19 +28,25 @@ export default function SourceForm({
   const [password, setPassword] = useState("");
   const [tested, setTested] = useState(!!editing);
   const [msg, setMsg] = useState<string | null>(null);
+  const [msgKind, setMsgKind] = useState<"ok" | "pending" | "error">("pending");
 
   const isFile = PATH_TYPES.includes(form.type);
   const payload = (): SourceFormData => ({ ...form, password: password || undefined });
 
+  const say = (text: string, kind: "ok" | "pending" | "error") => {
+    setMsg(text);
+    setMsgKind(kind);
+  };
+
   const test = async () => {
-    setMsg("Testing…");
+    say("Testing…", "pending");
     try {
       await api.testSource(payload());
       setTested(true);
-      setMsg("Connection OK");
+      say("Connection OK", "ok");
     } catch (e) {
       setTested(false);
-      setMsg((e as Error).message);
+      say((e as Error).message, "error");
     }
   };
 
@@ -50,7 +56,7 @@ export default function SourceForm({
       else await api.createSource(payload());
       onDone();
     } catch (e) {
-      setMsg((e as Error).message);
+      say((e as Error).message, "error");
     }
   };
 
@@ -131,7 +137,7 @@ export default function SourceForm({
         <button onClick={save} className="primary" disabled={!tested || !form.name}>Save</button>
         <button onClick={onCancel}>Cancel</button>
       </div>
-      {msg && <div className="source-form-msg">{msg}</div>}
+      {msg && <div className={`source-form-msg ${msgKind}`}>{msg}</div>}
     </div>
   );
 }

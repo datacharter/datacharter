@@ -36,12 +36,51 @@ _DENY = [
 ]
 
 
+_PROBE_TIMEOUT_S = 60.0  # a locked-down probe should return init.tools quickly
+_TURN_IDLE_TIMEOUT_S = 120.0  # abort a turn that produces no output for this long
+_STDERR_TAIL = 2000  # chars of stderr to surface when a subprocess fails
+
+
 class ClaudeGovernanceError(RuntimeError):
     """Raised when Claude Code exposes tools beyond the governed set — connection refused."""
 
 
 def claude_available() -> bool:
     return shutil.which("claude") is not None
+
+
+def _deny_path(workspace: Path) -> Path:
+    return Path(workspace) / ".datacharter" / "cc_deny.json"
+
+
+def save_deny(workspace: Path, deny: list[str]) -> None:
+    """Persist the asserted deny-list so a restart needn't re-probe Claude Code."""
+    path = _deny_path(workspace)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(deny))
+
+
+def load_deny(workspace: Path) -> list[str] | None:
+    """The persisted deny-list, or None if absent/unreadable."""
+    path = _deny_path(workspace)
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, list) else None
+
+
+async def _stderr_tail(proc) -> str:
+    if proc.stderr is None:
+        return ""
+    try:
+        data = await asyncio.wait_for(proc.stderr.read(), timeout=2.0)
+    except (TimeoutError, Exception):  # noqa: BLE001 — best-effort diagnostics only
+        return ""
+    text = data.decode(errors="replace").strip()
+    return f" (claude stderr: {text[-_STDERR_TAIL:]})" if text else ""
 
 
 def _dc_bin() -> str:
@@ -144,21 +183,34 @@ async def probe_tools(
         proc = await asyncio.create_subprocess_exec(
             "claude", "-p", "ok", "--output-format", "stream-json", "--verbose",
             *_base_flags(settings, mcp),
-            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL, env=_env(),
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=_env(),
         )
-        out, _ = await proc.communicate()
+        try:
+            out, err = await asyncio.wait_for(proc.communicate(), timeout=_PROBE_TIMEOUT_S)
+        except TimeoutError:
+            proc.kill()
+            await proc.wait()
+            raise ClaudeGovernanceError(
+                f"Claude Code did not respond within {_PROBE_TIMEOUT_S:.0f}s during the "
+                "tool-surface probe; refusing to connect."
+            ) from None
         for ev in parse_stream(out.decode().splitlines()):
             if ev["kind"] == "session":
                 return ev.get("tools", [])
     return []
 
 
-async def assert_tool_surface(serve_url: str, dc_bin: str | None = None) -> list[str]:
+async def assert_tool_surface(
+    serve_url: str, dc_bin: str | None = None, initial_deny: list[str] | None = None
+) -> list[str]:
     """Fail-closed: probe Claude's tool surface, auto-deny any non-governed tools it finds,
     and re-probe until only the governed tools remain — returning the effective deny-list.
-    Raises `ClaudeGovernanceError` if a non-governed tool cannot be disabled."""
+    Raises `ClaudeGovernanceError` if a non-governed tool cannot be disabled.
+
+    `initial_deny` (e.g. a persisted deny-list) warm-starts the loop so a reconnect
+    converges in one probe; the assertion still runs, so a newly-appeared tool is caught."""
     dc_bin = dc_bin or _dc_bin()
-    deny = list(_DENY)
+    deny = list(_DENY) + [t for t in (initial_deny or []) if t not in _DENY]
     extras: list[str] = []
     for _ in range(4):
         tools = await probe_tools(serve_url, dc_bin, deny)
@@ -192,10 +244,31 @@ async def run_turn(
         if session_id:
             args += ["--resume", session_id]
         proc = await asyncio.create_subprocess_exec(
-            *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL, env=_env()
+            *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=_env()
         )
         assert proc.stdout is not None
-        async for line in proc.stdout:
-            for ev in parse_stream([line.decode()]):
-                yield ev
-        await proc.wait()
+        try:
+            while True:
+                try:
+                    line = await asyncio.wait_for(
+                        proc.stdout.readline(), timeout=_TURN_IDLE_TIMEOUT_S
+                    )
+                except TimeoutError:
+                    proc.kill()
+                    tail = await _stderr_tail(proc)
+                    yield {
+                        "kind": "error",
+                        "detail": (
+                            f"Claude Code produced no output for {_TURN_IDLE_TIMEOUT_S:.0f}s "
+                            f"and was aborted.{tail}"
+                        ),
+                    }
+                    return
+                if not line:
+                    break
+                for ev in parse_stream([line.decode()]):
+                    yield ev
+        finally:
+            if proc.returncode is None:
+                proc.kill()
+            await proc.wait()

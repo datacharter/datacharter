@@ -58,9 +58,8 @@ Large queries can spill to disk. DataCharter contains and protects those spills:
   `temp_file_encryption` is always on — spill files use ephemeral keys, so
   leftover blocks after a crash are cryptographically unreadable.
 - The temp directory is wiped on startup and shutdown.
-- The local state DB (`.datacharter/state.duckdb`, holding query history and
-  saved snapshots) is encrypted with a key from your OS keyring (or
-  `DATACHARTER_STATE_KEY`).
+- The local state DB (`.datacharter/state.duckdb`, holding saved snapshots) is
+  encrypted with a key from your OS keyring (or `DATACHARTER_STATE_KEY`).
 - `serve --no-spill` disables disk spilling entirely for regulated environments.
 
 Full-disk encryption (FileVault/BitLocker) and OS swap are outside DataCharter's

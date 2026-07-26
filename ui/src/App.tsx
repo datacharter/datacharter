@@ -10,6 +10,7 @@ import SourcesView from "./components/SourcesView";
 import HelpModal from "./components/HelpModal";
 import EmptyState from "./components/EmptyState";
 import Toast from "./components/Toast";
+import { shouldReplaceEditor } from "./lib/editorGuard";
 import { exportRequest } from "./lib/mask";
 import { useResize } from "./lib/useResize";
 import Tutorial, { hasSeenTutorial } from "./components/Tutorial";
@@ -26,6 +27,7 @@ export default function App() {
   const [profileResult, setProfileResult] = useState<QueryResult | null>(null);
   const [error, setError] = useState<string | null>(null); // query errors: replace the grid
   const [actionError, setActionError] = useState<string | null>(null); // background actions: toast
+  const [previewError, setPreviewError] = useState<string | null>(null); // live-preview parse error
   const [running, setRunning] = useState(false);
   const [tab, setTab] = useState<Tab>("results");
   const [agentView, setAgentView] = useState(false);
@@ -60,6 +62,11 @@ export default function App() {
   const editorH = useResize("dc-editor-h", 300, "y", false, 120);
   const sqlRef = useRef(sql);
   sqlRef.current = sql;
+  const lastLoadedRef = useRef(sql); // last value WE put in the editor (for dirty detection)
+  const loadSql = useCallback((text: string) => {
+    setSql(text);
+    lastLoadedRef.current = text;
+  }, []);
   const tablesRef = useRef(tables);
   tablesRef.current = tables;
   const resultRef = useRef(result);
@@ -100,9 +107,9 @@ export default function App() {
 
   const loadAndRunExample = useCallback(() => {
     const example = exampleFor(tablesRef.current);
-    setSql(example);
+    loadSql(example);
     run(example);
-  }, [run]);
+  }, [run, loadSql]);
 
   // Instant preview: a beat after you stop typing, auto-run the query (row-capped,
   // silent on error) so results update live without pressing Run.
@@ -115,8 +122,9 @@ export default function App() {
         .then((preview) => {
           setResult(preview);
           setError(null);
+          setPreviewError(null);
         })
-        .catch(() => {});
+        .catch((e) => setPreviewError((e as Error).message));
     }, 700);
     return () => clearTimeout(timer);
   }, [sql]);
@@ -173,9 +181,18 @@ export default function App() {
     URL.revokeObjectURL(url);
   }, [exportFormat, agentView, maskedColumns]);
 
-  const pickRelation = useCallback((relation: string) => {
-    setSql(`SELECT * FROM ${relation} LIMIT 100;`);
-  }, []);
+  const pickRelation = useCallback(
+    (relation: string) => {
+      const next = `SELECT * FROM ${relation} LIMIT 100;`;
+      if (
+        shouldReplaceEditor(sqlRef.current, lastLoadedRef.current) ||
+        window.confirm("Replace your current query with a SELECT for this table?")
+      ) {
+        loadSql(next);
+      }
+    },
+    [loadSql],
+  );
 
   const explain = useCallback(async () => {
     setTab("plan");
@@ -201,7 +218,7 @@ export default function App() {
         setActionError(body.error?.message ?? "Upload failed");
         return;
       }
-      setSql(`SELECT * FROM ${body.table} LIMIT 100;`);
+      loadSql(`SELECT * FROM ${body.table} LIMIT 100;`);
       refreshCatalog();
     },
     [refreshCatalog],
@@ -214,6 +231,8 @@ export default function App() {
 
   const removeObject = useCallback(
     async (kind: "snapshot" | "upload", name: string) => {
+      const label = kind === "snapshot" ? `snapshot local.${name}` : `uploaded table ${name}`;
+      if (!window.confirm(`Remove ${label}? This can't be undone.`)) return;
       try {
         await (kind === "snapshot" ? api.deleteSnapshot(name) : api.deleteUpload(name));
         refreshCatalog();
@@ -351,7 +370,7 @@ export default function App() {
               >
                 {running ? "Running…" : "Run"}
               </button>
-              <QueryFiles currentSql={() => sqlRef.current} onLoad={setSql} />
+              <QueryFiles currentSql={() => sqlRef.current} onLoad={loadSql} />
               <button
                 onClick={snapshot}
                 title="Save this result as a reusable local.<name> table"
@@ -437,6 +456,11 @@ export default function App() {
                 Agent view
               </label>
             </div>
+            {previewError && !error && (
+              <div className="preview-error" title={previewError}>
+                ⚠ live preview: {previewError.split("\n")[0]}
+              </div>
+            )}
             <div className="tab-body">
               {error && (
                 <div className="error-box">

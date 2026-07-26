@@ -6,6 +6,25 @@ import SourceTree from "./SourceTree";
 
 const t = (source: string, table: string): TableInfo => ({ source, schema: "main", table, columns: [] });
 
+describe("SourceTree keyboard", () => {
+  it("loads a table on Enter (keyboard-operable)", () => {
+    const onPick = vi.fn();
+    const src = {
+      name: "store", type: "sqlite", path: "s.db", tables: ["customers"],
+      pii: {}, connection: {}, has_credential: false,
+    };
+    render(
+      <SourceTree
+        sources={[src]}
+        tables={[{ source: "store", schema: "main", table: "customers", columns: ["id"] }]}
+        onPick={onPick}
+      />,
+    );
+    fireEvent.keyDown(screen.getByText("customers"), { key: "Enter" });
+    expect(onPick).toHaveBeenCalled();
+  });
+});
+
 describe("SourceTree remove affordance", () => {
   it("offers remove on a snapshot and calls onRemove('snapshot', name)", () => {
     const onRemove = vi.fn();

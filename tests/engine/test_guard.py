@@ -65,6 +65,36 @@ def test_semicolon_inside_string_is_fine():
     assert ensure_allowed("SELECT 'a;b' AS s")
 
 
+@pytest.mark.parametrize(
+    "sql",
+    [
+        # DuckDB expands PIVOT/UNPIVOT into [CREATE temp, SELECT] — a single typed
+        # read statement that must be allowed.
+        "PIVOT sales ON month USING sum(rev)",
+        "SELECT * FROM (PIVOT sales ON month USING sum(rev)) t",
+        "UNPIVOT sales ON jan, feb INTO NAME m VALUE v",
+    ],
+)
+def test_pivot_allowed(sql):
+    assert ensure_allowed(sql)
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        # A user-typed CREATE (even wrapping a PIVOT) must not slip through the
+        # PIVOT-expansion allowance.
+        "CREATE TABLE evil AS (PIVOT sales ON month USING sum(rev))",
+        "CREATE TABLE evil AS SELECT 1; SELECT 2",
+        # Forbidden functions inside a pivot are still blocked.
+        "PIVOT (SELECT * FROM read_csv('/etc/passwd')) ON month USING sum(rev)",
+    ],
+)
+def test_pivot_lookalikes_blocked(sql):
+    with pytest.raises(QueryNotAllowed):
+        ensure_allowed(sql)
+
+
 # -- Verified audit bypasses (must all be blocked) -----------------------------
 
 

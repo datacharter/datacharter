@@ -49,6 +49,11 @@ _LOCAL_DDL_TARGET = re.compile(
 )
 _LEADING_COMMENTS = re.compile(r"^(?:\s*--[^\n]*\n|\s*/\*.*?\*/)*\s*", re.DOTALL)
 _EXPLAIN_PREFIX = re.compile(r"^\s*explain\s+(?:analyze\s+)?", re.IGNORECASE)
+# DuckDB expands PIVOT/UNPIVOT into [CREATE temp, SELECT]. A statement the user
+# typed as a read (starts with SELECT/WITH/(/PIVOT/UNPIVOT) that expands this way
+# is a read — the CREATE targets an internal temp and it cannot write.
+_PIVOT_LEADING = re.compile(r"^\s*(?:select|with|\(|pivot|unpivot)\b", re.IGNORECASE | re.DOTALL)
+_PIVOT_TOKEN = re.compile(r"\b(?:un)?pivot\b", re.IGNORECASE)
 
 
 def ensure_allowed(sql: str) -> str:
@@ -77,8 +82,36 @@ def _statement_type(con: duckdb.DuckDBPyConnection, sql: str) -> str:
     return str(statements[0].type).rsplit(".", 1)[-1].upper()
 
 
+def _is_pivot_expansion(statements: list, sql: str) -> bool:
+    """True if `sql` is a PIVOT/UNPIVOT read that DuckDB expanded into
+    [CREATE temp, SELECT] — the only case where one typed read yields two
+    statements. A user-typed CREATE (which starts with CREATE) never matches."""
+    types = [str(s.type).rsplit(".", 1)[-1].upper() for s in statements]
+    if types != ["CREATE", "SELECT"]:
+        return False
+    stripped = _LEADING_COMMENTS.sub("", sql)
+    return bool(_PIVOT_LEADING.match(stripped) and _PIVOT_TOKEN.search(stripped))
+
+
 def _check(con: duckdb.DuckDBPyConnection, sql: str) -> str:
-    stype = _statement_type(con, sql)
+    try:
+        statements = con.extract_statements(sql)
+    except Exception:
+        raise QueryNotAllowed("Could not parse SQL; check for syntax errors.") from None
+    if not statements:
+        raise QueryNotAllowed("Empty statement.")
+    if _is_pivot_expansion(statements, sql):
+        # Token-scan (not just the tree) so a forbidden function inside the pivot
+        # is caught even when the pivot serializes to an incomplete tree.
+        found = _forbidden_functions(con, sql) | _token_scan(sql)
+        if found:
+            raise QueryNotAllowed(
+                f"Filesystem/remote function(s) not allowed in a query: {', '.join(sorted(found))}."
+            )
+        return sql.strip()
+    if len(statements) > 1:
+        raise QueryNotAllowed("One statement at a time.")
+    stype = str(statements[0].type).rsplit(".", 1)[-1].upper()
     if stype == "SELECT":
         _reject_forbidden(con, sql)
         return sql.strip()

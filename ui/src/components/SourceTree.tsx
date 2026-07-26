@@ -1,5 +1,20 @@
-import { useMemo, useState } from "react";
+import { type KeyboardEvent, useMemo, useState } from "react";
 import type { SourceInfo, TableInfo } from "../api";
+
+/** Make a non-button element behave as a keyboard-operable button. */
+function pickableProps(onActivate: () => void) {
+  return {
+    role: "button" as const,
+    tabIndex: 0,
+    onClick: onActivate,
+    onKeyDown: (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onActivate();
+      }
+    },
+  };
+}
 
 interface Props {
   sources: SourceInfo[];
@@ -95,7 +110,7 @@ export default function SourceTree({ sources, tables, onPick, onRemove, onSetAcc
           >
             {hasCols ? (open ? "−" : "+") : ""}
           </button>
-          <span className="tree-table-name" onClick={() => onPick(relation)}>
+          <span className="tree-table-name" {...pickableProps(() => onPick(relation))}>
             {t.table}
           </span>
           {source && piiFor(source, t.table) && <span className="pii">PII</span>}
@@ -125,7 +140,7 @@ export default function SourceTree({ sources, tables, onPick, onRemove, onSetAcc
           <div className="tree-columns">
             {t.columns.map((c) => (
               <div className="tree-column" key={c}>
-                <span className="tree-column-name" onClick={() => onPick(relation)}>
+                <span className="tree-column-name" {...pickableProps(() => onPick(relation))}>
                   {c}
                 </span>
                 {t.access?.[c]?.pii && <span className="pii-dot" title="PII">•</span>}

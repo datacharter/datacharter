@@ -1,3 +1,6 @@
+import { useRef } from "react";
+import { useFocusTrap } from "../lib/useFocusTrap";
+
 interface QA {
   q: string;
   a: string;
@@ -42,9 +45,19 @@ const FAQ: QA[] = [
 ];
 
 export default function HelpModal({ onClose }: { onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useFocusTrap(ref, onClose);
   return (
     <div className="help-overlay" onClick={onClose}>
-      <div className="help-modal" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="help-modal"
+        ref={ref}
+        role="dialog"
+        aria-modal="true"
+        aria-label="DataCharter help"
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="help-head">
           <h2>DataCharter</h2>
           <button className="help-close" onClick={onClose} aria-label="Close">

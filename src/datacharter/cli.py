@@ -343,7 +343,7 @@ def _cmd_snapshot(args: argparse.Namespace) -> int:
     charter = load_charter(ws)
     engine = _open_engine(ws, charter.sources)
     try:
-        engine.query_sync(f"CREATE OR REPLACE TABLE local.{args.name} AS {args.sql}")
+        engine.snapshot_sync(args.sql, args.name)
     except EngineError as exc:
         print(f"Snapshot failed: {exc}", file=sys.stderr)
         return 1
@@ -399,8 +399,10 @@ def _cmd_recheck(args: argparse.Namespace) -> int:
 
 def _cmd_drift(args: argparse.Namespace) -> int:
     import asyncio
+    import json as _json
 
     from datacharter.contracts import load_charter
+    from datacharter.contracts.pii import classify_pii
 
     ws = Path(args.directory).resolve()
     if not (ws / "charter.yaml").exists():
@@ -414,12 +416,20 @@ def _cmd_drift(args: argparse.Namespace) -> int:
         engine.close()
     idx = {c: i for i, c in enumerate(catalog.columns)}
     live_columns: dict[str, set[str]] = {}
+    fingerprint: dict[str, dict[str, str]] = {}  # relation -> {column: type}
     for row in catalog.rows:
-        if row[idx["database"]] in ("system", "temp"):
+        db = row[idx["database"]]
+        if db in ("system", "temp", "local"):
             continue
-        live_columns[row[idx["name"]]] = set(row[idx["column_names"]])
+        name = row[idx["name"]]
+        relation = name if db == "memory" else f"{db}.{name}"
+        cols = list(row[idx["column_names"]])
+        types = list(row[idx["column_types"]])
+        fingerprint[relation] = dict(zip(cols, types, strict=False))
+        live_columns[name] = set(cols)
 
     problems: list[str] = []
+    # Existence checks: declared tables and PII columns must still be present.
     for src in charter.sources:
         for table in src.tables:
             if table not in live_columns:
@@ -436,8 +446,35 @@ def _cmd_drift(args: argparse.Namespace) -> int:
                     problems.append(
                         f"{src.name}: PII column '{table}.{col}' no longer exists (masking gap)"
                     )
+
+    # Shape checks: compare column set/types against a recorded baseline.
+    baseline = ws / ".datacharter" / "schema.json"
+    if args.update:
+        baseline.parent.mkdir(parents=True, exist_ok=True)
+        baseline.write_text(_json.dumps(fingerprint, indent=2, sort_keys=True))
+        print("Schema baseline updated.")
+        return 0
+    if not baseline.exists():
+        baseline.parent.mkdir(parents=True, exist_ok=True)
+        baseline.write_text(_json.dumps(fingerprint, indent=2, sort_keys=True))
+    else:
+        saved = _json.loads(baseline.read_text())
+        for relation, cols in fingerprint.items():
+            old = saved.get(relation)
+            if old is None:
+                continue  # a new relation (e.g. a snapshot) is not drift of a declared source
+            for col, typ in cols.items():
+                if col not in old:
+                    pii = " — looks like PII, add it to charter.yaml" if classify_pii([col]) else ""
+                    problems.append(f"{relation}: new column '{col}' ({typ}){pii}")
+                elif old[col] != typ:
+                    problems.append(f"{relation}: column '{col}' retyped {old[col]} -> {typ}")
+            for col in old:
+                if col not in cols:
+                    problems.append(f"{relation}: column '{col}' removed")
+
     if not problems:
-        print("No schema drift: all declared tables and PII columns are present.")
+        print("No schema drift: declared tables/PII present and column shapes unchanged.")
         return 0
     print("Schema drift detected:")
     for problem in problems:
@@ -544,6 +581,41 @@ def _cmd_metric(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_query(args: argparse.Namespace) -> int:
+    import csv
+    import json as _json
+
+    from datacharter.contracts import load_charter
+    from datacharter.engine.guard import QueryNotAllowed
+    from datacharter.engine.session import EngineError
+
+    ws = Path(args.directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+    charter = load_charter(ws)
+    engine = _open_engine(ws, charter.sources)
+    try:
+        result = engine.query_sync(args.sql)
+    except (EngineError, QueryNotAllowed) as exc:
+        print(f"Query failed: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        engine.close()
+    if args.format == "json":
+        rows = [dict(zip(result.columns, r, strict=True)) for r in result.rows]
+        print(_json.dumps(rows, default=str))
+    elif args.format == "csv":
+        writer = csv.writer(sys.stdout)
+        writer.writerow(result.columns)
+        writer.writerows(result.rows)
+    else:  # table
+        print(" | ".join(result.columns))
+        for row in result.rows:
+            print(" | ".join("" if v is None else str(v) for v in row))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="datacharter", description="Charter your data.")
     parser.add_argument("--version", action="version", version=f"datacharter {__version__}")
@@ -612,9 +684,12 @@ def main(argv: list[str] | None = None) -> int:
     p_scan.set_defaults(func=_cmd_scan)
 
     p_drift = sub.add_parser(
-        "drift", help="Report schema drift: declared tables/PII vs the live sources"
+        "drift", help="Report schema drift: declared tables/PII + column shape vs a baseline"
     )
     p_drift.add_argument("directory", nargs="?", default=".")
+    p_drift.add_argument(
+        "--update", action="store_true", help="Record the current schema as the new baseline"
+    )
     p_drift.set_defaults(func=_cmd_drift)
 
     p_explain = sub.add_parser(
@@ -631,6 +706,14 @@ def main(argv: list[str] | None = None) -> int:
     p_sample.add_argument("--rows", type=int, default=10, help="Rows to sample (default 10)")
     p_sample.add_argument("directory", nargs="?", default=".")
     p_sample.set_defaults(func=_cmd_sample)
+
+    p_query = sub.add_parser("query", help="Run a read-only SQL query and print the result")
+    p_query.add_argument("sql")
+    p_query.add_argument("directory", nargs="?", default=".")
+    p_query.add_argument(
+        "--format", choices=["table", "csv", "json"], default="table", help="Output format"
+    )
+    p_query.set_defaults(func=_cmd_query)
 
     p_metric = sub.add_parser(
         "metric", help="Run a contract-defined metric (charter.yaml metrics:)"

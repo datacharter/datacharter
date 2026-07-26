@@ -62,3 +62,56 @@ def test_build_configs_locks_down(tmp_path):
     assert "Bash" in s["permissions"]["deny"] and "Agent" in s["permissions"]["deny"]
     m = json.loads(mcp.read_text())
     assert m["mcpServers"]["datacharter"]["args"] == ["mcp", "--serve-url", "http://127.0.0.1:9"]
+
+
+def test_deny_list_round_trips(tmp_path):
+    assert cc.load_deny(tmp_path) is None
+    cc.save_deny(tmp_path, ["Bash", "CustomPluginTool"])
+    assert cc.load_deny(tmp_path) == ["Bash", "CustomPluginTool"]
+
+
+async def test_assert_tool_surface_warm_starts_from_persisted_deny(monkeypatch):
+    seen = {}
+
+    async def fake_probe(url, dc_bin=None, deny=None):
+        seen["deny"] = deny
+        return GOVERNED_TOOLS  # a clean surface
+
+    monkeypatch.setattr(cc, "probe_tools", fake_probe)
+    deny = await cc.assert_tool_surface("http://x", initial_deny=["CustomPluginTool"])
+    assert "CustomPluginTool" in seen["deny"]  # persisted list warm-started the probe
+    assert "CustomPluginTool" in deny
+
+
+async def test_run_turn_aborts_on_stall(monkeypatch):
+    import asyncio
+
+    class _HangStdout:
+        async def readline(self):
+            await asyncio.sleep(3600)
+
+    class _Stderr:
+        async def read(self):
+            return b"claude boom"
+
+    class _FakeProc:
+        def __init__(self):
+            self.returncode = None
+            self.stdout = _HangStdout()
+            self.stderr = _Stderr()
+
+        def kill(self):
+            self.returncode = -9
+
+        async def wait(self):
+            return self.returncode
+
+    async def fake_exec(*a, **k):
+        return _FakeProc()
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
+    monkeypatch.setattr(cc, "_TURN_IDLE_TIMEOUT_S", 0.2)
+    events = [ev async for ev in cc.run_turn("q", "http://x")]
+    errs = [e for e in events if e["kind"] == "error"]
+    assert errs and "no output" in errs[0]["detail"]
+    assert "boom" in errs[0]["detail"]

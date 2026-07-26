@@ -14,9 +14,11 @@ export default function LLMConfig({
   const [model, setModel] = useState(current?.model ?? "");
   const [apiKey, setApiKey] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
+  const [msgKind, setMsgKind] = useState<"ok" | "pending" | "error">("pending");
 
   const save = async () => {
     setMsg("Saving…");
+    setMsgKind("pending");
     try {
       await api.configureLLM({
         base_url: baseUrl || undefined,
@@ -26,6 +28,7 @@ export default function LLMConfig({
       onDone();
     } catch (e) {
       setMsg((e as Error).message);
+      setMsgKind("error");
     }
   };
 
@@ -57,7 +60,7 @@ export default function LLMConfig({
           <button className="primary" onClick={save}>Save</button>
           <button onClick={onCancel}>Cancel</button>
         </div>
-        {msg && <div className="source-form-msg">{msg}</div>}
+        {msg && <div className={`source-form-msg ${msgKind}`}>{msg}</div>}
       </div>
       <p className="hint">
         The API key is stored in your OS keyring, never on disk. Or set OPENAI_BASE_URL /

@@ -47,7 +47,7 @@ def test_available_reports_claude(client, monkeypatch):
 def test_connect_success_sets_backend(client, monkeypatch):
     c, ws = client
 
-    async def _ok(serve_url, dc_bin=None):
+    async def _ok(serve_url, dc_bin=None, initial_deny=None):
         return ["Bash"]  # effective deny-list (surface verified clean)
 
     monkeypatch.setattr(cc, "claude_available", lambda: True)
@@ -60,7 +60,7 @@ def test_connect_success_sets_backend(client, monkeypatch):
 def test_connect_refuses_on_governance(client, monkeypatch):
     c, ws = client
 
-    async def _boom(serve_url, dc_bin=None):
+    async def _boom(serve_url, dc_bin=None, initial_deny=None):
         raise cc.ClaudeGovernanceError("exposes non-governed tools: Bash")
 
     monkeypatch.setattr(cc, "claude_available", lambda: True)

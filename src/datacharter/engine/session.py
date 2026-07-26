@@ -567,7 +567,7 @@ class Engine:
                     f"Could not open the local state database ({STATE_DIR}/state.duckdb); "
                     "the encryption key may have changed. Restore the original key "
                     "(env DATACHARTER_STATE_KEY), or delete that file to start fresh "
-                    "(this discards saved snapshots and history)."
+                    "(this discards saved snapshots)."
                 ) from None
             raise exc
 

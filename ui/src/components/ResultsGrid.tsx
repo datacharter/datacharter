@@ -120,7 +120,7 @@ export default function ResultsGrid({
       </div>
       <div className="status">
         {result.row_count.toLocaleString()} rows
-        {result.truncated ? " (truncated — refine your query or raise the limit)" : ""}
+        {result.truncated ? " (truncated — add a WHERE filter or LIMIT to narrow it)" : ""}
       </div>
       {result.warnings?.map((warning) => (
         <div key={warning} className="warning" role="alert">

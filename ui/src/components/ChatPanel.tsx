@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import embed from "vega-embed";
 import { api, type AgentStatus } from "../api";
 import { captionForSpec } from "../lib/caption";
+import { shouldAutoScroll } from "../lib/chatScroll";
 import ClaudeCodeConnect from "./ClaudeCodeConnect";
 import LLMConfig from "./LLMConfig";
 
@@ -19,6 +20,7 @@ export default function ChatPanel({ dark }: { dark?: boolean }) {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
+  const nearBottom = useRef(true);
   const claudeCode = status?.backend === "claude-code";
   const available = status ? status.available || claudeCode : null;
   const model = claudeCode ? "Claude Code (your subscription)" : (status?.model ?? "");
@@ -29,7 +31,16 @@ export default function ChatPanel({ dark }: { dark?: boolean }) {
   useEffect(refresh, [refresh]);
 
   useEffect(() => {
-    scroller.current?.scrollTo(0, scroller.current.scrollHeight);
+    if (nearBottom.current && scroller.current) {
+      scroller.current.scrollTo(0, scroller.current.scrollHeight);
+    }
+  }, [messages]);
+
+  const copyTranscript = useCallback(() => {
+    const text = messages
+      .map((m) => `${m.role === "user" ? "You" : "Agent"}: ${m.text}`)
+      .join("\n\n");
+    navigator.clipboard?.writeText(text).catch(() => {});
   }, [messages]);
 
   const ask = useCallback(async () => {
@@ -115,11 +126,34 @@ export default function ChatPanel({ dark }: { dark?: boolean }) {
     <div className="chat">
       <div className="chat-head">
         <span className="hint">{model}</span>
+        <button
+          className="chat-config"
+          title="Copy transcript"
+          disabled={messages.length === 0}
+          onClick={copyTranscript}
+        >
+          ⧉
+        </button>
+        <button
+          className="chat-config"
+          title="Clear chat"
+          disabled={messages.length === 0 || busy}
+          onClick={() => setMessages([])}
+        >
+          🗑
+        </button>
         <button className="chat-config" title="Configure LLM" onClick={() => setConfiguring(true)}>
           ⚙
         </button>
       </div>
-      <div className="chat-log" ref={scroller}>
+      <div
+        className="chat-log"
+        ref={scroller}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          nearBottom.current = shouldAutoScroll(el.scrollTop, el.scrollHeight, el.clientHeight);
+        }}
+      >
         {messages.length === 0 && (
           <div className="chat-empty hint">
             Ask about your data{model ? ` — ${model}` : ""}. PII stays masked.
@@ -163,7 +197,7 @@ function Message({ msg, dark }: { msg: Msg; dark?: boolean }) {
       {msg.tools.length > 0 && (
         <div className="chat-tools">{msg.tools.map((t) => `· ${t}`).join(" ")}</div>
       )}
-      {prose && <div className="chat-prose">{prose}</div>}
+      {prose && <div className="chat-prose">{renderProse(prose)}</div>}
       {spec && <VegaBlock spec={spec} dark={dark} />}
     </div>
   );
@@ -184,6 +218,27 @@ function VegaBlock({ spec, dark }: { spec: object; dark?: boolean }) {
       <div className="chat-chart" ref={ref} />
     </>
   );
+}
+
+/** Render prose with ```fenced code``` blocks as <pre><code>; plain text otherwise. */
+function renderProse(text: string): ReactNode[] {
+  const parts: ReactNode[] = [];
+  const fence = /```(?:\w*)\n?([\s\S]*?)```/g;
+  let last = 0;
+  let key = 0;
+  let m: RegExpExecArray | null = fence.exec(text);
+  while (m !== null) {
+    if (m.index > last) parts.push(<span key={key++}>{text.slice(last, m.index)}</span>);
+    parts.push(
+      <pre className="chat-code" key={key++}>
+        <code>{m[1].replace(/\n$/, "")}</code>
+      </pre>,
+    );
+    last = m.index + m[0].length;
+    m = fence.exec(text);
+  }
+  if (last < text.length) parts.push(<span key={key++}>{text.slice(last)}</span>);
+  return parts;
 }
 
 function splitVegaSpec(text: string): { prose: string; spec: object | null } {

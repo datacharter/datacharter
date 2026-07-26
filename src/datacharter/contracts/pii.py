@@ -65,6 +65,34 @@ def classify_pii(columns: list[str]) -> list[str]:
     return [col for col in columns if any(tok in col.lower() for tok in PII_TOKENS)]
 
 
+_PHONE_SEP = re.compile(r"[-()+.\s]")
+_PHONE_CHARS = set("0123456789-()+. ")
+
+
+def _luhn_ok(digits: str) -> bool:
+    total = 0
+    for i, ch in enumerate(reversed(digits)):
+        d = int(ch)
+        if i % 2 == 1:
+            d *= 2
+            if d > 9:
+                d -= 9
+        total += d
+    return total % 10 == 0
+
+
+def _looks_like_card(s: str) -> bool:
+    compact = re.sub(r"[ -]", "", s)
+    return compact.isdigit() and 13 <= len(compact) <= 19 and _luhn_ok(compact)
+
+
+def _looks_like_phone(s: str) -> bool:
+    # Require phone formatting (a separator) so bare numeric IDs aren't flagged.
+    if not _PHONE_SEP.search(s) or set(s) - _PHONE_CHARS:
+        return False
+    return 7 <= sum(c.isdigit() for c in s) <= 15
+
+
 def detect_value_pii(values: list, *, threshold: float = 0.6) -> str | None:
     """Return a PII type if most non-null sampled values match its pattern.
 
@@ -75,9 +103,14 @@ def detect_value_pii(values: list, *, threshold: float = 0.6) -> str | None:
     samples = [str(v) for v in values if v is not None]
     if len(samples) < 3:
         return None
+    n = len(samples)
     for kind, pattern in _VALUE_PATTERNS.items():
-        if sum(1 for s in samples if pattern.match(s)) / len(samples) >= threshold:
+        if sum(1 for s in samples if pattern.match(s)) / n >= threshold:
             return kind
+    if sum(1 for s in samples if _looks_like_card(s)) / n >= threshold:
+        return "credit_card"
+    if sum(1 for s in samples if _looks_like_phone(s)) / n >= threshold:
+        return "phone"
     return None
 
 
