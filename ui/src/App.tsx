@@ -9,6 +9,7 @@ import SourceTree from "./components/SourceTree";
 import SourcesView from "./components/SourcesView";
 import HelpModal from "./components/HelpModal";
 import EmptyState from "./components/EmptyState";
+import Toast from "./components/Toast";
 import { exportRequest } from "./lib/mask";
 import { useResize } from "./lib/useResize";
 import Tutorial, { hasSeenTutorial } from "./components/Tutorial";
@@ -23,12 +24,15 @@ export default function App() {
   const [sql, setSql] = useState(STARTER);
   const [result, setResult] = useState<QueryResult | null>(null);
   const [profileResult, setProfileResult] = useState<QueryResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null); // query errors: replace the grid
+  const [actionError, setActionError] = useState<string | null>(null); // background actions: toast
   const [running, setRunning] = useState(false);
   const [tab, setTab] = useState<Tab>("results");
   const [agentView, setAgentView] = useState(false);
   const [exportFormat, setExportFormat] = useState("csv");
   const [planText, setPlanText] = useState<string | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [planLoading, setPlanLoading] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [catalogLoaded, setCatalogLoaded] = useState(false);
@@ -120,11 +124,14 @@ export default function App() {
   const profile = useCallback(async () => {
     setTab("profile");
     if (profileResult) return;
+    setProfileLoading(true);
     try {
       const body = sqlRef.current.trim().replace(/;\s*$/, "");
       setProfileResult(await api.query(`SUMMARIZE ${body}`));
     } catch (e) {
-      setError((e as Error).message);
+      setActionError((e as Error).message);
+    } finally {
+      setProfileLoading(false);
     }
   }, [profileResult]);
 
@@ -137,7 +144,7 @@ export default function App() {
       body: JSON.stringify({ sql: sqlRef.current, name }),
     });
     if (resp.ok) refreshCatalog();
-    else setError((await resp.json()).error?.message ?? "Snapshot failed");
+    else setActionError((await resp.json()).error?.message ?? "Snapshot failed");
   }, [refreshCatalog]);
 
   const exportResult = useCallback(async () => {
@@ -154,7 +161,7 @@ export default function App() {
       body: JSON.stringify(body),
     });
     if (!resp.ok) {
-      setError((await resp.json()).error?.message ?? "Export failed");
+      setActionError((await resp.json()).error?.message ?? "Export failed");
       return;
     }
     const blob = await resp.blob();
@@ -172,12 +179,15 @@ export default function App() {
 
   const explain = useCallback(async () => {
     setTab("plan");
+    setPlanLoading(true);
     try {
       const body = sqlRef.current.trim().replace(/;\s*$/, "");
       const res = await api.query(`EXPLAIN ANALYZE ${body}`);
       setPlanText(res.rows.map((r) => r.join("\n")).join("\n"));
     } catch (e) {
-      setError((e as Error).message);
+      setActionError((e as Error).message);
+    } finally {
+      setPlanLoading(false);
     }
   }, []);
 
@@ -188,7 +198,7 @@ export default function App() {
       const resp = await fetch("/api/upload", { method: "POST", body: form });
       const body = await resp.json();
       if (!resp.ok) {
-        setError(body.error?.message ?? "Upload failed");
+        setActionError(body.error?.message ?? "Upload failed");
         return;
       }
       setSql(`SELECT * FROM ${body.table} LIMIT 100;`);
@@ -208,7 +218,7 @@ export default function App() {
         await (kind === "snapshot" ? api.deleteSnapshot(name) : api.deleteUpload(name));
         refreshCatalog();
       } catch (e) {
-        setError((e as Error).message);
+        setActionError((e as Error).message);
       }
     },
     [refreshCatalog],
@@ -220,7 +230,7 @@ export default function App() {
         await api.setAgentAccess(a);
         refreshCatalog();
       } catch (e) {
-        setError((e as Error).message);
+        setActionError((e as Error).message);
       }
     },
     [refreshCatalog],
@@ -259,6 +269,7 @@ export default function App() {
         />
       )}
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+      {actionError && <Toast message={actionError} onClose={() => setActionError(null)} />}
       <header className="topbar">
         <svg className="logo" viewBox="0 0 128 128" aria-hidden="true">
           <circle cx="64" cy="64" r="56" fill="none" stroke="currentColor" strokeWidth="7" />
@@ -427,7 +438,18 @@ export default function App() {
               </label>
             </div>
             <div className="tab-body">
-              {error && <div className="error-box">{error}</div>}
+              {error && (
+                <div className="error-box">
+                  <span>{error}</span>
+                  <button
+                    className="error-close"
+                    aria-label="Dismiss"
+                    onClick={() => setError(null)}
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
               {!error && tab === "results" && result && (
                 <ResultsGrid result={result} maskColumns={agentView ? maskedColumns : undefined} />
               )}
@@ -438,10 +460,18 @@ export default function App() {
                   maskColumns={agentView ? maskedColumns : undefined}
                 />
               )}
-              {!error && tab === "profile" && profileResult && (
-                <ResultsGrid result={profileResult} />
-              )}
-              {!error && tab === "plan" && planText && <pre className="plan">{planText}</pre>}
+              {!error && tab === "profile" &&
+                (profileResult ? (
+                  <ResultsGrid result={profileResult} />
+                ) : profileLoading ? (
+                  <div className="empty-state">Profiling…</div>
+                ) : null)}
+              {!error && tab === "plan" &&
+                (planText ? (
+                  <pre className="plan">{planText}</pre>
+                ) : planLoading ? (
+                  <div className="empty-state">Planning…</div>
+                ) : null)}
               {!error && !result && tab !== "profile" && (
                 <div className="empty-state">Run a query to see results.</div>
               )}

@@ -51,7 +51,7 @@ def _materialize(desc, rows):
     src = Source(name="wh", type=SourceType.SNOWFLAKE, connection={"account": "x"}, tables=["t"])
     conn = duckdb.connect()
     fake = _FakeSnowflake(rows=rows, description=desc)
-    materialize_snowflake(conn, src, ["t"], connector_factory=lambda _s: fake)
+    materialize_snowflake(conn, src, ["t"], connector=fake)
     return conn
 
 

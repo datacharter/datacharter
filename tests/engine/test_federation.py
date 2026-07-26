@@ -117,7 +117,7 @@ def test_snowflake_materializes_into_local_table(tmp_path):
         name="wh", type=SourceType.SNOWFLAKE, connection={"account": "x"}, tables=["users"]
     )
     conn = duckdb.connect()
-    materialize_snowflake(conn, src, ["users"], connector_factory=lambda _s: fake)
+    materialize_snowflake(conn, src, ["users"], connector=fake)
 
     rows = conn.execute('SELECT name FROM "wh__users" ORDER BY id').fetchall()
     assert rows == [("ada",), ("grace",)]
@@ -142,7 +142,7 @@ def test_snowflake_extract_honors_pushdown(tmp_path):
         src,
         ["users"],
         pushdowns={"users": Pushdown(columns={"email"}, predicates=["tier = 'pro'"])},
-        connector_factory=lambda _s: fake,
+        connector=fake,
     )
     sql = fake.last_cursor.executed
     # Probe is cap+1 so a full result is detectable as truncation.
@@ -182,26 +182,54 @@ def test_engine_lazy_pushdown_end_to_end(tmp_path, monkeypatch):
 
 
 def test_engine_re_extracts_on_filter_change(tmp_path, monkeypatch):
+    # The connector is now reused across queries, so re-extraction is measured by
+    # remote extract executions, not by connection count.
     from datacharter.engine import snowflake as sf_mod
 
     desc = [("id", 0, None, None, None, None, None), ("tier", 2, None, None, None, None, None)]
-    calls = []
+    extracts: list[str] = []
+    conns: list[object] = []
 
-    def fake_factory(_source):
-        fake = _FakeSnowflake(rows=[(1, "pro")], description=desc)
-        calls.append(fake)
-        return fake
+    class _Cur:
+        description = desc
 
-    monkeypatch.setattr(sf_mod, "_connect", fake_factory)
+        def __init__(self):
+            self._rows = [(1, "pro")]
+
+        def execute(self, s):
+            if "FROM users" in s:
+                extracts.append(s)
+
+        def fetchmany(self, n):
+            batch, self._rows = self._rows[:n], self._rows[n:]
+            return batch
+
+        def close(self):
+            pass
+
+    class _Conn:
+        def cursor(self):
+            return _Cur()
+
+        def close(self):
+            pass
+
+    def factory(_source):
+        c = _Conn()
+        conns.append(c)
+        return c
+
+    monkeypatch.setattr(sf_mod, "_connect", factory)
     src = Source(
         name="wh", type=SourceType.SNOWFLAKE, connection={"account": "x"}, tables=["users"]
     )
     with Engine(tmp_path, [src]) as eng:
         eng.query_sync("SELECT id FROM wh__users WHERE tier='pro'")
         eng.query_sync("SELECT id FROM wh__users WHERE tier='pro'")  # same shape -> cached
-        assert len(calls) == 1
+        assert len(extracts) == 1
         eng.query_sync("SELECT id FROM wh__users WHERE tier='free'")  # new filter -> re-extract
-        assert len(calls) == 2
+        assert len(extracts) == 2
+        assert len(conns) == 1  # one connector reused across all queries
 
 
 # -- D12: extract cap (configurable) + truncation honesty ----------------------
@@ -220,7 +248,7 @@ def test_max_rows_caps_extract_and_reports_truncation(tmp_path):
         max_rows=2,
     )
     conn = duckdb.connect()
-    result = materialize_snowflake(conn, src, ["users"], connector_factory=lambda _s: fake)
+    result = materialize_snowflake(conn, src, ["users"], connector=fake)
     assert result == {"users": 2}  # truncated at the cap of 2
     assert conn.execute('SELECT count(*) FROM "wh__users"').fetchone() == (2,)
 

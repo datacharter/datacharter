@@ -8,11 +8,13 @@ import datetime
 import re
 import shutil
 import threading
+import time
 from collections.abc import Sequence
 from pathlib import Path
 
 import duckdb
 
+from datacharter.engine import snowflake as _sf_mod
 from datacharter.engine.aggregate import build_remote_aggregation
 from datacharter.engine.guard import ensure_allowed
 from datacharter.engine.provenance import extract_provenance
@@ -85,6 +87,9 @@ class Engine:
         self._materialized: dict[str, tuple] = {}
         # alias -> cap that truncated its last extract (None/absent = complete).
         self._truncated: dict[str, int | None] = {}
+        # Reused Snowflake connectors, source name -> (connector, monotonic last-used).
+        self._sf_conns: dict[str, object] = {}
+        self._sf_last: dict[str, float] = {}
         for src in self.sources:
             self._secret_values.update(str(v) for v in src.credentials.values())
 
@@ -98,10 +103,7 @@ class Engine:
         tmp.mkdir(parents=True, exist_ok=True)
 
         self._conn = duckdb.connect()
-        self._setup("SET temp_directory = " + self._quoted(str(tmp)))
-        self._setup("SET temp_file_encryption = true")
-        if not self._allow_spill:
-            self._setup("SET max_temp_directory_size = '0'")
+        self._apply_spill(self._conn)
         self._attach_local(state)
         for src in self.sources:
             self._register(src)
@@ -132,6 +134,30 @@ class Engine:
         for table in src.tables:
             self._connector_aliases[f"{src.name}__{table}".lower()] = (src, table)
 
+    _SF_IDLE_TTL = 300.0  # reconnect a connector idle longer than this
+
+    def _sf_connector(self, src: Source):
+        """A reused Snowflake connector for this source, reconnecting if idle too
+        long. Connector access is already serialized under _exec_lock."""
+        now = time.monotonic()
+        conn = self._sf_conns.get(src.name)
+        if conn is not None and now - self._sf_last.get(src.name, 0.0) > self._SF_IDLE_TTL:
+            with contextlib.suppress(Exception):
+                conn.close()
+            conn = None
+        if conn is None:
+            conn = _sf_mod._connect(src)
+            self._sf_conns[src.name] = conn
+        self._sf_last[src.name] = now
+        return conn
+
+    def _close_sf_connector(self, name: str) -> None:
+        conn = self._sf_conns.pop(name, None)
+        self._sf_last.pop(name, None)
+        if conn is not None:
+            with contextlib.suppress(Exception):
+                conn.close()
+
     def _ensure_connectors(self, sql: str) -> list[str]:
         """Materialize any connector tables this query touches, pushing its filters.
 
@@ -150,7 +176,11 @@ class Engine:
             signature = (cols, tuple(pushdown.predicates))
             if self._materialized.get(alias) != signature:
                 try:
-                    result = materialize_snowflake(conn, src, [table], pushdowns={table: pushdown})
+                    result = materialize_snowflake(
+                        conn, src, [table],
+                        pushdowns={table: pushdown},
+                        connector=self._sf_connector(src),
+                    )
                 except Exception as exc:
                     raise self._wrap(exc) from None
                 self._materialized[alias] = signature
@@ -165,6 +195,8 @@ class Engine:
         return warnings
 
     def close(self) -> None:
+        for name in list(self._sf_conns):
+            self._close_sf_connector(name)
         if self._conn is not None:
             self._conn.close()
             self._conn = None
@@ -217,7 +249,9 @@ class Engine:
             return None
         src, table = self._connector_aliases[agg.alias]
         try:
-            rows, truncated = run_snowflake_sql(src, agg.render(table), row_limit)
+            rows, truncated = run_snowflake_sql(
+                src, agg.render(table), row_limit, connector=self._sf_connector(src)
+            )
         except Exception:
             return None
         warnings = []
@@ -251,7 +285,9 @@ class Engine:
             return None
         src, table = self._connector_aliases[agg.alias]
         try:
-            rows, _ = run_snowflake_sql(src, agg.render(table), _cap_for(src))
+            rows, _ = run_snowflake_sql(
+                src, agg.render(table), _cap_for(src), connector=self._sf_connector(src)
+            )
         except Exception:
             return None
         types = _duckdb_types(agg.columns, rows)
@@ -269,14 +305,50 @@ class Engine:
         timeout_s: float = 60.0,
         row_limit: int = DEFAULT_ROW_LIMIT,
     ) -> QueryResult:
-        """Async wrapper around query_sync with interrupt-based timeout.
+        """Async query with an interrupt-based timeout.
 
-        Serialized per engine: one connection, one in-flight query — keeps
-        interrupt() scoped to the query that armed the timer.
+        Non-connector reads run concurrently, each on its own cursor with its own
+        interrupt. Connector (Snowflake) reads stay serialized because they lazily
+        materialize (a write) inside the read path, and re-extract on filter change.
         """
         conn = self._require_conn()
-        async with self._query_lock:
-            return await self._query_locked(conn, sql, timeout_s, row_limit)
+        if self._connector_aliases:
+            async with self._query_lock:
+                return await self._query_locked(conn, sql, timeout_s, row_limit)
+        return await self._query_concurrent(sql, timeout_s, row_limit)
+
+    async def _query_concurrent(self, sql: str, timeout_s: float, row_limit: int) -> QueryResult:
+        """Run one read on its own cursor (shares the in-memory DB) without the
+        exclusive lock, so reads don't serialize. The cursor's own interrupt keeps
+        the timeout scoped to this query."""
+        normalized = ensure_allowed(sql)
+        cur = self._require_conn().cursor()
+        self._apply_spill(cur)
+        loop = asyncio.get_running_loop()
+        timer = loop.call_later(timeout_s, cur.interrupt)
+        try:
+            result = await asyncio.to_thread(self._run_on_cursor, cur, normalized, row_limit)
+        except EngineError as exc:
+            if timer.cancelled() or not timer.when() > loop.time():
+                raise QueryTimeout(f"Query exceeded {timeout_s}s and was interrupted.") from None
+            raise exc
+        finally:
+            timer.cancel()
+            cur.close()
+        result.provenance = extract_provenance(sql)
+        return result
+
+    def _run_on_cursor(self, cur, normalized: str, row_limit: int) -> QueryResult:
+        try:
+            c = cur.execute(normalized)
+            columns = [d[0] for d in c.description] if c.description else []
+            rows = c.fetchmany(row_limit + 1) if columns else []
+        except duckdb.Error as exc:
+            raise self._wrap(exc) from None
+        capped = rows[:row_limit]
+        return QueryResult(
+            columns=columns, rows=capped, row_count=len(capped), truncated=len(rows) > row_limit
+        )
 
     async def diff(
         self,
@@ -384,6 +456,7 @@ class Engine:
         """Deregister a source: drop its views/materialized tables and detach."""
         with self._exec_lock:
             conn = self._require_conn()
+            self._close_sf_connector(name)
             src = next((s for s in self.sources if s.name == name), None)
             for alias in [a for a, (s, _t) in self._connector_aliases.items() if s.name == name]:
                 with contextlib.suppress(duckdb.Error):
@@ -502,6 +575,18 @@ class Engine:
         conn = self._require_conn()
         try:
             conn.execute(stmt)
+        except duckdb.Error as exc:
+            raise self._wrap(exc) from None
+
+    def _apply_spill(self, target) -> None:
+        """Apply the spill-hygiene pragmas to a connection or cursor. These are
+        connection-scoped, so every read cursor must re-apply them (security invariant)."""
+        tmp = self.workspace / STATE_DIR / "tmp"
+        try:
+            target.execute("SET temp_directory = " + self._quoted(str(tmp)))
+            target.execute("SET temp_file_encryption = true")
+            if not self._allow_spill:
+                target.execute("SET max_temp_directory_size = '0'")
         except duckdb.Error as exc:
             raise self._wrap(exc) from None
 

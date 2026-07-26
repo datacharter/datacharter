@@ -5,6 +5,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-07-26
+
+### Added
+
+- Concurrent reads: queries on local/attached (non-connector) workspaces now run
+  in parallel, each on its own cursor with its own timeout — a long query no
+  longer freezes the live preview, the agent, or the catalog. (Snowflake queries
+  stay serialized, since they materialize on read.)
+- Snowflake sources now accept an `authenticator` (e.g. `externalbrowser`,
+  `oauth`) for SSO/MFA, and the connector is reused across queries instead of
+  reconnecting every time (removing seconds of login latency per query).
+
+### Fixed
+
+- Background-action failures (export, snapshot, upload, an agent-access toggle)
+  now show a dismissible toast instead of replacing the entire results/chart/
+  profile pane; the query error box is dismissible too.
+- The Profile and Explain tabs show a "Profiling…" / "Planning…" placeholder
+  while they load, instead of a blank panel.
+
 ## [0.4.1] - 2026-07-25
 
 ### Security
