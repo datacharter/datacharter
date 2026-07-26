@@ -60,6 +60,8 @@ class Source(BaseModel):
     pii: dict[str, list[str]] = Field(default_factory=dict)
     #: Agent-access overrides (on=real, off=masked) at source/table/column level.
     agent_access: dict = Field(default_factory=dict)
+    #: Row-level filters for the agent surface: table -> SQL boolean predicate.
+    row_filters: dict[str, str] = Field(default_factory=dict)
     #: Connector-extract cap (Snowflake). Overrides the engine default; ignored
     #: for ATTACH/file sources, which stream and are not row-capped.
     max_rows: int | None = Field(default=None, gt=0)

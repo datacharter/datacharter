@@ -7,6 +7,8 @@ from typing import Any
 
 from datacharter.agent.access_guard import check_query_access
 from datacharter.contracts.access import resolve_masked
+from datacharter.engine.provenance import extract_provenance
+from datacharter.engine.row_filter import apply_row_filters
 from datacharter.engine.session import Engine
 from datacharter.models import QueryResult, Source
 
@@ -85,6 +87,12 @@ class ToolBox:
         self._overrides = {s.name: s.agent_access for s in sources if s.agent_access}
         # Names that may be masked, for the access guard's parse-failure fallback.
         self._masked_names: set[str] = set(self._pii) | set(self._auto_pii)
+        # Row-level filters for the agent surface: table (and source__table alias) -> predicate.
+        self._row_filters: dict[str, str] = {}
+        for src in sources:
+            for tbl, pred in src.row_filters.items():
+                self._row_filters[tbl.lower()] = pred
+                self._row_filters[f"{src.name}__{tbl}".lower()] = pred
         # Query budget: a per-query statement timeout (the 50-row result cap below
         # already bounds egress). EXPLAIN can't reliably give output cardinality —
         # aggregate roots print no estimate — so the timeout is the robust backstop.
@@ -146,7 +154,13 @@ class ToolBox:
     async def _query(self, args: dict) -> str:
         sql = str(args.get("sql", ""))
         check_query_access(sql, is_masked=self._masked, masked_names=self._masked_names)
-        result = await self._engine.query(sql, row_limit=_MAX_TOOL_ROWS, timeout_s=self._timeout_s)
+        run_sql = apply_row_filters(sql, self._row_filters) if self._row_filters else sql
+        result = await self._engine.query(
+            run_sql, row_limit=_MAX_TOOL_ROWS, timeout_s=self._timeout_s
+        )
+        if run_sql != sql:
+            # Mask + report the ORIGINAL query, not the injected filter subquery.
+            result.provenance = extract_provenance(sql)
         return self._render(result, self._mask_indices(result))
 
     def _masked(self, source: str, table: str, column: str) -> bool:

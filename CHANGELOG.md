@@ -5,6 +5,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-26
+
+### Added
+
+- **Row-level security for the agent.** Declare `row_filters` in `charter.yaml`
+  (a table → SQL predicate map, e.g. `orders: "region = 'US'"`) and the agent,
+  MCP, and Claude Code surfaces see only matching rows — their queries are
+  rewritten to honor the filter, fail-closed (a query that references a filtered
+  table but can't be rewritten is refused, never run unfiltered). The human SQL
+  editor is unaffected. Composes with `pii`/`agent_access` column masking, so you
+  can mask columns *and* restrict rows. Predicates are static (the local core has
+  no per-user principal).
+
 ## [0.5.0] - 2026-07-26
 
 A polish release: correctness, safety, and accessibility across the CLI, engine,

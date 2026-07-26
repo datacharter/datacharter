@@ -184,3 +184,16 @@ def test_wrong_version_rejected(tmp_path):
     ws = write_charter(tmp_path, "version: 2\nsources:\n  f:\n    type: csv\n    path: x.csv\n")
     with pytest.raises(CharterError, match=r"unsupported version"):
         load_charter(ws)
+
+
+def test_loader_parses_row_filters(tmp_path):
+    from datacharter.contracts import load_charter
+
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "o.csv").write_text("a,region\n1,US\n")
+    (tmp_path / "charter.yaml").write_text(
+        "version: 1\nsources:\n  store:\n    type: csv\n    path: data/o.csv\n"
+        "    row_filters:\n      o: \"region = 'US'\"\n"
+    )
+    charter = load_charter(tmp_path)
+    assert charter.sources[0].row_filters == {"o": "region = 'US'"}

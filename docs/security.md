@@ -41,6 +41,10 @@ values by conditioning results on them (e.g. `WHERE email = '…'` or
 read-only guard uses. This does not apply to the local human SQL editor, which
 returns real values.
 
+Row-level security is available too: `row_filters` in `charter.yaml` restrict the
+agent to specific rows per table (its queries are rewritten to honor the filter,
+fail-closed). Again, the human SQL editor is unaffected.
+
 ## Credentials never touch disk in the clear
 
 - `charter.yaml` may only reference secrets as `${NAME}`; literal secret values

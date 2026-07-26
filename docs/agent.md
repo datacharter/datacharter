@@ -93,6 +93,10 @@ The agent runs a short tool loop over a small set of **read-only** tools:
   column may be selected (values return as `•••`) but cannot be used to filter,
   join, group, or order results, so its values can't be inferred by predicate.
   The human SQL editor is unaffected.
+- **Row-level security (optional).** Declare `row_filters` in `charter.yaml` to
+  limit the agent to specific rows per table (e.g. `orders: "region = 'US'"`);
+  its queries are rewritten to honor the filter, fail-closed. See the
+  [charter.yaml reference](charter-yaml.html#row_filters).
 - **Read-only is enforced in the engine**, not just the prompt: a statement
   allowlist rejects anything but queries (the only write path is `local.*` DDL
   for snapshots). The agent cannot modify your data.

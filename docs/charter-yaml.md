@@ -143,6 +143,25 @@ agent_access:
 The **data explorer's left panel** writes this block for you: the 👁 / 🙈
 toggles on each source, table, and column persist straight into `agent_access`.
 
+### `row_filters`
+
+Optional. Row-level security for the **agent** surface: a mapping of table name
+to a SQL boolean predicate. Queries the agent, MCP, or Claude Code run against a
+filtered table are rewritten to see only rows matching the predicate; the human
+SQL editor is unaffected. Rewriting is fail-closed — if a filtered table is
+referenced but the query can't be rewritten, it is refused rather than run
+unfiltered.
+
+```yaml
+row_filters:
+  orders: "region = 'US'"
+  customers: "tier != 'internal'"
+```
+
+Predicates are static (authored in the contract); the local OSS core has no
+per-user principal, so there is no `${...}` interpolation. Combine with `pii`
+/ `agent_access` to mask columns *and* restrict rows.
+
 ### `max_rows`
 
 An integer greater than zero. The extract cap for a **connector** source

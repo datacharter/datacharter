@@ -122,6 +122,7 @@ def _build_source(name: str, body: Any, resolver: SecretResolver, warnings: list
             tables=list(body.get("tables") or []),
             pii={k: list(v) for k, v in (body.get("pii") or {}).items()},
             agent_access=dict(body.get("agent_access") or {}),
+            row_filters=dict(body.get("row_filters") or {}),
             max_rows=max_rows,
         )
     except ValidationError as exc:
