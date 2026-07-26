@@ -10,6 +10,8 @@ import SourcesView from "./components/SourcesView";
 import HelpModal from "./components/HelpModal";
 import EmptyState from "./components/EmptyState";
 import Toast from "./components/Toast";
+import CommandPalette from "./components/CommandPalette";
+import { type Command } from "./lib/commandPalette";
 import { shouldReplaceEditor } from "./lib/editorGuard";
 import { exportRequest } from "./lib/mask";
 import { useResize } from "./lib/useResize";
@@ -40,6 +42,7 @@ export default function App() {
   const [catalogLoaded, setCatalogLoaded] = useState(false);
   const [view, setView] = useState<"explorer" | "sources">("explorer");
   const [showHelp, setShowHelp] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">(
     () => (localStorage.getItem("dc-theme") as "light" | "dark") || "light",
   );
@@ -264,6 +267,40 @@ export default function App() {
     [uploadFile],
   );
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const commands = useMemo<Command[]>(() => {
+    const a = (id: string, label: string, run: () => void): Command => ({ id, label, run });
+    const actions = [
+      a("run", "Run query", () => run()),
+      a("export", "Export result", () => exportResult()),
+      a("snapshot", "Snapshot result", () => snapshot()),
+      a("profile", "Profile", () => profile()),
+      a("explain", "Explain plan", () => explain()),
+      a("tab-results", "Go to Results", () => setTab("results")),
+      a("tab-chart", "Go to Chart", () => setTab("chart")),
+      a("tab-plan", "Go to Plan", () => setTab("plan")),
+      a("agent-view", "Toggle Agent view", () => setAgentView((v) => !v)),
+      a("theme", "Toggle theme", () => setTheme((t) => (t === "dark" ? "light" : "dark"))),
+      a("help", "Help — About & FAQ", () => setShowHelp(true)),
+      a("tour", "Take the tour", () => setShowTutorial(true)),
+    ];
+    const tableCmds = tables.map((t) => {
+      const rel = t.source === "memory" ? t.table : `${t.source}.${t.table}`;
+      return a(`open:${rel}`, `Open ${rel}`, () => pickRelation(rel));
+    });
+    return [...actions, ...tableCmds];
+  }, [run, exportResult, snapshot, profile, explain, pickRelation, tables]);
+
   return (
     <div
       className={dragging ? "app dragging" : "app"}
@@ -289,6 +326,9 @@ export default function App() {
       )}
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
       {actionError && <Toast message={actionError} onClose={() => setActionError(null)} />}
+      {paletteOpen && (
+        <CommandPalette commands={commands} onClose={() => setPaletteOpen(false)} />
+      )}
       <header className="topbar">
         <svg className="logo" viewBox="0 0 128 128" aria-hidden="true">
           <circle cx="64" cy="64" r="56" fill="none" stroke="currentColor" strokeWidth="7" />

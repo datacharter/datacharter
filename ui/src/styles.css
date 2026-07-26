@@ -960,3 +960,25 @@ table.grid td.rownum, table.grid th.rownum {
 .source-form-msg.ok { color: var(--ok); }
 .source-form-msg.error { color: var(--danger); }
 .source-form-msg.pending { color: var(--text-dim); }
+
+/* ⌘K command palette */
+.cmdk-overlay {
+  position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, 0.35);
+  display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh;
+}
+.cmdk {
+  width: min(560px, 92vw); background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 10px; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35); overflow: hidden;
+}
+.cmdk-input {
+  width: 100%; border: 0; border-bottom: 1px solid var(--border); padding: 14px 16px;
+  font-size: 15px; background: transparent; color: var(--text); outline: none;
+}
+.cmdk-list { list-style: none; margin: 0; padding: 6px; max-height: 50vh; overflow-y: auto; }
+.cmdk-item {
+  display: flex; justify-content: space-between; gap: 12px; padding: 8px 12px;
+  border-radius: 6px; cursor: pointer; color: var(--text);
+}
+.cmdk-item.active { background: var(--accent-soft); }
+.cmdk-hint { color: var(--text-dim); font-size: 12px; }
+.cmdk-empty { padding: 10px 12px; color: var(--text-dim); }

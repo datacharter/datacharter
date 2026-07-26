@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-26
+
+### Added
+
+- **Command palette (⌘K / Ctrl-K):** fuzzy-jump to any table or run any action —
+  Run, Export, Snapshot, Profile, Explain, switch tabs, toggle Agent view or
+  theme, open Help/tour, or "Open `<relation>`" to load a table. ↑/↓ to move,
+  Enter to run, Esc to close. A fast keyboard-driven path through the app.
+
 ## [0.6.0] - 2026-07-26
 
 ### Added
