@@ -22,22 +22,27 @@ def _engine(tmp_path):
 
 
 def test_concurrent_reads_do_not_serialize(tmp_path):
+    # A trivial fast query must not be blocked behind a slow one. This tests the
+    # lock (not CPU speedup), so it holds even on a 2-core CI runner where two
+    # CPU-bound queries wouldn't parallelize in wall-clock terms.
     eng = _engine(tmp_path)
-    slow = "SELECT count(*) FROM range(1500000000) t(x) WHERE x % 7 = 3"
+    slow = "SELECT count(*) FROM range(2000000000) t(x) WHERE x % 7 = 3"
     try:
 
         async def main():
+            slow_task = asyncio.create_task(eng.query(slow, timeout_s=60))
+            await asyncio.sleep(0.3)  # let the slow query start
             t0 = time.perf_counter()
-            await eng.query(slow, timeout_s=60)
-            single = time.perf_counter() - t0
-            t1 = time.perf_counter()
-            await asyncio.gather(eng.query(slow, timeout_s=60), eng.query(slow, timeout_s=60))
-            pair = time.perf_counter() - t1
-            return single, pair
+            fast = await eng.query("SELECT 1 AS one", timeout_s=60)
+            fast_elapsed = time.perf_counter() - t0
+            slow_running = not slow_task.done()  # was the slow query still in flight?
+            await slow_task
+            return fast, fast_elapsed, slow_running
 
-        single, pair = asyncio.run(main())
-        # Serialized -> pair ~= 2x single. Concurrent -> pair ~= single.
-        assert pair < single * 1.7, f"pair={pair:.2f}s single={single:.2f}s (looks serialized)"
+        fast, fast_elapsed, slow_running = asyncio.run(main())
+        assert fast.rows[0][0] == 1
+        assert slow_running, "slow query already finished; can't prove overlap"
+        assert fast_elapsed < 1.0, f"fast blocked {fast_elapsed:.2f}s behind the slow query"
     finally:
         eng.close()
 
