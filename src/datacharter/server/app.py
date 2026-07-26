@@ -52,6 +52,7 @@ class SaveQueryRequest(BaseModel):
 class ExportRequest(BaseModel):
     sql: str
     format: str = Field(pattern=r"^(csv|parquet|json|xlsx)$")
+    mask_columns: list[str] = Field(default_factory=list)
 
 
 class SnapshotRequest(BaseModel):
@@ -84,6 +85,21 @@ _QUERY_NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_\-]{0,62}$")
 
 def _error(status: int, kind: str, message: str) -> JSONResponse:
     return JSONResponse(status_code=status, content={"error": {"type": kind, "message": message}})
+
+
+def _quote_ident(name: str) -> str:
+    return '"' + name.replace('"', '""') + '"'
+
+
+def _mask_export_sql(sql: str, mask_columns: list[str]) -> str:
+    """Wrap `sql` so the named output columns come back as '•••'. Stays a read-only
+    SELECT; the injected value is always the literal mask and identifiers are quoted,
+    so a column name cannot break out of the REPLACE clause."""
+    if not mask_columns:
+        return sql
+    repl = ", ".join(f"'•••' AS {_quote_ident(c)}" for c in mask_columns)
+    inner = sql.strip().rstrip(";")
+    return f"SELECT * REPLACE ({repl}) FROM (\n{inner}\n) _dc_export"
 
 
 def create_app(
@@ -341,8 +357,9 @@ def create_app(
 
     @app.post("/api/export")
     async def export(body: ExportRequest) -> FileResponse:
+        sql = _mask_export_sql(body.sql, body.mask_columns)
         dest = workspace / ".datacharter" / "tmp" / f"export-{uuid.uuid4().hex[:8]}.{body.format}"
-        await asyncio.to_thread(app.state.engine.export_sync, body.sql, body.format, dest)
+        await asyncio.to_thread(app.state.engine.export_sync, sql, body.format, dest)
         media = {
             "csv": "text/csv",
             "json": "application/json",

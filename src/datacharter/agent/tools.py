@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from datacharter.agent.access_guard import check_query_access
 from datacharter.contracts.access import resolve_masked
 from datacharter.engine.session import Engine
 from datacharter.models import QueryResult, Source
@@ -76,6 +77,8 @@ class ToolBox:
         self._auto_pii = auto_pii or set()
         # Per-source agent-access overrides (on=real, off=masked).
         self._overrides = {s.name: s.agent_access for s in sources if s.agent_access}
+        # Names that may be masked, for the access guard's parse-failure fallback.
+        self._masked_names: set[str] = set(self._pii) | set(self._auto_pii)
 
     async def run(self, name: str, arguments: str) -> str:
         try:
@@ -117,10 +120,22 @@ class ToolBox:
         if not _is_safe_relation(relation):
             return "Error: invalid relation name."
         result = await self._engine.query(f"DESCRIBE {relation}", timeout_s=30)
-        return self._render(result, set())  # schema is always visible; values masked only in query
+        parts = relation.split(".")
+        source = parts[-2] if len(parts) >= 2 else ""
+        table = parts[-1]
+        name_idx = result.columns.index("column_name") if "column_name" in result.columns else 0
+        masked = [
+            str(row[name_idx])
+            for row in result.rows
+            if self._masked(source, table, str(row[name_idx]))
+        ]
+        payload = json.loads(self._render(result, set()))  # schema always visible
+        payload["masked_columns"] = masked
+        return json.dumps(payload, default=str)
 
     async def _query(self, args: dict) -> str:
         sql = str(args.get("sql", ""))
+        check_query_access(sql, is_masked=self._masked, masked_names=self._masked_names)
         result = await self._engine.query(sql, row_limit=_MAX_TOOL_ROWS)
         return self._render(result, self._mask_indices(result))
 

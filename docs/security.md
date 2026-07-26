@@ -31,6 +31,16 @@ engine registers from your `charter.yaml`, never through ad-hoc readers in a
 query. Because the check is the parser (not a text filter), comment, quote, and
 dollar-quote tricks don't get past it.
 
+## Agent access is enforced, not display-only
+
+For the agent, MCP, and Claude Code surfaces, a masked column may appear only in
+the `SELECT` list (its values return as `•••`). Using it in `WHERE`, `JOIN`,
+`GROUP BY`, `ORDER BY`, or a subquery is refused, so a model cannot infer masked
+values by conditioning results on them (e.g. `WHERE email = '…'` or
+`ORDER BY email`). The refusal is fail-closed and reuses the same parser the
+read-only guard uses. This does not apply to the local human SQL editor, which
+returns real values.
+
 ## Credentials never touch disk in the clear
 
 - `charter.yaml` may only reference secrets as `${NAME}`; literal secret values

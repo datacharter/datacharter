@@ -89,7 +89,10 @@ The agent runs a short tool loop over a small set of **read-only** tools:
   [`agent_access`](charter-yaml.html#agent_access) block — to unmask a
   non-sensitive column or hide one that isn't PII. Flip **Agent view** on any
   result to see exactly what the agent receives. The same governance applies over
-  [MCP](mcp.html) and to Claude Code.
+  [MCP](mcp.html) and to Claude Code. Masking is enforced, not cosmetic: a masked
+  column may be selected (values return as `•••`) but cannot be used to filter,
+  join, group, or order results, so its values can't be inferred by predicate.
+  The human SQL editor is unaffected.
 - **Read-only is enforced in the engine**, not just the prompt: a statement
   allowlist rejects anything but queries (the only write path is `local.*` DDL
   for snapshots). The agent cannot modify your data.

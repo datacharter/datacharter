@@ -130,6 +130,46 @@ def test_export_rejects_writes(client):
     assert resp.status_code == 400
 
 
+def test_export_masks_requested_columns(client):
+    resp = client.post(
+        "/api/export",
+        json={
+            "sql": "SELECT id, email FROM store.customers ORDER BY id",
+            "format": "csv",
+            "mask_columns": ["email"],
+        },
+    )
+    assert resp.status_code == 200
+    text = resp.content.decode()
+    assert "•••" in text
+    assert "@" not in text  # no real email leaked
+
+
+def test_export_without_mask_columns_is_unchanged(client):
+    resp = client.post(
+        "/api/export",
+        json={"sql": "SELECT email FROM store.customers ORDER BY id", "format": "csv"},
+    )
+    assert resp.status_code == 200
+    assert "@" in resp.content.decode()  # real values
+
+
+def test_export_mask_column_name_is_injection_safe(client):
+    # a quote in the identifier must be doubled, not break out of the REPLACE clause
+    resp = client.post(
+        "/api/export",
+        json={
+            "sql": 'SELECT email AS "wei""rd" FROM store.customers ORDER BY id',
+            "format": "csv",
+            "mask_columns": ['wei"rd'],
+        },
+    )
+    assert resp.status_code == 200
+    text = resp.content.decode()
+    assert "•••" in text
+    assert "@" not in text
+
+
 def test_snapshot_creates_local_table(client):
     resp = client.post("/api/snapshot", json={"sql": "SELECT 7 AS lucky", "name": "mysnap"})
     assert resp.status_code == 200

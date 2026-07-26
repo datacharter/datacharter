@@ -4,40 +4,55 @@ import type { QueryResult } from "../api";
 import { applicableKinds, buildSpec, detectChart, type ChartConfig, type ChartKind } from "../lib/chartSpec";
 import { captionForConfig } from "../lib/caption";
 import { classifyColumns } from "../lib/columns";
+import { withoutColumns } from "../lib/mask";
 
-/** Auto-detected Vega-Lite chart with manual overrides; agent specs plug in later. */
-export default function ChartPanel({ result, dark }: { result: QueryResult; dark?: boolean }) {
-  const detected = useMemo(() => detectChart(result), [result]);
+/** Auto-detected Vega-Lite chart with manual overrides; agent specs plug in later.
+ *  With `maskColumns`, those columns are dropped entirely — a chart of ••• is
+ *  meaningless, and dropping keeps raw PII out of Vega's embedded data (Agent view). */
+export default function ChartPanel({
+  result,
+  dark,
+  maskColumns,
+}: {
+  result: QueryResult;
+  dark?: boolean;
+  maskColumns?: Set<string>;
+}) {
+  const view = useMemo(
+    () => (maskColumns ? withoutColumns(result, maskColumns) : result),
+    [result, maskColumns],
+  );
+  const detected = useMemo(() => detectChart(view), [view]);
   const [config, setConfig] = useState<ChartConfig | null>(detected);
   const container = useRef<HTMLDivElement>(null);
-  const view = useRef<EmbedResult | null>(null);
+  const embedded = useRef<EmbedResult | null>(null);
 
   useEffect(() => setConfig(detected), [detected]);
 
   useEffect(() => {
     if (!container.current || !config) return;
     let cancelled = false;
-    embed(container.current, buildSpec(result, config), {
+    embed(container.current, buildSpec(view, config), {
       actions: { export: true, source: false, compiled: false, editor: false },
       theme: dark ? "dark" : undefined,
     }).then((r) => {
       if (cancelled) r.view.finalize();
-      else view.current = r;
+      else embedded.current = r;
     });
     return () => {
       cancelled = true;
-      view.current?.view.finalize();
-      view.current = null;
+      embedded.current?.view.finalize();
+      embedded.current = null;
     };
-  }, [result, config, dark]);
+  }, [view, config, dark]);
 
   if (!detected || !config) {
     return <div className="empty-state">No chartable columns in this result.</div>;
   }
 
-  const classes = classifyColumns(result);
-  const numericCols = result.columns.filter((c) => classes.get(c) === "numeric");
-  const kinds = applicableKinds(result);
+  const classes = classifyColumns(view);
+  const numericCols = view.columns.filter((c) => classes.get(c) === "numeric");
+  const kinds = applicableKinds(view);
 
   return (
     <div className="chart-body">
@@ -59,7 +74,7 @@ export default function ChartPanel({ result, dark }: { result: QueryResult; dark
             value={config.x}
             onChange={(e) => setConfig({ ...config, x: e.target.value })}
           >
-            {result.columns.map((c) => (
+            {view.columns.map((c) => (
               <option key={c}>{c}</option>
             ))}
           </select>

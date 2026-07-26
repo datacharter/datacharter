@@ -9,6 +9,7 @@ import SourceTree from "./components/SourceTree";
 import SourcesView from "./components/SourcesView";
 import HelpModal from "./components/HelpModal";
 import EmptyState from "./components/EmptyState";
+import { exportRequest } from "./lib/mask";
 import { useResize } from "./lib/useResize";
 import Tutorial, { hasSeenTutorial } from "./components/Tutorial";
 import { registerCompletions } from "./monaco";
@@ -57,6 +58,8 @@ export default function App() {
   sqlRef.current = sql;
   const tablesRef = useRef(tables);
   tablesRef.current = tables;
+  const resultRef = useRef(result);
+  resultRef.current = result;
 
   const refreshCatalog = useCallback(() => {
     Promise.allSettled([
@@ -138,10 +141,17 @@ export default function App() {
   }, [refreshCatalog]);
 
   const exportResult = useCallback(async () => {
+    const { body, filename } = exportRequest(
+      sqlRef.current,
+      exportFormat,
+      agentView,
+      maskedColumns,
+      resultRef.current?.columns ?? [],
+    );
     const resp = await fetch("/api/export", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ sql: sqlRef.current, format: exportFormat }),
+      body: JSON.stringify(body),
     });
     if (!resp.ok) {
       setError((await resp.json()).error?.message ?? "Export failed");
@@ -151,10 +161,10 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `datacharter-export.${exportFormat}`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-  }, [exportFormat]);
+  }, [exportFormat, agentView, maskedColumns]);
 
   const pickRelation = useCallback((relation: string) => {
     setSql(`SELECT * FROM ${relation} LIMIT 100;`);
@@ -347,8 +357,15 @@ export default function App() {
                   <option key={f}>{f}</option>
                 ))}
               </select>
-              <button onClick={exportResult} title="Download the result in the selected format">
-                Export
+              <button
+                onClick={exportResult}
+                title={
+                  agentView
+                    ? "Download the masked Agent-view result (PII → •••)"
+                    : "Download the result in the selected format"
+                }
+              >
+                Export{agentView ? " (masked)" : ""}
               </button>
               <button onClick={explain} title="Show the query plan (EXPLAIN ANALYZE)">
                 Explain
@@ -414,7 +431,13 @@ export default function App() {
               {!error && tab === "results" && result && (
                 <ResultsGrid result={result} maskColumns={agentView ? maskedColumns : undefined} />
               )}
-              {!error && tab === "chart" && result && <ChartPanel result={result} dark={dark} />}
+              {!error && tab === "chart" && result && (
+                <ChartPanel
+                  result={result}
+                  dark={dark}
+                  maskColumns={agentView ? maskedColumns : undefined}
+                />
+              )}
               {!error && tab === "profile" && profileResult && (
                 <ResultsGrid result={profileResult} />
               )}

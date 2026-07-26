@@ -1,0 +1,35 @@
+import type { QueryResult } from "../api";
+
+/** A copy of `result` with the named columns (and their row cells) removed. */
+export function withoutColumns(result: QueryResult, names: Set<string>): QueryResult {
+  const lower = new Set([...names].map((n) => n.toLowerCase()));
+  const keep = result.columns
+    .map((c, i) => [c, i] as const)
+    .filter(([c]) => !lower.has(c.toLowerCase()));
+  return {
+    ...result,
+    columns: keep.map(([c]) => c),
+    rows: result.rows.map((row) => keep.map(([, i]) => row[i])),
+  };
+}
+
+export interface ExportPlan {
+  body: { sql: string; format: string; mask_columns?: string[] };
+  filename: string;
+}
+
+/** Build the /api/export request body + download filename for the current view. */
+export function exportRequest(
+  sql: string,
+  format: string,
+  agentView: boolean,
+  masked: Set<string>,
+  resultColumns: string[],
+): ExportPlan {
+  const maskCols = agentView ? resultColumns.filter((c) => masked.has(c.toLowerCase())) : [];
+  const suffix = maskCols.length ? "-agent-view" : "";
+  return {
+    body: maskCols.length ? { sql, format, mask_columns: maskCols } : { sql, format },
+    filename: `datacharter-export${suffix}.${format}`,
+  };
+}

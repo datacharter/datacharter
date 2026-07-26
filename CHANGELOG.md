@@ -5,6 +5,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-07-25
+
+### Security
+
+- The governed agent surface (built-in agent, MCP, and Claude Code) now refuses
+  a query that uses a masked (PII) column to filter, join, group, or order —
+  closing a way an agent could infer masked values by predicate (e.g.
+  `WHERE email = '…'` or `ORDER BY email`). A masked column can still be
+  selected (its values return as `•••`). The local human SQL editor is
+  unaffected.
+
+### Fixed
+
+- "Agent view" is now consistent across the whole result surface: the Chart tab
+  drops masked columns (so no raw PII reaches the plotted data), and Export
+  downloads a masked `…-agent-view` file while Agent view is on. Previously only
+  the results grid honored the toggle.
+- Snowflake `NUMBER` columns are extracted with their true precision/scale
+  (`BIGINT`/`HUGEINT`/`DECIMAL`) instead of `DOUBLE`, so large integer keys and
+  exact decimals are no longer silently corrupted beyond 2^53.
+
 ## [0.4.0] - 2026-07-25
 
 ### Added

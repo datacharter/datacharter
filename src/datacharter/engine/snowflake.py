@@ -17,8 +17,8 @@ _EXTRACT_ROW_CAP = 1_000_000
 _CHUNK = 10_000
 
 # DuckDB type per snowflake-connector type_code (cursor.description[1]).
+# type_code 0 (FIXED/NUMBER) is resolved from precision/scale by _duckdb_type.
 _TYPE_CODE_TO_DUCKDB = {
-    0: "DOUBLE",  # FIXED / NUMBER
     1: "DOUBLE",  # REAL
     2: "VARCHAR",  # TEXT
     3: "DATE",
@@ -29,6 +29,25 @@ _TYPE_CODE_TO_DUCKDB = {
     8: "TIMESTAMP",
     13: "BOOLEAN",
 }
+
+
+def _duckdb_type(desc: tuple) -> str:
+    """DuckDB column type for one Snowflake cursor.description entry.
+
+    FIXED/NUMBER (type_code 0) is Snowflake's NUMBER(precision, scale): map it to
+    an exact type so big integer keys and decimals survive the extract — mapping
+    it to DOUBLE silently loses precision beyond 2**53."""
+    type_code = desc[1]
+    if type_code == 0:
+        precision, scale = desc[4], desc[5]
+        if scale and scale > 0:
+            if precision and precision <= 38:
+                return f"DECIMAL({precision},{scale})"
+            return "DOUBLE"
+        if precision is not None and precision <= 18:
+            return "BIGINT"
+        return "HUGEINT"
+    return _TYPE_CODE_TO_DUCKDB.get(type_code, "VARCHAR")
 
 
 class SnowflakeUnavailable(Exception):
@@ -95,7 +114,7 @@ def materialize_snowflake(
                     truncated[table] = None
                     continue
                 cols = [d[0] for d in cur.description]
-                types = [_TYPE_CODE_TO_DUCKDB.get(d[1], "VARCHAR") for d in cur.description]
+                types = [_duckdb_type(d) for d in cur.description]
                 col_defs = ", ".join(f'"{c}" {t}' for c, t in zip(cols, types, strict=False))
                 conn.execute(f'DROP TABLE IF EXISTS "{alias}"')
                 conn.execute(f'CREATE TABLE "{alias}" ({col_defs})')
