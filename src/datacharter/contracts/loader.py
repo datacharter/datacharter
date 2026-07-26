@@ -9,7 +9,7 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, Field, ValidationError
 
-from datacharter.contracts.metrics import Metric
+from datacharter.contracts.metrics import Metric, MetricJoin
 from datacharter.contracts.resolve import FULL_REF, SecretResolver, UnresolvedReference
 from datacharter.models import CONNECTOR_TYPES, FILE_TYPES, Source, SourceType
 
@@ -82,6 +82,16 @@ def _build_metric(name: str, body: Any, filename: str) -> Metric:
             relation=str(relation),
             expression=str(expression),
             dimensions=[str(d) for d in (body.get("dimensions") or [])],
+            joins=[
+                MetricJoin(
+                    relation=str(j.get("relation")),
+                    # YAML parses a bare `on:` key as the boolean True — accept both.
+                    on=str(j.get("on", j.get(True, ""))),
+                    type=str(j.get("type", "inner")),
+                )
+                for j in (body.get("joins") or [])
+            ],
+            time_column=(str(body["time_column"]) if body.get("time_column") else None),
         )
     except ValidationError as exc:
         raise CharterError(f"{filename}: metrics.{name}: {exc}") from None

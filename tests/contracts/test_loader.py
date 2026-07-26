@@ -197,3 +197,28 @@ def test_loader_parses_row_filters(tmp_path):
     )
     charter = load_charter(tmp_path)
     assert charter.sources[0].row_filters == {"o": "region = 'US'"}
+
+
+def test_loader_parses_metric_joins_and_time_column(tmp_path):
+    from datacharter.contracts import load_charter
+
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "o.csv").write_text("customer_id,total,created_at\n1,10,2024-01-01\n")
+    (tmp_path / "charter.yaml").write_text(
+        "version: 1\n"
+        "sources:\n  o:\n    type: csv\n    path: data/o.csv\n"
+        "metrics:\n"
+        "  revenue:\n"
+        "    relation: o\n"
+        "    expression: sum(total)\n"
+        "    time_column: created_at\n"
+        "    joins:\n"
+        "      - relation: c\n"
+        "        on: o.customer_id = c.id\n"
+        "        type: left\n"
+    )
+    m = load_charter(tmp_path).metrics[0]
+    assert m.time_column == "created_at"
+    assert m.joins[0].relation == "c"
+    assert m.joins[0].type == "left"
+    assert m.joins[0].on == "o.customer_id = c.id"

@@ -563,7 +563,7 @@ def _cmd_metric(args: argparse.Namespace) -> int:
         return 1
     by = [c.strip() for c in args.by.split(",")] if args.by else None
     try:
-        sql = metric_sql(metric, by=by)
+        sql = metric_sql(metric, by=by, grain=args.grain)
     except MetricError as exc:
         print(str(exc), file=sys.stderr)
         return 1
@@ -720,6 +720,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_metric.add_argument("name")
     p_metric.add_argument("--by", help="Comma-separated dimensions to group by")
+    p_metric.add_argument(
+        "--grain",
+        choices=["day", "week", "month", "quarter", "year"],
+        help="Time grain to group by (needs a metric time_column)",
+    )
     p_metric.add_argument("directory", nargs="?", default=".")
     p_metric.set_defaults(func=_cmd_metric)
 

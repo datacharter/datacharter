@@ -5,6 +5,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-26
+
+### Added
+
+- **Semantic layer: metrics with joins and time grains.** A `charter.yaml`
+  `metric` can now span tables via `joins` (`{relation, on, type}`, type ∈
+  inner/left/right/full) and declare a `time_column`, so `datacharter metric
+  revenue --grain month` resolves to one governed SELECT grouped by a
+  `date_trunc` of that column (grain ∈ day/week/month/quarter/year). A certified
+  metric can answer "revenue by region, by month" across joined sources. Metrics
+  without `joins`/`time_column` behave exactly as before.
+
 ## [0.7.0] - 2026-07-26
 
 ### Added

@@ -179,14 +179,23 @@ Optional, top-level. Declare named, governed aggregations so the agent, the
 ```yaml
 metrics:
   revenue:
-    relation: orders          # base relation (a source table or view)
-    expression: sum(total)    # the aggregate expression
-    dimensions: [customer_id] # optional default GROUP BY columns
+    relation: orders                    # base relation (a source table or view)
+    expression: sum(orders.total)       # the aggregate expression
+    dimensions: [customers.region]      # optional default GROUP BY columns
+    time_column: orders.created_at      # optional; enables --grain
+    joins:                              # optional joins across sources/tables
+      - relation: customers
+        on: orders.customer_id = customers.id
+        type: left                      # inner (default) | left | right | full
 ```
 
 Each metric resolves to a single read-only `SELECT`. Run one with
-`datacharter metric revenue` (add `--by region` to override the grouping). Joins
-across sources and time grains are not supported yet.
+`datacharter metric revenue` — add `--by region` to override the grouping, or
+`--grain month` (needs `time_column`; one of day/week/month/quarter/year) to
+group by a `date_trunc` of the time column. Joins let a metric span tables:
+`FROM relation <type> JOIN <relation> ON <on> …`. The aggregate `expression` and
+each join `on` are raw SQL (authored in the trusted contract); relations,
+dimensions, `time_column`, the grain, and the join `type` are validated.
 
 ## Secret resolution order
 
