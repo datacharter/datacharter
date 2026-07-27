@@ -222,3 +222,18 @@ def test_loader_parses_metric_joins_and_time_column(tmp_path):
     assert m.joins[0].relation == "c"
     assert m.joins[0].type == "left"
     assert m.joins[0].on == "o.customer_id = c.id"
+
+
+def test_loader_parses_tests(tmp_path):
+    from datacharter.contracts import load_charter
+
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "o.csv").write_text("id\n1\n")
+    (tmp_path / "charter.yaml").write_text(
+        "version: 1\nsources:\n  o:\n    type: csv\n    path: data/o.csv\n"
+        "tests:\n  id_not_null:\n    type: not_null\n    relation: o\n    column: id\n"
+    )
+    t = load_charter(tmp_path).tests[0]
+    assert t.name == "id_not_null"
+    assert t.type == "not_null"
+    assert t.column == "id"

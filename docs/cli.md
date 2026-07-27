@@ -66,10 +66,15 @@ Report schema drift: declared tables or PII columns that no longer exist in the
 live sources (a missing PII column is a masking gap). Exits non-zero on drift —
 usable as a CI gate.
 
-### `metric <name> [directory] [--by cols]`
+### `metric <name> [directory] [--by cols] [--grain g]`
 Run a contract-defined [metric](charter-yaml.html#metrics) — a named aggregation
 declared under `metrics:` — resolved to one governed query. `--by` overrides the
-grouping dimensions.
+grouping dimensions; `--grain day|week|month|quarter|year` groups by a
+`date_trunc` of the metric's `time_column`.
+
+### `test [directory] [--select name]`
+Run the [data assertions](charter-yaml.html#tests) declared under `tests:` and
+**exit non-zero if any fail** — for CI. `--select` runs one test by name.
 
 ### `snapshot <name> <sql> [directory]`
 Save a query's result as `local.<name>` along with its SQL.

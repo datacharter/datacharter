@@ -9,6 +9,7 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, Field, ValidationError
 
+from datacharter.contracts.datatests import DataTest
 from datacharter.contracts.metrics import Metric, MetricJoin
 from datacharter.contracts.resolve import FULL_REF, SecretResolver, UnresolvedReference
 from datacharter.models import CONNECTOR_TYPES, FILE_TYPES, Source, SourceType
@@ -31,6 +32,7 @@ class Charter(BaseModel):
     sources: list[Source]
     warnings: list[str]
     metrics: list[Metric] = Field(default_factory=list)
+    tests: list[DataTest] = Field(default_factory=list)
 
 
 def load_charter(workspace: Path | str, filename: str = CHARTER_FILE) -> Charter:
@@ -67,7 +69,15 @@ def load_charter(workspace: Path | str, filename: str = CHARTER_FILE) -> Charter
     if not isinstance(metrics_raw, dict):
         raise CharterError(f"{filename}: 'metrics' must be a mapping of name -> metric.")
     metrics = [_build_metric(str(n), b, filename) for n, b in metrics_raw.items()]
-    return Charter(version=version, sources=sources, warnings=warnings, metrics=metrics)
+
+    tests_raw = raw.get("tests") or {}
+    if not isinstance(tests_raw, dict):
+        raise CharterError(f"{filename}: 'tests' must be a mapping of name -> test.")
+    tests = [_build_test(str(n), b, filename) for n, b in tests_raw.items()]
+
+    return Charter(
+        version=version, sources=sources, warnings=warnings, metrics=metrics, tests=tests
+    )
 
 
 def _build_metric(name: str, body: Any, filename: str) -> Metric:
@@ -95,6 +105,25 @@ def _build_metric(name: str, body: Any, filename: str) -> Metric:
         )
     except ValidationError as exc:
         raise CharterError(f"{filename}: metrics.{name}: {exc}") from None
+
+
+def _build_test(name: str, body: Any, filename: str) -> DataTest:
+    if not isinstance(body, dict):
+        raise CharterError(f"{filename}: tests.{name} must be a mapping.")
+    try:
+        return DataTest(
+            name=name,
+            type=str(body.get("type", "")),
+            relation=str(body.get("relation", "")),
+            column=(str(body["column"]) if body.get("column") else None),
+            columns=[str(c) for c in (body.get("columns") or [])],
+            values=list(body.get("values") or []),
+            min=body.get("min"),
+            max=body.get("max"),
+            expression=(str(body["expression"]) if body.get("expression") else None),
+        )
+    except ValidationError as exc:
+        raise CharterError(f"{filename}: tests.{name}: {exc}") from None
 
 
 def _build_source(name: str, body: Any, resolver: SecretResolver, warnings: list[str]) -> Source:

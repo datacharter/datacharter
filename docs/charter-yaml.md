@@ -197,6 +197,36 @@ group by a `date_trunc` of the time column. Joins let a metric span tables:
 each join `on` are raw SQL (authored in the trusted contract); relations,
 dimensions, `time_column`, the grain, and the join `type` are validated.
 
+## Tests
+
+Optional, top-level. Declare data assertions and run them with `datacharter test`
+(which **exits non-zero if any fail** — drop it in CI). Each test is keyed by
+name; `type` is one of `not_null`, `unique`, `accepted_values`, `row_count`, or
+`expression`.
+
+```yaml
+tests:
+  orders_id_not_null: { type: not_null, relation: orders, column: id }
+  order_id_unique:    { type: unique, relation: orders, columns: [id] }
+  region_valid:       { type: accepted_values, relation: customers, column: region, values: [US, EU] }
+  has_orders:         { type: row_count, relation: orders, min: 1 }
+  totals_nonneg:      { type: expression, relation: orders, expression: "total >= 0" }
+```
+
+- `not_null` — `column` must have no NULLs.
+- `unique` — `columns` (or `column`) must be unique together.
+- `accepted_values` — `column` values must be within `values` (NULLs ignored).
+- `row_count` — `count(*)` must be within `min`/`max` (either or both).
+- `expression` — a boolean predicate that must hold for every row.
+
+`expression` is raw SQL (trusted contract); relations, columns, and
+`accepted_values` literals are validated/quoted. Because tests run through the
+read-only engine, they work across every source DuckDB federates. In CI:
+
+```yaml
+- run: uvx datacharter test    # non-zero exit fails the job
+```
+
 ## Secret resolution order
 
 A `${NAME}` reference is resolved in this order, first hit wins:

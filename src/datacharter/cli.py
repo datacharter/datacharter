@@ -616,6 +616,44 @@ def _cmd_query(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_test(args: argparse.Namespace) -> int:
+    from datacharter.contracts import load_charter
+    from datacharter.contracts.datatests import DataTestError, check_sql
+    from datacharter.engine.guard import QueryNotAllowed
+    from datacharter.engine.session import EngineError
+
+    ws = Path(args.directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+    charter = load_charter(ws)
+    tests = charter.tests
+    if args.select:
+        tests = [t for t in tests if t.name == args.select]
+    if not tests:
+        print("No matching tests." if args.select else "No tests declared in charter.yaml.")
+        return 0
+    engine = _open_engine(ws, charter.sources)
+    failures = 0
+    try:
+        for t in tests:
+            try:
+                n = engine.query_sync(check_sql(t)).rows[0][0]
+            except (DataTestError, EngineError, QueryNotAllowed) as exc:
+                print(f"  ✗ {t.name} — error: {exc}")
+                failures += 1
+                continue
+            if n:
+                print(f"  ✗ {t.name} — {n} failing row(s)")
+                failures += 1
+            else:
+                print(f"  ✓ {t.name}")
+    finally:
+        engine.close()
+    print(f"\n{len(tests) - failures}/{len(tests)} passed.")
+    return 1 if failures else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="datacharter", description="Charter your data.")
     parser.add_argument("--version", action="version", version=f"datacharter {__version__}")
@@ -727,6 +765,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_metric.add_argument("directory", nargs="?", default=".")
     p_metric.set_defaults(func=_cmd_metric)
+
+    p_test = sub.add_parser(
+        "test", help="Run charter data assertions (exits non-zero if any fail)"
+    )
+    p_test.add_argument("directory", nargs="?", default=".")
+    p_test.add_argument("--select", help="Run only the named test")
+    p_test.set_defaults(func=_cmd_test)
 
     p_snap = sub.add_parser("snapshot", help="Save a query result as local.<name> plus its SQL")
     p_snap.add_argument("name")

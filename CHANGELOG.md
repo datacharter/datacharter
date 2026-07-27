@@ -5,6 +5,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-26
+
+### Added
+
+- **`datacharter test` — declarative data assertions.** Declare checks under a
+  top-level `tests:` block in `charter.yaml` — `not_null`, `unique`,
+  `accepted_values`, `row_count`, and `expression` — and run them with
+  `datacharter test`, which prints ✓/✗ per test and **exits non-zero if any
+  fail** (drop it into CI). Assertions run through the read-only engine, so they
+  work across every source DuckDB federates. `--select` runs a single test.
+
 ## [0.8.0] - 2026-07-26
 
 ### Added
