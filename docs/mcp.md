@@ -61,6 +61,20 @@ Use the absolute path to your workspace (the directory containing
 `charter.yaml`). If `datacharter` is installed in a virtual environment, use its
 full path (or `uvx datacharter`).
 
+## Run it in Docker
+
+The repository ships a `Dockerfile` that runs the MCP server over stdio with a
+bundled demo workspace, so it starts and answers introspection out of the box:
+
+```sh
+docker build -t datacharter-mcp .
+docker run -i --rm datacharter-mcp                       # demo workspace
+docker run -i --rm -v "$PWD:/workspace" datacharter-mcp  # your own workspace
+```
+
+An MCP client can launch it with `"command": "docker", "args": ["run", "-i",
+"--rm", "datacharter-mcp"]`.
+
 ## Scope
 
 This is the local, single-user surface: stdio transport, no authentication —
