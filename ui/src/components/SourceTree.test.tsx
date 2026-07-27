@@ -68,6 +68,24 @@ describe("SourceTree remove affordance", () => {
     });
   });
 
+  it("renders access toggles for a local snapshot and calls onSetAccess with source 'local'", () => {
+    const onSetAccess = vi.fn();
+    const snap = {
+      source: "local", schema: "main", table: "snap", columns: ["email"],
+      access: { email: { masked: true, pii: true } },
+    };
+    render(<SourceTree sources={[]} tables={[snap]} onPick={() => {}} onSetAccess={onSetAccess} />);
+    // table-level toggle exists for the snapshot (all-masked -> flips to real)
+    fireEvent.click(screen.getByLabelText("Toggle agent access for table snap"));
+    expect(onSetAccess).toHaveBeenCalledWith({ source: "local", table: "snap", value: true });
+    // column-level toggle uses the reserved "local" source
+    fireEvent.click(screen.getByLabelText("Expand columns"));
+    fireEvent.click(screen.getByLabelText("Toggle agent access for email"));
+    expect(onSetAccess).toHaveBeenCalledWith({
+      source: "local", table: "snap", column: "email", value: true,
+    });
+  });
+
   it("does not offer remove on a charter-source table", () => {
     const src = { name: "store", type: "sqlite", path: "s.db", tables: ["orders"], pii: {}, connection: {}, has_credential: false };
     render(<SourceTree sources={[src]} tables={[t("store", "orders")]} onPick={() => {}} onRemove={() => {}} />);

@@ -170,6 +170,20 @@ as truncated. It overrides the default cap of 1,000,000. It does not apply to
 ATTACH or file sources, which stream and are not row-capped; setting it on one
 of those produces a warning.
 
+## `local_access`
+
+Optional, top-level. Agent-access overrides for `local.*` **snapshot** relations
+(`datacharter snapshot`). Same shape and precedence as a source's
+[`agent_access`](#agent_access) — snapshot columns are masked by the PII default,
+and this block overrides per column/table. The left panel's 👁 / 🙈 toggles on a
+snapshot write here.
+
+```yaml
+local_access:
+  columns:
+    snap.email: true    # let the agent see a snapshotted email column
+```
+
 ## Metrics
 
 Optional, top-level. Declare named, governed aggregations so the agent, the

@@ -141,7 +141,9 @@ def create_app(
             app.state.auto_pii = {c.lower() for cols in detected.values() for c in cols}
         except Exception:  # detection must never break serving
             app.state.auto_pii = set()
-        app.state.toolbox = ToolBox(engine, loaded.sources, auto_pii=app.state.auto_pii)
+        app.state.toolbox = ToolBox(
+            engine, loaded.sources, auto_pii=app.state.auto_pii, local_access=loaded.local_access
+        )
         try:
             yield
         finally:
@@ -195,7 +197,8 @@ def create_app(
         # Re-read the contract so the catalog/PII map + agent-access reflect an edit.
         app.state.charter = load_charter(workspace)
         app.state.toolbox = ToolBox(
-            app.state.engine, app.state.charter.sources, auto_pii=app.state.auto_pii
+            app.state.engine, app.state.charter.sources,
+            auto_pii=app.state.auto_pii, local_access=app.state.charter.local_access,
         )
 
     def _sources_payload() -> dict:
@@ -231,7 +234,11 @@ def create_app(
         from datacharter.contracts.writer import ContractWriteError
         from datacharter.contracts.writer import set_agent_access as write_access
 
-        if not any(s.name == body.source for s in app.state.charter.sources):
+        # "local" is the reserved pseudo-source for local.* snapshots; otherwise the
+        # source must be declared in the charter.
+        if body.source != "local" and not any(
+            s.name == body.source for s in app.state.charter.sources
+        ):
             return _error(404, "not_found", f"Source '{body.source}' does not exist.")
         try:
             write_access(workspace, body.source, body.table, body.column, body.value)
@@ -304,6 +311,8 @@ def create_app(
         declared_pii = {c.lower() for s in sources for cols in s.pii.values() for c in cols}
         auto_pii = app.state.auto_pii
         overrides = {s.name: s.agent_access for s in sources if s.agent_access}
+        if app.state.charter.local_access:
+            overrides["local"] = app.state.charter.local_access  # snapshot overrides
         pii_set = declared_pii | auto_pii
         listing = []
         for row in result.rows:

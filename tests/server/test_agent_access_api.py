@@ -78,3 +78,29 @@ def test_human_query_unaffected_by_mask(client):
 def test_unknown_source_404(client):
     r = client.post("/api/agent-access", json={"source": "ghost", "column": "x", "value": True})
     assert r.status_code == 404
+
+
+def _local_access(c, table):
+    for t in c.get("/api/tables").json()["tables"]:
+        if t["source"] == "local" and t["table"] == table:
+            return t["access"]
+    return {}
+
+
+def test_local_snapshot_toggle_via_api(client):
+    # snapshot a PII column into local.snap
+    r = client.post(
+        "/api/snapshot", json={"name": "snap", "sql": "SELECT email FROM store.customers"}
+    )
+    assert r.status_code == 200
+    # default: masked, and the agent sees masked
+    assert _local_access(client, "snap")["email"]["masked"] is True
+    assert _tool_query(client, "SELECT email FROM local.snap LIMIT 1")["rows"][0][0] == "•••"
+    # toggle it on via the reserved "local" source
+    r = client.post(
+        "/api/agent-access",
+        json={"source": "local", "table": "snap", "column": "email", "value": True},
+    )
+    assert r.status_code == 200 and r.json()["ok"] is True
+    assert _local_access(client, "snap")["email"]["masked"] is False  # now real
+    assert "@" in _tool_query(client, "SELECT email FROM local.snap LIMIT 1")["rows"][0][0]

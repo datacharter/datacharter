@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-07-27
+
+### Fixed
+- Agent-access toggles now appear on **local snapshots** (`local.*`) in the left
+  panel, and persist to a top-level `local_access` block in `charter.yaml`.
+  Previously snapshots had no toggles and their access couldn't be adjusted (they
+  were still masked by the PII default). The human editor is unaffected.
+
 ## [0.10.1] - 2026-07-27
 
 ### Fixed

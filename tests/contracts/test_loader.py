@@ -8,6 +8,19 @@ def write_charter(tmp_path, text):
     return tmp_path
 
 
+def test_loader_parses_local_access(tmp_path):
+    ws = write_charter(
+        tmp_path,
+        "version: 1\nsources: {}\nlocal_access:\n  columns:\n    snap.email: true\n",
+    )
+    assert load_charter(ws).local_access == {"columns": {"snap.email": True}}
+
+
+def test_loader_local_access_defaults_empty(tmp_path):
+    ws = write_charter(tmp_path, "version: 1\nsources: {}\n")
+    assert load_charter(ws).local_access == {}
+
+
 def test_minimal_file_source_loads(tmp_path):
     text = "version: 1\nsources:\n  plans:\n    type: csv\n    path: data/plans.csv\n"
     ws = write_charter(tmp_path, text)

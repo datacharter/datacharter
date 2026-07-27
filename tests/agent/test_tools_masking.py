@@ -90,3 +90,23 @@ def test_describe_shows_schema_unmasked(tmp_path):
         assert "email" in flat and "•••" not in flat  # column name visible, no value masking
     finally:
         eng.close()
+
+
+def test_local_snapshot_access_toggle(tmp_path):
+    """A snapshot's PII column is masked by default; a local_access override flips it."""
+    core_main(["init", str(tmp_path), "--demo"])
+    sources = load_charter(tmp_path).sources
+    eng = Engine(tmp_path, sources).start()
+    try:
+        eng.snapshot_sync("SELECT email FROM store.customers", "snap")
+        default = _q(ToolBox(eng, sources), "SELECT email FROM local.snap")
+        assert default["masked_columns"] == ["email"]  # name-based default protects it
+        assert all(row[0] == "•••" for row in default["rows"])
+        overridden = _q(
+            ToolBox(eng, sources, local_access={"columns": {"snap.email": True}}),
+            "SELECT email FROM local.snap",
+        )
+        assert "masked_columns" not in overridden  # toggled ON -> nothing masked
+        assert all(row[0] != "•••" for row in overridden["rows"])  # real values
+    finally:
+        eng.close()

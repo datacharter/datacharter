@@ -74,6 +74,7 @@ class ToolBox:
         sources: list[Source],
         *,
         auto_pii: set[str] | None = None,
+        local_access: dict | None = None,
         timeout_s: float = _DEFAULT_TIMEOUT_S,
     ) -> None:
         self._engine = engine
@@ -83,8 +84,11 @@ class ToolBox:
             for cols in src.pii.values():
                 self._pii.update(c.lower() for c in cols)
         self._auto_pii = auto_pii or set()
-        # Per-source agent-access overrides (on=real, off=masked).
+        # Per-source agent-access overrides (on=real, off=masked); `local.*` snapshot
+        # overrides live under the reserved "local" key (charter `local_access`).
         self._overrides = {s.name: s.agent_access for s in sources if s.agent_access}
+        if local_access:
+            self._overrides["local"] = local_access
         # Names that may be masked, for the access guard's parse-failure fallback.
         self._masked_names: set[str] = set(self._pii) | set(self._auto_pii)
         # Row-level filters for the agent surface: table (and source__table alias) -> predicate.

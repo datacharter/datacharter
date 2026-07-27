@@ -96,7 +96,13 @@ export default function SourceTree({ sources, tables, onPick, onRemove, onSetAcc
   const owned = new Set(sources.map((s) => s.name));
   const uploads = (bySource.get("memory") ?? []).filter((t) => !owned.has(t.table));
 
-  const tableNode = (t: TableInfo, relation: string, source?: SourceInfo, remove?: Remove) => {
+  const tableNode = (
+    t: TableInfo,
+    relation: string,
+    source?: SourceInfo,
+    remove?: Remove,
+    accessSource: string | undefined = source?.name,
+  ) => {
     const open = openTables.has(relation);
     const hasCols = t.columns.length > 0;
     return (
@@ -114,12 +120,12 @@ export default function SourceTree({ sources, tables, onPick, onRemove, onSetAcc
             {t.table}
           </span>
           {source && piiFor(source, t.table) && <span className="pii">PII</span>}
-          {source &&
+          {accessSource &&
             onSetAccess &&
             t.access &&
             Object.keys(t.access).length > 0 &&
             accessToggle(`Toggle agent access for table ${t.table}`, !anyReal([t]), () =>
-              onSetAccess({ source: source.name, table: t.table, value: !anyReal([t]) }),
+              onSetAccess({ source: accessSource, table: t.table, value: !anyReal([t]) }),
             )}
           {remove && (
             <button
@@ -144,12 +150,12 @@ export default function SourceTree({ sources, tables, onPick, onRemove, onSetAcc
                   {c}
                 </span>
                 {t.access?.[c]?.pii && <span className="pii-dot" title="PII">•</span>}
-                {source &&
+                {accessSource &&
                   onSetAccess &&
                   t.access?.[c] &&
                   accessToggle(`Toggle agent access for ${c}`, t.access[c].masked, () =>
                     onSetAccess({
-                      source: source.name,
+                      source: accessSource,
                       table: t.table,
                       column: c,
                       value: t.access![c].masked,
@@ -222,10 +228,13 @@ export default function SourceTree({ sources, tables, onPick, onRemove, onSetAcc
         <div className="tree-group">
           {locals.length === 0 && <div className="hint tree-empty">empty</div>}
           {locals.map((t) =>
-            tableNode(t, `local.${t.table}`, undefined, {
-              label: `Remove local.${t.table}`,
-              run: () => onRemove?.("snapshot", t.table),
-            }),
+            tableNode(
+              t,
+              `local.${t.table}`,
+              undefined,
+              { label: `Remove local.${t.table}`, run: () => onRemove?.("snapshot", t.table) },
+              "local",
+            ),
           )}
         </div>
       </div>

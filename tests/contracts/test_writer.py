@@ -84,3 +84,11 @@ def test_set_agent_access_unknown_source(tmp_path):
     (tmp_path / "charter.yaml").write_text(BASE)
     with pytest.raises(ContractWriteError):
         set_agent_access(tmp_path, "ghost", "t", "c", True)
+
+
+def test_set_agent_access_local_writes_top_level(tmp_path):
+    (tmp_path / "charter.yaml").write_text(BASE)
+    set_agent_access(tmp_path, "local", "snap", "email", True)  # snapshot field
+    la = _reload(tmp_path)["local_access"]
+    assert la["columns"]["snap.email"] is True
+    assert "local" not in (_reload(tmp_path).get("sources") or {})  # not a fake source

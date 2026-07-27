@@ -72,14 +72,21 @@ def set_agent_access(
     Touches only the source's `agent_access` block; everything else is preserved verbatim."""
     path = workspace / CHARTER_FILE
     y, data = _load(path)
-    sources = data.get("sources") or {}
-    if source not in sources:
-        raise ContractWriteError(f"Source '{source}' is not in the charter.")
-    entry = sources[source]
-    aa = entry.get("agent_access")
-    if aa is None:
-        aa = {}
-        entry["agent_access"] = aa
+    if source == "local":
+        # `local.*` snapshots have no source entry — overrides live top-level.
+        aa = data.get("local_access")
+        if aa is None:
+            aa = {}
+            data["local_access"] = aa
+    else:
+        sources = data.get("sources") or {}
+        if source not in sources:
+            raise ContractWriteError(f"Source '{source}' is not in the charter.")
+        entry = sources[source]
+        aa = entry.get("agent_access")
+        if aa is None:
+            aa = {}
+            entry["agent_access"] = aa
     if column is not None and table is not None:
         aa.setdefault("columns", {})[f"{table}.{column}"] = value
     elif table is not None:

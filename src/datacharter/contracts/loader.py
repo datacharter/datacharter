@@ -33,6 +33,9 @@ class Charter(BaseModel):
     warnings: list[str]
     metrics: list[Metric] = Field(default_factory=list)
     tests: list[DataTest] = Field(default_factory=list)
+    #: Agent-access overrides for `local.*` snapshot relations (same shape as a
+    #: source's `agent_access`: {source?, tables?, columns?}). `on`=real, `off`=masked.
+    local_access: dict = Field(default_factory=dict)
 
 
 def load_charter(workspace: Path | str, filename: str = CHARTER_FILE) -> Charter:
@@ -75,8 +78,13 @@ def load_charter(workspace: Path | str, filename: str = CHARTER_FILE) -> Charter
         raise CharterError(f"{filename}: 'tests' must be a mapping of name -> test.")
     tests = [_build_test(str(n), b, filename) for n, b in tests_raw.items()]
 
+    local_access = raw.get("local_access") or {}
+    if not isinstance(local_access, dict):
+        raise CharterError(f"{filename}: 'local_access' must be a mapping.")
+
     return Charter(
-        version=version, sources=sources, warnings=warnings, metrics=metrics, tests=tests
+        version=version, sources=sources, warnings=warnings, metrics=metrics,
+        tests=tests, local_access=local_access,
     )
 
 
