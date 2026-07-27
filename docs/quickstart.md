@@ -159,16 +159,21 @@ at all.
 Beyond `init` / `serve`, the CLI has commands for governance and exploration —
 the full list is in the [CLI reference](cli.html):
 
+- `datacharter query "<sql>"` — run a read-only query from the terminal (`--format table|csv|json`).
+- `datacharter test` — run declared [data assertions](charter-yaml.html#tests); exits non-zero for CI.
 - `datacharter scan --write` — detect PII columns and record them in `charter.yaml`.
 - `datacharter drift` — exit non-zero when a declared table or PII column disappears.
 - `datacharter diff a b --key id` — diff two relations across sources.
 - `datacharter metric revenue` — run a governed [metric](charter-yaml.html#metrics).
+- `datacharter lineage` — cross-source lineage aggregated from your query history.
 - `datacharter sample customers` — a PII-masked sample, safe to share.
 - `datacharter snapshot n <sql>` / `recheck n` — "did this number change?".
 - `datacharter explain <sql>` — a query's plan and estimates without running it.
 - `datacharter mcp` — serve the governed tools over [MCP](mcp.html).
 
-The web app also previews results as you type, captions charts, and — with
+The web app also previews results as you type, captions charts, profiles columns
+with top-value bars, estimates a query's cost before you run it, keeps a
+reopenable query history, offers a ⌘K command palette, and — with
 `serve --offline` — runs with no outbound network.
 
 ## Where state lives
