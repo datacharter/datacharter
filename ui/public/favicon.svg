@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="DataCharter">
+  <!-- Ring adapts to the tab bar's light/dark; arrow keeps the brand blue. -->
+  <style>
+    .ring { stroke: #334155; }
+    @media (prefers-color-scheme: dark) { .ring { stroke: #cbd5e1; } }
+  </style>
+  <circle class="ring" cx="64" cy="64" r="56" fill="none" stroke-width="7"/>
+  <path d="M30 84 L52 60 L66 72 L92 42" fill="none" stroke="#3B82C4" stroke-width="11"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M78 38 L96 38 L96 56" fill="none" stroke="#3B82C4" stroke-width="11"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

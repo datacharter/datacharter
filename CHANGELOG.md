@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-07-27
+
+### Fixed
+- The app now serves a favicon (a theme-adaptive SVG mark), so browsers no longer
+  log a `/favicon.ico` 404 on load.
+
 ## [0.10.0] - 2026-07-26
 
 ### Added
