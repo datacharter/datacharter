@@ -67,14 +67,16 @@ def test_query_timeout_envelope(client):
 
 
 def test_profile_summarize(client):
-    resp = client.post("/api/profile", json={"relation": "store.customers"})
+    resp = client.post("/api/profile", json={"sql": "SELECT * FROM store.customers"})
     assert resp.status_code == 200
     assert "column_name" in resp.json()["columns"]
+    assert "top_values" in resp.json()
 
 
 def test_profile_rejects_injection_shape(client):
-    resp = client.post("/api/profile", json={"relation": "customers; DROP TABLE x"})
-    assert resp.status_code == 422  # pydantic pattern rejects before any SQL
+    resp = client.post("/api/profile", json={"sql": "SELECT 1; DROP TABLE x"})
+    assert resp.status_code == 400  # the read-only guard rejects multiple statements
+    assert resp.json()["error"]["type"] == "query_not_allowed"
 
 
 def test_sse_stream_query(client):

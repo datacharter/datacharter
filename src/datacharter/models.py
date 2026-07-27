@@ -16,8 +16,10 @@ class SourceType(StrEnum):
     CSV = "csv"
     PARQUET = "parquet"
     JSON = "json"
+    EXCEL = "excel"
     ICEBERG = "iceberg"
     DELTA = "delta"
+    DUCKDB = "duckdb"
     BIGQUERY = "bigquery"
     MSSQL = "mssql"
     SNOWFLAKE = "snowflake"
@@ -28,6 +30,7 @@ ATTACH_TYPES = {
     SourceType.POSTGRES,
     SourceType.MYSQL,
     SourceType.SQLITE,
+    SourceType.DUCKDB,
     SourceType.BIGQUERY,
     SourceType.MSSQL,
 }
@@ -43,6 +46,7 @@ FILE_TYPES = {
     SourceType.CSV,
     SourceType.PARQUET,
     SourceType.JSON,
+    SourceType.EXCEL,
     SourceType.ICEBERG,
     SourceType.DELTA,
 }
@@ -75,7 +79,10 @@ class QueryResult(BaseModel):
     #: Non-fatal advisories (e.g. a connector source hit its extract cap).
     warnings: list[str] = Field(default_factory=list)
     #: Source relations/columns the query read (SELECT only); None when unavailable.
-    provenance: dict[str, list[str]] | None = None
+    #: Keys: `relations`/`columns` (list[str]) and an optional nested `lineage` map.
+    provenance: dict | None = None
+    #: Profiling only: per-column [value, count] top-frequency lists.
+    top_values: dict[str, list] | None = None
 
 
 class DiffResult(BaseModel):

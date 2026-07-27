@@ -22,6 +22,7 @@ from datacharter.agent.cache import AnswerCache, contract_fingerprint
 from datacharter.agent.llm import LLMClient
 from datacharter.agent.tools import ToolBox
 from datacharter.contracts import Charter, CharterError, load_charter
+from datacharter.engine import history
 from datacharter.engine.guard import QueryNotAllowed
 from datacharter.engine.session import DEFAULT_ROW_LIMIT, Engine, EngineError, QueryTimeout
 from datacharter.engine.statekey import resolve_state_key
@@ -38,10 +39,15 @@ class QueryRequest(BaseModel):
     sql: str
     row_limit: int = Field(default=DEFAULT_ROW_LIMIT, ge=1, le=1_000_000)
     timeout_s: float = Field(default=DEFAULT_TIMEOUT_S, gt=0, le=3600)
+    record: bool = False
 
 
 class ProfileRequest(BaseModel):
-    relation: str = Field(pattern=r"^[A-Za-z_][A-Za-z0-9_.]*$")
+    sql: str
+
+
+class ExplainRequest(BaseModel):
+    sql: str
 
 
 class SaveQueryRequest(BaseModel):
@@ -325,13 +331,40 @@ def create_app(
 
     @app.post("/api/query")
     async def query(body: QueryRequest) -> QueryResult:
-        return await app.state.engine.query(
+        result = await app.state.engine.query(
             body.sql, timeout_s=body.timeout_s, row_limit=body.row_limit
         )
+        if body.record:
+            history.record(workspace, body.sql, len(result.rows), result.provenance)
+        return result
+
+    @app.get("/api/history")
+    async def get_history(limit: int = 50) -> dict:
+        return {"entries": history.read_history(workspace, limit=limit)}
+
+    @app.post("/api/explain")
+    async def explain(body: ExplainRequest) -> dict:
+        plan, estimate = await app.state.engine.explain(body.sql)
+        return {"plan": plan, "estimated_rows": estimate}
 
     @app.post("/api/profile")
     async def profile(body: ProfileRequest) -> QueryResult:
-        return await app.state.engine.query(f"SUMMARIZE {body.relation}", timeout_s=120)
+        q = body.sql.strip().rstrip(";")
+        result = await app.state.engine.query(f"SUMMARIZE {q}", timeout_s=120)
+        top: dict[str, list] = {}
+        for row in result.rows[:60]:  # per-column top values; cap to keep it snappy
+            col = str(row[0]).replace('"', '""')
+            try:
+                tv = await app.state.engine.query(
+                    f'SELECT "{col}" AS v, count(*) AS c FROM ({q}) _p '
+                    f'WHERE "{col}" IS NOT NULL GROUP BY 1 ORDER BY c DESC, 1 LIMIT 5',
+                    timeout_s=120,
+                )
+            except (EngineError, QueryNotAllowed, QueryTimeout):
+                continue
+            top[row[0]] = [[r[0], r[1]] for r in tv.rows]
+        result.top_values = top
+        return result
 
     @app.get("/api/queries")
     async def list_queries() -> dict:
@@ -528,7 +561,7 @@ def create_app(
                         got_text = True
                         yield _sse("text", {"text": ev["text"]})
                     elif ev["kind"] == "tool_call":
-                        yield _sse("tool_call", {"tool": ev["tool"]})
+                        yield _sse("tool_call", {"tool": ev["tool"], "sql": ev.get("sql", "")})
                     elif ev["kind"] == "result":
                         if ev.get("is_error"):
                             yield _sse("error", {"detail": ev.get("text") or "Claude Code error"})
@@ -547,7 +580,10 @@ def create_app(
 
         async def events() -> AsyncIterator[str]:
             async for ev in agent.run(body.question):
-                yield _sse(ev.kind, {"text": ev.text, "tool": ev.tool, "detail": ev.detail})
+                yield _sse(
+                    ev.kind,
+                    {"text": ev.text, "tool": ev.tool, "detail": ev.detail, "sql": ev.sql},
+                )
 
         return StreamingResponse(events(), media_type="text/event-stream")
 

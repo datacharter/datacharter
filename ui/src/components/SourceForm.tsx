@@ -3,10 +3,10 @@ import { api, type SourceFormData, type SourceInfo } from "../api";
 
 const DB_FIELDS = ["host", "port", "database", "user", "schema"];
 const TYPES = [
-  "postgres", "mysql", "sqlite", "bigquery", "mssql",
-  "snowflake", "csv", "parquet", "json",
+  "postgres", "mysql", "sqlite", "duckdb", "bigquery", "mssql",
+  "snowflake", "csv", "parquet", "json", "excel",
 ];
-const PATH_TYPES = ["csv", "parquet", "json", "sqlite"];  // use a path, no credentials
+const PATH_TYPES = ["csv", "parquet", "json", "excel", "sqlite", "duckdb"];  // path, no credentials
 
 export default function SourceForm({
   editing,

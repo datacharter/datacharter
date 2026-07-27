@@ -76,6 +76,12 @@ grouping dimensions; `--grain day|week|month|quarter|year` groups by a
 Run the [data assertions](charter-yaml.html#tests) declared under `tests:` and
 **exit non-zero if any fail** — for CI. `--select` runs one test by name.
 
+### `lineage [directory] [--relation R] [--json]`
+Show cross-source lineage aggregated from your local query history: which
+relations get read together, and which output columns derive from which inputs.
+`--relation` filters to one relation; `--json` emits the graph for tooling.
+History is recorded as you run queries in the app.
+
 ### `snapshot <name> <sql> [directory]`
 Save a query's result as `local.<name>` along with its SQL.
 

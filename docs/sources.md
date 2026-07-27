@@ -26,7 +26,7 @@ DataCharter writes the source into `charter.yaml` and registers it live.
   from the DuckDB community repository on first use
   (`INSTALL <ext> FROM community; LOAD <ext>`).
 - **file-view** &mdash; a view over a DuckDB file reader
-  (`read_csv`, `read_parquet`, `read_json`, `iceberg_scan`, `delta_scan`).
+  (`read_csv`, `read_parquet`, `read_json`, `read_xlsx`, `iceberg_scan`, `delta_scan`).
   Remote paths (`s3://`, and other object stores) load `httpfs` and use a
   temporary S3-style secret from the source's credentials.
 - **connector-extract** &mdash; no reliable ATTACH exists, so a Python connector
@@ -40,11 +40,13 @@ DataCharter writes the source into `charter.yaml` and registers it live.
 | `postgres` | ATTACH | `postgres` (bundled) | Native DuckDB filter + projection |
 | `mysql` | ATTACH | `mysql` (bundled) | Native DuckDB filter + projection |
 | `sqlite` | ATTACH | `sqlite` (bundled) | Native DuckDB filter + projection |
+| `duckdb` | ATTACH | core | Native DuckDB filter + projection (attach an existing `.duckdb`/`.db` file, read-only) |
 | `bigquery` | ATTACH (community extension) | `bigquery` (auto-installed) | Native DuckDB filter + projection |
 | `mssql` | ATTACH (community extension) | `mssql` (auto-installed) | Native DuckDB filter + projection |
 | `csv` | file-view | core (`httpfs` for remote) | Column projection; row pruning where the reader supports it |
 | `parquet` | file-view | core (`httpfs` for remote) | Column projection + row-group / predicate pruning |
 | `json` | file-view | core (`httpfs` for remote) | Column projection |
+| `excel` | file-view | `excel` core extension (auto-loaded) | Reads `.xlsx`; column projection |
 | `iceberg` | file-view | `iceberg` core extension | Column projection + partition pruning |
 | `delta` | file-view | `delta` core extension | Column projection + partition pruning |
 | `snowflake` | connector-extract | `datacharter[snowflake]` extra | Connector pushdown planner + aggregation pushdown; **materialized, capped by `max_rows`** |

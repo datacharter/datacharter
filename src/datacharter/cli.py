@@ -654,6 +654,37 @@ def _cmd_test(args: argparse.Namespace) -> int:
     return 1 if failures else 0
 
 
+def _cmd_lineage(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from datacharter.engine import history
+
+    ws = Path(args.directory).resolve()
+    graph = history.lineage(ws)
+    if args.relation:
+        rel = args.relation
+        graph = {
+            "relations": {rel: graph["relations"].get(rel, {"co_read": {}})},
+            "columns": {c: ins for c, ins in graph["columns"].items() if rel in " ".join(ins)},
+        }
+    if args.json:
+        print(_json.dumps(graph, indent=2))
+        return 0
+    if not graph["relations"] and not graph["columns"]:
+        print("No query history yet. Run some queries in the app first.")
+        return 0
+    for rel, node in sorted(graph["relations"].items()):
+        print(rel)
+        for other, n in sorted(node["co_read"].items(), key=lambda kv: -kv[1]):
+            print(f"  read with {other} ({n} quer{'y' if n == 1 else 'ies'})")
+    derived = {c: ins for c, ins in graph["columns"].items() if ins}
+    if derived:
+        print("\ncolumn lineage:")
+        for out_col, inputs in sorted(derived.items()):
+            print(f"  {out_col} <- {', '.join(inputs)}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="datacharter", description="Charter your data.")
     parser.add_argument("--version", action="version", version=f"datacharter {__version__}")
@@ -772,6 +803,14 @@ def main(argv: list[str] | None = None) -> int:
     p_test.add_argument("directory", nargs="?", default=".")
     p_test.add_argument("--select", help="Run only the named test")
     p_test.set_defaults(func=_cmd_test)
+
+    p_lineage = sub.add_parser(
+        "lineage", help="Show cross-source lineage aggregated from query history"
+    )
+    p_lineage.add_argument("directory", nargs="?", default=".")
+    p_lineage.add_argument("--relation", help="Filter to one relation")
+    p_lineage.add_argument("--json", action="store_true", help="Emit the graph as JSON")
+    p_lineage.set_defaults(func=_cmd_lineage)
 
     p_snap = sub.add_parser("snapshot", help="Save a query result as local.<name> plus its SQL")
     p_snap.add_argument("name")

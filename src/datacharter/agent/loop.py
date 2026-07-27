@@ -52,6 +52,8 @@ class AgentEvent:
     text: str = ""
     tool: str = ""
     detail: str = ""
+    #: For a query tool_call, the SQL the agent ran (so the UI can surface it).
+    sql: str = ""
 
 
 class Agent:
@@ -111,9 +113,12 @@ class Agent:
                 }
             )
             for call in tool_calls:
-                yield AgentEvent(kind="tool_call", tool=call.name, detail=call.arguments)
-                if call.name == "query":
-                    last_query_sql = _sql_arg(call.arguments) or last_query_sql
+                call_sql = _sql_arg(call.arguments) if call.name == "query" else None
+                yield AgentEvent(
+                    kind="tool_call", tool=call.name, detail=call.arguments, sql=call_sql or ""
+                )
+                if call_sql:
+                    last_query_sql = call_sql
                 result = await self._tools.run(call.name, call.arguments)
                 yield AgentEvent(kind="tool_result", tool=call.name, detail=result)
                 messages.append(
@@ -133,7 +138,7 @@ class Agent:
         result = await self._tools.run("query", args)
         if result.startswith("Error:"):  # cached SQL no longer valid — fall back to the LLM
             return
-        yield AgentEvent(kind="tool_call", tool="query", detail=args)
+        yield AgentEvent(kind="tool_call", tool="query", detail=args, sql=sql)
         yield AgentEvent(kind="tool_result", tool="query", detail=result)
         yield AgentEvent(kind="text", text="(re-ran your saved query on current data)")
         yield AgentEvent(kind="done")

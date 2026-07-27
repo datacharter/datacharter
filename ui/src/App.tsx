@@ -11,8 +11,11 @@ import HelpModal from "./components/HelpModal";
 import EmptyState from "./components/EmptyState";
 import Toast from "./components/Toast";
 import CommandPalette from "./components/CommandPalette";
+import HistoryPanel from "./components/HistoryPanel";
+import ProfileBars from "./components/ProfileBars";
 import { type Command } from "./lib/commandPalette";
 import { shouldReplaceEditor } from "./lib/editorGuard";
+import { formatEstimate } from "./lib/estimate";
 import { exportRequest } from "./lib/mask";
 import { useResize } from "./lib/useResize";
 import Tutorial, { hasSeenTutorial } from "./components/Tutorial";
@@ -42,6 +45,8 @@ export default function App() {
   const [catalogLoaded, setCatalogLoaded] = useState(false);
   const [view, setView] = useState<"explorer" | "sources">("explorer");
   const [showHelp, setShowHelp] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [estimate, setEstimate] = useState<number | null | undefined>(undefined);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">(
     () => (localStorage.getItem("dc-theme") as "light" | "dark") || "light",
@@ -95,7 +100,7 @@ export default function App() {
       setError(null);
       setProfileResult(null);
       try {
-        setResult(await api.query(sqlText ?? sqlRef.current));
+        setResult(await api.query(sqlText ?? sqlRef.current, 10000, true));
         setTab("results");
         refreshCatalog();
       } catch (e) {
@@ -117,6 +122,7 @@ export default function App() {
   // Instant preview: a beat after you stop typing, auto-run the query (row-capped,
   // silent on error) so results update live without pressing Run.
   useEffect(() => {
+    setEstimate(undefined); // a prior estimate no longer matches the edited query
     const body = sql.replace(/--[^\n]*/g, "").trim();
     if (!body) return;
     const timer = setTimeout(() => {
@@ -138,13 +144,22 @@ export default function App() {
     setProfileLoading(true);
     try {
       const body = sqlRef.current.trim().replace(/;\s*$/, "");
-      setProfileResult(await api.query(`SUMMARIZE ${body}`));
+      setProfileResult(await api.profile(body));
     } catch (e) {
       setActionError((e as Error).message);
     } finally {
       setProfileLoading(false);
     }
   }, [profileResult]);
+
+  const estimateCost = useCallback(async () => {
+    try {
+      const r = await api.explain(sqlRef.current);
+      setEstimate(r.estimated_rows);
+    } catch (e) {
+      setActionError((e as Error).message);
+    }
+  }, []);
 
   const snapshot = useCallback(async () => {
     const name = window.prompt("Snapshot as local.<name>", "snap");
@@ -286,6 +301,8 @@ export default function App() {
       a("snapshot", "Snapshot result", () => snapshot()),
       a("profile", "Profile", () => profile()),
       a("explain", "Explain plan", () => explain()),
+      a("estimate", "Estimate cost", () => estimateCost()),
+      a("history", "Query history", () => setShowHistory(true)),
       a("tab-results", "Go to Results", () => setTab("results")),
       a("tab-chart", "Go to Chart", () => setTab("chart")),
       a("tab-plan", "Go to Plan", () => setTab("plan")),
@@ -299,7 +316,7 @@ export default function App() {
       return a(`open:${rel}`, `Open ${rel}`, () => pickRelation(rel));
     });
     return [...actions, ...tableCmds];
-  }, [run, exportResult, snapshot, profile, explain, pickRelation, tables]);
+  }, [run, exportResult, snapshot, profile, explain, estimateCost, pickRelation, tables]);
 
   return (
     <div
@@ -325,6 +342,9 @@ export default function App() {
         />
       )}
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+      {showHistory && (
+        <HistoryPanel onPick={(s) => loadSql(s)} onClose={() => setShowHistory(false)} />
+      )}
       {actionError && <Toast message={actionError} onClose={() => setActionError(null)} />}
       {paletteOpen && (
         <CommandPalette commands={commands} onClose={() => setPaletteOpen(false)} />
@@ -358,6 +378,13 @@ export default function App() {
           title={dark ? "Switch to day" : "Switch to night"}
         >
           {dark ? "☀" : "🌙"}
+        </button>
+        <button
+          className="topbar-btn"
+          onClick={() => setShowHistory(true)}
+          title="Query history"
+        >
+          History
         </button>
         <button className="topbar-btn" onClick={() => setShowHelp(true)} title="About & FAQ">
           Docs
@@ -440,6 +467,18 @@ export default function App() {
               <button onClick={explain} title="Show the query plan (EXPLAIN ANALYZE)">
                 Explain
               </button>
+              <button onClick={estimateCost} title="Estimate rows this query will return (pre-flight)">
+                Estimate
+              </button>
+              {estimate !== undefined && (
+                <span
+                  className={
+                    formatEstimate(estimate).warn ? "estimate-badge warn" : "estimate-badge"
+                  }
+                >
+                  {formatEstimate(estimate).label}
+                </span>
+              )}
             </div>
             <MonacoEditor
               language="sql"
@@ -526,7 +565,15 @@ export default function App() {
               )}
               {!error && tab === "profile" &&
                 (profileResult ? (
-                  <ResultsGrid result={profileResult} />
+                  <div className="profile-scroll">
+                    <ResultsGrid result={profileResult} />
+                    {profileResult.top_values && (
+                      <ProfileBars
+                        top={profileResult.top_values}
+                        masked={agentView ? maskedColumns : undefined}
+                      />
+                    )}
+                  </div>
                 ) : profileLoading ? (
                   <div className="empty-state">Profiling…</div>
                 ) : null)}
@@ -546,7 +593,7 @@ export default function App() {
         </main>
         <div className="resizer-x" onMouseDown={chatW.onMouseDown} />
         <aside className="chat-dock" style={{ width: chatW.size }}>
-          <ChatPanel dark={dark} />
+          <ChatPanel dark={dark} onOpenSql={loadSql} />
         </aside>
       </div>
     </div>

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import datetime
+import json
 import re
 import shutil
 import threading
@@ -53,6 +54,22 @@ def _valid_relation(relation: str) -> bool:
     return 1 <= len(parts) <= 3 and all(
         p and all(ch.isalnum() or ch == "_" for ch in p) for p in parts
     )
+
+
+def _root_cardinality(raw_json: str) -> int | None:
+    """The plan root's Estimated Cardinality from `EXPLAIN (FORMAT json)`, or None."""
+    try:
+        plan = json.loads(raw_json)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    root = plan[0] if isinstance(plan, list) and plan else plan
+    if not isinstance(root, dict):
+        return None
+    value = (root.get("extra_info") or {}).get("Estimated Cardinality")
+    try:
+        return int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
 
 
 class Engine:
@@ -215,6 +232,29 @@ class Engine:
         result = self._execute(sql, row_limit=row_limit)
         result.provenance = extract_provenance(sql)
         return result
+
+    def explain_sync(self, sql: str) -> tuple[str, int | None]:
+        """Cost pre-flight for a read: the plan text and the root row estimate.
+
+        The estimate is the plan root's `Estimated Cardinality`; it is None when
+        DuckDB emits none (e.g. an aggregate root). The query is validated as a
+        read before either EXPLAIN runs — neither executes it.
+        """
+        conn = self._require_conn()
+        normalized = ensure_allowed(sql)
+        with self._exec_lock:
+            self._ensure_connectors(normalized)
+            try:
+                plan_rows = conn.execute(f"EXPLAIN {normalized}").fetchall()
+                json_rows = conn.execute(f"EXPLAIN (FORMAT json) {normalized}").fetchall()
+            except duckdb.Error as exc:
+                raise self._wrap(exc) from None
+        plan = "\n".join(str(r[-1]) for r in plan_rows)
+        estimate = _root_cardinality(json_rows[0][-1]) if json_rows else None
+        return plan, estimate
+
+    async def explain(self, sql: str, *, timeout_s: float = 60.0) -> tuple[str, int | None]:
+        return await asyncio.to_thread(self.explain_sync, sql)
 
     def _execute(self, sql: str, *, row_limit: int = DEFAULT_ROW_LIMIT) -> QueryResult:
         conn = self._require_conn()

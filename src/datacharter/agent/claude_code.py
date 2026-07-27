@@ -160,7 +160,7 @@ def parse_stream(lines: Iterable[str]) -> Iterator[dict]:
             if ev.get("type") == "tool_use" and name.startswith("mcp__datacharter__"):
                 label = ev["name"].removeprefix("mcp__datacharter__")
                 sql = (ev.get("input") or {}).get("sql")
-                yield {"kind": "tool_call", "tool": f"{label}: {sql}" if sql else label}
+                yield {"kind": "tool_call", "tool": label, "sql": sql or ""}
             delta = ev.get("delta") or {}
             if delta.get("type") == "text_delta" and delta.get("text"):
                 yield {"kind": "text", "text": delta["text"]}

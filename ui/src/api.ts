@@ -44,6 +44,15 @@ export interface QueryResult {
   truncated: boolean;
   warnings?: string[];
   provenance?: Provenance | null;
+  top_values?: Record<string, [unknown, number][]> | null;
+}
+
+export interface HistoryEntry {
+  ts: string;
+  sql: string;
+  row_count: number;
+  relations: string[];
+  columns: string[];
 }
 
 export interface ApiError {
@@ -65,17 +74,25 @@ export const api = {
   sources: () =>
     request<{ sources: SourceInfo[]; warnings: string[] }>("/api/sources"),
   tables: () => request<{ tables: TableInfo[] }>("/api/tables"),
-  query: (sql: string, rowLimit = 10000) =>
+  query: (sql: string, rowLimit = 10000, record = false) =>
     request<QueryResult>("/api/query", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ sql, row_limit: rowLimit }),
+      body: JSON.stringify({ sql, row_limit: rowLimit, record }),
     }),
-  profile: (relation: string) =>
+  history: (limit = 50) =>
+    request<{ entries: HistoryEntry[] }>(`/api/history?limit=${limit}`),
+  explain: (sql: string) =>
+    request<{ plan: string; estimated_rows: number | null }>("/api/explain", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sql }),
+    }),
+  profile: (sql: string) =>
     request<QueryResult>("/api/profile", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ relation }),
+      body: JSON.stringify({ sql }),
     }),
   createSource: (f: SourceFormData) =>
     request<{ name: string }>("/api/sources", {

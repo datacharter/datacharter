@@ -22,6 +22,7 @@ _FILE_READERS = {
     SourceType.CSV: "read_csv",
     SourceType.PARQUET: "read_parquet",
     SourceType.JSON: "read_json",
+    SourceType.EXCEL: "read_xlsx",
     SourceType.ICEBERG: "iceberg_scan",
     SourceType.DELTA: "delta_scan",
 }
@@ -91,6 +92,9 @@ def registration_sql(source: Source, workspace: Path) -> list[str]:
     if source.type == SourceType.SQLITE:
         path = _resolve_path(source, workspace)
         return [f"ATTACH {_q(path)} AS {source.name} (TYPE sqlite, READ_ONLY)"]
+    if source.type == SourceType.DUCKDB:
+        path = _resolve_path(source, workspace)
+        return [f"ATTACH {_q(path)} AS {source.name} (READ_ONLY)"]
     if source.type == SourceType.BIGQUERY:
         return _bigquery_registration(source)
     if source.type in _DB_SECRET_KEYS:
@@ -121,7 +125,7 @@ def qualified_name(source: Source, table: str) -> str:
     if st == SourceType.BIGQUERY:
         ds = conn.get("dataset") or conn.get("dataset_id")
         return f"{name}.{ds}.{table}" if ds else f"{name}.{table}"
-    if st == SourceType.SQLITE:
+    if st in (SourceType.SQLITE, SourceType.DUCKDB):
         return f"{name}.main.{table}"
     if st == SourceType.MSSQL:
         return f"{name}.{conn.get('schema', 'dbo')}.{table}"

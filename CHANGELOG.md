@@ -5,108 +5,88 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-26
+
+### Added
+- Query history: explicit runs are recorded locally; a History panel (toolbar +
+  ⌘K) reloads any past query. `datacharter lineage` aggregates history into a
+  cross-source co-read + column-lineage graph.
+- Rich profiling: the Profile tab now shows per-column top-value frequency bars
+  (masked under Agent view for PII columns).
+- Actionable agent transcript: each query the agent runs appears as a chip with
+  "Open in editor".
+- Connectors: `excel` (.xlsx) and `duckdb` (attach an existing .duckdb file).
+- Cost pre-flight: an Estimate button (and `POST /api/explain`) shows the
+  row-count estimate before you Run; warns on large scans.
+
 ## [0.9.0] - 2026-07-26
 
 ### Added
-
-- **`datacharter test` — declarative data assertions.** Declare checks under a
-  top-level `tests:` block in `charter.yaml` — `not_null`, `unique`,
-  `accepted_values`, `row_count`, and `expression` — and run them with
-  `datacharter test`, which prints ✓/✗ per test and **exits non-zero if any
-  fail** (drop it into CI). Assertions run through the read-only engine, so they
-  work across every source DuckDB federates. `--select` runs a single test.
+- `datacharter test`: declarative data assertions under a top-level `tests:`
+  block (`not_null`, `unique`, `accepted_values`, `row_count`, `expression`),
+  run through the read-only engine, exiting non-zero if any fail (for CI).
+  `--select` runs one test.
 
 ## [0.8.0] - 2026-07-26
 
 ### Added
-
-- **Semantic layer: metrics with joins and time grains.** A `charter.yaml`
-  `metric` can now span tables via `joins` (`{relation, on, type}`, type ∈
-  inner/left/right/full) and declare a `time_column`, so `datacharter metric
-  revenue --grain month` resolves to one governed SELECT grouped by a
-  `date_trunc` of that column (grain ∈ day/week/month/quarter/year). A certified
-  metric can answer "revenue by region, by month" across joined sources. Metrics
-  without `joins`/`time_column` behave exactly as before.
+- Semantic layer: metrics can span tables via `joins` ({relation, on, type}) and
+  declare a `time_column`, so `datacharter metric <name> --grain month` resolves
+  to one governed SELECT grouped by a `date_trunc` (grain ∈ day/week/month/
+  quarter/year). Metrics without joins/time_column are unchanged.
 
 ## [0.7.0] - 2026-07-26
 
 ### Added
-
-- **Command palette (⌘K / Ctrl-K):** fuzzy-jump to any table or run any action —
-  Run, Export, Snapshot, Profile, Explain, switch tabs, toggle Agent view or
-  theme, open Help/tour, or "Open `<relation>`" to load a table. ↑/↓ to move,
-  Enter to run, Esc to close. A fast keyboard-driven path through the app.
+- Command palette (⌘K / Ctrl-K): fuzzy-jump to any table or run any action
+  (Run/Export/Snapshot/Profile/Explain, tab switch, toggle Agent view/theme,
+  Help/tour, Open `<relation>`). ↑/↓ move, Enter runs, Esc closes.
 
 ## [0.6.0] - 2026-07-26
 
 ### Added
-
-- **Row-level security for the agent.** Declare `row_filters` in `charter.yaml`
-  (a table → SQL predicate map, e.g. `orders: "region = 'US'"`) and the agent,
-  MCP, and Claude Code surfaces see only matching rows — their queries are
-  rewritten to honor the filter, fail-closed (a query that references a filtered
-  table but can't be rewritten is refused, never run unfiltered). The human SQL
-  editor is unaffected. Composes with `pii`/`agent_access` column masking, so you
-  can mask columns *and* restrict rows. Predicates are static (the local core has
-  no per-user principal).
+- Row-level security for the agent: `row_filters` in `charter.yaml` (table → SQL
+  predicate) restrict the agent/MCP/Claude Code surfaces to matching rows via a
+  fail-closed query rewrite; the human SQL editor is unaffected. Composes with
+  `pii`/`agent_access` column masking. Static predicates (no per-user principal).
 
 ## [0.5.0] - 2026-07-26
 
-A polish release: correctness, safety, and accessibility across the CLI, engine,
-and UI.
+Polish release (P2 tier): correctness, safety, and accessibility across CLI,
+engine, and UI.
 
 ### Added
-
-- `datacharter query "<sql>" [--format table|csv|json]` — run ad-hoc read-only
-  SQL from the command line.
-- `datacharter drift` now detects column **shape** changes (new/removed/retyped
-  columns), re-scans new columns for PII, and records a baseline you can refresh
-  with `--drift --update`. Previously it only flagged missing tables/columns.
-- PII value-detection recognizes credit-card numbers (Luhn) and formatted phone
-  numbers, without flagging bare numeric IDs.
-- The agent enforces a per-query statement timeout, so a runaway query is
-  interrupted rather than tying up the session.
+- `datacharter query "<sql>" [--format table|csv|json]`.
+- `drift` detects column shape changes (new/removed/retyped) + new-PII rescan, with `--update` baseline.
+- PII value-detection: Luhn cards + formatted phones (bare numeric IDs not flagged).
+- Agent per-query statement-timeout budget.
 
 ### Fixed
-
-- `PIVOT`/`UNPIVOT` queries now run (they were rejected because DuckDB expands
-  them into two statements internally).
-- `datacharter snapshot` uses the same pushed-aggregation path as the API, so a
-  connector-backed snapshot pulls the smaller aggregated result.
-- Source-tree table/column rows are keyboard-operable; the Help and Tutorial
-  dialogs trap focus, close on Escape, and restore focus; the remove (✕) control
-  is always reachable, not hover-only.
-- Clicking a table no longer silently discards in-progress SQL, and deleting a
-  snapshot/upload now asks first.
-- Background-action wording, live-preview parse errors (a non-destructive chip),
-  and the "truncated" note no longer reference controls that don't exist.
-- Chat auto-scrolls only when you're already at the bottom, adds clear/copy, and
-  renders fenced code blocks (e.g. the SQL the agent wrote).
-- Connection/config forms show success vs. failure distinctly; the theme's
-  `--muted` color is now defined (no more mismatched greys/reds).
-- Claude Code driver: subprocess timeouts, captured stderr on failure, and a
-  persisted deny-list that warm-starts (but never replaces) the fail-closed
-  tool-surface assertion.
+- `PIVOT`/`UNPIVOT` run (they expand to CREATE+SELECT); CLI `snapshot` uses the pushed egress path.
+- Keyboard-operable source tree; focus-trap/Escape/restore-focus on Help & Tutorial; reachable ✕.
+- Editor-overwrite guard + confirm snapshot/upload delete.
+- Honest truncation copy + non-destructive preview-error chip.
+- Chat auto-scroll only near bottom; clear/copy; fenced code rendering.
+- Typed connection/config status; defined `--muted` token.
+- Claude Code driver: subprocess timeouts, stderr capture, persisted deny-list warm-start.
 
 ## [0.4.2] - 2026-07-26
 
 ### Added
 
-- Concurrent reads: queries on local/attached (non-connector) workspaces now run
-  in parallel, each on its own cursor with its own timeout — a long query no
-  longer freezes the live preview, the agent, or the catalog. (Snowflake queries
-  stay serialized, since they materialize on read.)
-- Snowflake sources now accept an `authenticator` (e.g. `externalbrowser`,
-  `oauth`) for SSO/MFA, and the connector is reused across queries instead of
-  reconnecting every time (removing seconds of login latency per query).
+- Concurrent reads: queries on local/attached (non-connector) workspaces run in
+  parallel, each on its own cursor with its own timeout — a long query no longer
+  freezes the live preview, the agent, or the catalog. (Snowflake stays
+  serialized, since it materializes on read.)
+- Snowflake sources accept an `authenticator` (SSO/MFA), and the connector is
+  reused across queries instead of reconnecting each time.
 
 ### Fixed
 
-- Background-action failures (export, snapshot, upload, an agent-access toggle)
-  now show a dismissible toast instead of replacing the entire results/chart/
-  profile pane; the query error box is dismissible too.
-- The Profile and Explain tabs show a "Profiling…" / "Planning…" placeholder
-  while they load, instead of a blank panel.
+- Background-action failures (export/snapshot/upload/access toggle) show a
+  dismissible toast instead of blanking the results pane; the query error box is
+  dismissible too.
+- Profile/Explain tabs show a "Profiling…"/"Planning…" placeholder while loading.
 
 ## [0.4.1] - 2026-07-25
 
@@ -133,39 +113,40 @@ and UI.
 
 ### Added
 
-- **Connect Claude Code:** run the chat agent on your local Claude Code subscription (no
-  API key) instead of an OpenAI-wire LLM — surfaced beside "Connect an LLM". Data stays
-  governed (Claude reaches it only through datacharter's read-only, PII-masked tools via a
-  loopback bridge), and the connection is refused, fail-closed, unless the tool sandbox
-  verifies (auto-denying any non-governed tools). Requires a Claude Pro/Max subscription +
-  Claude Code installed.
-- **Per-field agent-access toggles (left panel):** control per field / table / source
-  whether the agent sees real values or masked (`•••`) ones, persisted to the contract
+- **Per-field agent-access toggles (left panel):** control per field / table / source whether
+  the agent sees real values or masked (`•••`) ones, persisted to the contract
   (`agent_access:`). PII (declared or auto-detected) defaults to masked; everything else to
-  real; an explicit toggle wins. Enforced on the agent surface only (agent, MCP, Claude
-  Code) — the human SQL editor is never masked. "Agent view" mirrors the toggles.
+  real; an explicit toggle wins. Enforced on the agent surface only (agent, MCP, Claude Code);
+  the human SQL editor is never masked.
+- **Connect Claude Code:** run the chat agent on your local Claude Code subscription (no
+  API key) instead of an OpenAI-wire LLM. Data stays governed — Claude reaches it only
+  through datacharter's read-only, PII-masked tools (via a loopback `/api/tool` bridge) —
+  and the connection is **refused (fail-closed) unless the tool sandbox verifies** it
+  exposes nothing beyond those tools. Requires a Claude Pro/Max subscription + Claude Code
+  installed.
+- Empty workspaces get an "add your data" first-run launchpad (add a source / drop a
+  CSV / load the demo dataset) instead of the demo feature-tour, which now auto-shows
+  only when the workspace has sources. New `POST /api/demo` loads the demo `store` as a
+  normal, deletable source.
+
+### Added
+
 - Remove snapshots and uploaded tables directly from the sidebar (a ✕ on `local.*` and
-  uploaded rows), via `DELETE /api/snapshot/{name}` and `DELETE /api/uploads/{name}`.
+  uploaded rows), via `DELETE /api/snapshot/{name}` and `DELETE /api/uploads/{name}` —
+  previously a saved snapshot could not be removed without wiping local state.
 
 ### Fixed
 
 - The sidebar listed each attached-source table twice — once correctly and once as a fake
   "upload" — because the engine's internal `<source>__<table>` compatibility views were
   included in the catalog listing. They're now hidden.
-
-## [0.3.4] - 2026-07-24
-
-### Added
-
-- Empty workspaces get an "add your data" first-run launchpad (add a source / drop a
-  CSV / load the demo dataset) instead of the demo feature-tour, which now auto-shows
-  only when the workspace has sources. New `POST /api/demo` loads the demo `store` as a
-  normal, deletable source.
-
-## [0.3.3] - 2026-07-24
-
-### Fixed
-
+- After uploading a CSV to an empty workspace, the explorer was unreachable: the upload
+  registers a queryable table without a charter source, so the "no sources yet" launchpad
+  stayed up. The launchpad now hides once there is anything to explore (a source *or* a
+  table).
+- Loading the demo again after deleting it failed (`table customers already exists`):
+  deleting the source left `demo/store.db` on disk. `POST /api/demo` now recreates the
+  demo tables idempotently.
 - First-run tutorial on a fresh (empty) workspace crashed with a `Catalog Error`:
   its "Run the example" button ran a hardcoded demo query (`FROM store.orders`)
   that only exists in the demo workspace. The example now adapts to the live

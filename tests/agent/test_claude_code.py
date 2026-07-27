@@ -22,7 +22,7 @@ def test_parse_stream_maps_events():
     kinds = [e["kind"] for e in evs]
     assert kinds == ["session", "tool_call", "text", "result"]
     assert evs[0]["tools"] == ["mcp__datacharter__query"] and evs[0]["session_id"] == "s1"
-    assert "SELECT 1" in next(e for e in evs if e["kind"] == "tool_call")["tool"]
+    assert next(e for e in evs if e["kind"] == "tool_call")["sql"] == "SELECT 1"
     assert evs[-1]["text"] == "Hello" and evs[-1]["is_error"] is False
 
 

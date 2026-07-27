@@ -6,14 +6,25 @@ import { shouldAutoScroll } from "../lib/chatScroll";
 import ClaudeCodeConnect from "./ClaudeCodeConnect";
 import LLMConfig from "./LLMConfig";
 
+interface ToolRun {
+  tool: string;
+  sql: string;
+}
+
 interface Msg {
   role: "user" | "assistant";
   text: string;
-  tools: string[];
+  tools: ToolRun[];
 }
 
 /** Streams agent answers over SSE; renders any ```vega-lite block inline. */
-export default function ChatPanel({ dark }: { dark?: boolean }) {
+export default function ChatPanel({
+  dark,
+  onOpenSql,
+}: {
+  dark?: boolean;
+  onOpenSql?: (sql: string) => void;
+}) {
   const [status, setStatus] = useState<AgentStatus | null>(null);
   const [configuring, setConfiguring] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -81,7 +92,7 @@ export default function ChatPanel({ dark }: { dark?: boolean }) {
             const data = JSON.parse(line.slice(6));
             if (event === "text") patch((m) => ({ ...m, text: m.text + data.text }));
             else if (event === "tool_call")
-              patch((m) => ({ ...m, tools: [...m.tools, data.tool] }));
+              patch((m) => ({ ...m, tools: [...m.tools, { tool: data.tool, sql: data.sql ?? "" }] }));
             else if (event === "error")
               patch((m) => ({ ...m, text: m.text + `\n\n⚠ ${data.detail}` }));
           }
@@ -160,7 +171,7 @@ export default function ChatPanel({ dark }: { dark?: boolean }) {
           </div>
         )}
         {messages.map((m, i) => (
-          <Message key={i} msg={m} dark={dark} />
+          <Message key={i} msg={m} dark={dark} onOpenSql={onOpenSql} />
         ))}
         {busy &&
           messages[messages.length - 1]?.role === "assistant" &&
@@ -190,13 +201,33 @@ export default function ChatPanel({ dark }: { dark?: boolean }) {
   );
 }
 
-function Message({ msg, dark }: { msg: Msg; dark?: boolean }) {
+export function Message({
+  msg,
+  dark,
+  onOpenSql,
+}: {
+  msg: Msg;
+  dark?: boolean;
+  onOpenSql?: (sql: string) => void;
+}) {
   const { prose, spec } = splitVegaSpec(msg.text);
+  const queries = msg.tools.filter((t) => t.sql);
+  const others = msg.tools.filter((t) => !t.sql);
   return (
     <div className={`chat-msg ${msg.role}`}>
-      {msg.tools.length > 0 && (
-        <div className="chat-tools">{msg.tools.map((t) => `· ${t}`).join(" ")}</div>
+      {others.length > 0 && (
+        <div className="chat-tools">{others.map((t) => `· ${t.tool}`).join(" ")}</div>
       )}
+      {queries.map((t, i) => (
+        <div className="chat-query" key={i}>
+          <code className="chat-query-sql">{t.sql}</code>
+          {onOpenSql && (
+            <button className="chat-query-open" onClick={() => onOpenSql(t.sql)}>
+              Open in editor
+            </button>
+          )}
+        </div>
+      ))}
       {prose && <div className="chat-prose">{renderProse(prose)}</div>}
       {spec && <VegaBlock spec={spec} dark={dark} />}
     </div>

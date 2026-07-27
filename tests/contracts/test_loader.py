@@ -164,7 +164,7 @@ def test_inline_var_in_path(tmp_path, monkeypatch):
 
 
 def test_unknown_type_lists_valid_ones(tmp_path):
-    ws = write_charter(tmp_path, "version: 1\nsources:\n  f:\n    type: excel\n    path: x.xlsx\n")
+    ws = write_charter(tmp_path, "version: 1\nsources:\n  f:\n    type: oracle\n    path: x\n")
     with pytest.raises(CharterError, match=r"is not one of: postgres"):
         load_charter(ws)
 
