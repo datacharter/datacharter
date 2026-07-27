@@ -52,6 +52,11 @@ With `--key`, rows are matched by key and changed rows are counted separately.
 Show a query's plan and `~N rows` estimates **without running it** — a pre-flight
 cost check.
 
+### `query <sql> [directory] [--format table|csv|json]`
+Run a read-only SQL query across your sources and print the result — federated
+joins, the same read-only guard as the app. `--format` selects table (default),
+CSV, or JSON output.
+
 ### `sample <relation> [directory] [--rows N]`
 Print a PII-masked CSV sample of a relation (contract PII columns come back as
 `•••`), safe to paste into a ticket. Default 10 rows.

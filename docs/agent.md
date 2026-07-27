@@ -102,6 +102,9 @@ The agent runs a short tool loop over a small set of **read-only** tools:
   for snapshots). The agent cannot modify your data.
 - **Charts inline.** The agent can emit a Vega-Lite spec that renders directly in
   the results panel.
+- **Reproducible answers.** Each query the agent runs appears in the transcript as
+  the exact governed SQL, with one click to open it in the editor and run it
+  yourself.
 - **Streaming.** Answers stream to the chat panel over Server-Sent Events
   (`/api/agent/ask`). `/api/agent/available` reports whether an endpoint is
   configured and which model is in use.

@@ -12,8 +12,8 @@ actually means 👇
 
 **🔍 Query all your data, locally — no pipelines, no warehouse, no waiting**
 
-- Local CSV, Parquet, and JSON files
-- Postgres, MySQL, SQL Server, Snowflake, BigQuery — and more
+- Local CSV, Parquet, JSON, and Excel files — or drag one onto the window
+- Postgres, MySQL, SQLite, SQL Server, Snowflake, BigQuery, DuckDB, Iceberg, Delta — and more
 - JOIN a local CSV → a Snowflake table → a Parquet file in S3, in **one** SQL statement, all on your laptop
 - Yes, it's as unreasonable as it sounds. You kind of have to try it to believe it.
 
@@ -30,12 +30,14 @@ actually means 👇
 
 Beyond local federation and governed agent access, you also get:
 
-- **See answers as you type.** Live results preview while you write SQL, one-click auto-charts, and a profiling panel (missing values, distributions, outliers) — no separate BI tool.
+- **See answers as you type.** Live results preview while you write SQL, one-click auto-charts, and a profiling panel — missing values, distributions, outliers, and per-column top-value bars — no separate BI tool.
+- **Never lose a query.** Every run is saved to a local history you can reopen, and a **⌘K command palette** jumps to any table or action.
+- **Know the cost before you run.** One click estimates how many rows a query will scan and warns before a big one.
 - **Safe by design.** The engine is read-only by construction — no query can write, delete, or touch the filesystem — so pointing an AI (or a teammate) at your real databases can't do damage.
 - **Point *other* AI tools at your data, too.** A governed MCP server exposes the same read-only, PII-masked query tools to Cursor, Cline, or your own agent.
-- **Trust every answer.** Each result shows exactly which source columns it read — so you always know where a number came from.
+- **Every agent answer is reproducible.** The chat shows the exact SQL the agent ran, with one click to open it in the editor — and each result shows which source columns it read, so you always know where a number came from.
 - **Save, reuse, export.** Snapshot a result as a reusable local table; export to CSV, Parquet, JSON, or XLSX.
-- **Governance you can automate.** Catch schema/PII drift in CI, diff data across sources, and define certified metrics — all from the command line.
+- **Governance you can automate.** From the command line: assert data quality (`datacharter test`), catch schema/PII drift in CI, diff data across sources, trace cross-source lineage, and define certified metrics.
 
 ![DataCharter — live SQL preview, auto-charts, per-query provenance, and PII masking](https://raw.githubusercontent.com/datacharter/datacharter/main/brand/demo.gif)
 
