@@ -1,0 +1,30 @@
+name: Publish to MCP Registry
+
+# Publishes server.json to the official MCP Registry under io.github.datacharter/*.
+# Uses GitHub Actions OIDC — the workflow runs in this org-owned repo, which proves
+# ownership of the io.github.datacharter namespace (no secrets required).
+# Runs on version tags, or on demand via the Actions tab / `gh workflow run`.
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install mcp-publisher
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Authenticate (GitHub OIDC)
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish server.json
+        run: ./mcp-publisher publish
