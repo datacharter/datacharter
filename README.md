@@ -122,6 +122,13 @@ Apache-2.0 mock LLM server, as the offline agent endpoint in CI.
 DuckDB is a trademark of the DuckDB Foundation. DataCharter is an independent
 project and is not affiliated with or endorsed by the DuckDB Foundation.
 
+## Privacy
+
+DataCharter runs entirely on your machine. It collects **no** data, sends **no**
+telemetry, and operates **no** servers — your data, queries, and credentials never
+leave your control except to the sources you configure or a model provider you
+explicitly enable. Full policy: **[Privacy Policy](https://datacharter.github.io/datacharter/privacy)**.
+
 ## License
 
 [Apache-2.0](LICENSE)

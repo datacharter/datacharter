@@ -24,16 +24,31 @@ __all__ = ["mcp_tool_defs", "handle_message", "serve_stdio"]
 PROTOCOL_VERSION = "2025-11-25"
 _SUPPORTED_VERSIONS = frozenset({"2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"})
 
+# MCP tool annotations. Every tool is read-only (the ToolBox read-only guard rejects
+# writes) and scoped to charter-declared sources — so readOnlyHint holds and the world
+# is closed. Human-readable titles are surfaced by MCP clients and required by the
+# Claude Connectors Directory.
+_ANNOTATIONS: dict[str, dict[str, Any]] = {
+    "list_sources": {"title": "List data sources"},
+    "list_tables": {"title": "List tables"},
+    "describe_table": {"title": "Describe table"},
+    "query": {"title": "Run read-only SQL query"},
+}
+_READ_ONLY = {"readOnlyHint": True, "idempotentHint": True, "openWorldHint": False}
+
 
 def mcp_tool_defs() -> list[dict[str, Any]]:
     """Adapt the OpenAI-shaped `TOOL_SPECS` to MCP tool definitions."""
     return [
         {
-            "name": spec["function"]["name"],
+            "name": name,
+            "title": _ANNOTATIONS[name]["title"],
             "description": spec["function"]["description"],
             "inputSchema": spec["function"]["parameters"],
+            "annotations": {**_ANNOTATIONS[name], **_READ_ONLY},
         }
         for spec in TOOL_SPECS
+        for name in [spec["function"]["name"]]
     ]
 
 

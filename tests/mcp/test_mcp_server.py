@@ -36,8 +36,12 @@ def test_tool_defs_are_mcp_shaped():
     names = {d["name"] for d in defs}
     assert names == {"list_sources", "list_tables", "describe_table", "query"}
     for d in defs:
-        assert set(d) >= {"name", "description", "inputSchema"}
+        assert set(d) >= {"name", "description", "inputSchema", "title", "annotations"}
         assert d["inputSchema"]["type"] == "object"
+        # Directory requirement: a title and a read-only/destructive hint on every tool.
+        assert d["title"]
+        assert d["annotations"]["title"] == d["title"]
+        assert d["annotations"]["readOnlyHint"] is True
     query = next(d for d in defs if d["name"] == "query")
     assert query["inputSchema"]["required"] == ["sql"]
 

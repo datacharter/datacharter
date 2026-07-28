@@ -19,6 +19,17 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Wait for the package version on PyPI
+        run: |
+          v=$(jq -r '.version' server.json)
+          for i in $(seq 1 60); do
+            if curl -sf "https://pypi.org/pypi/datacharter/$v/json" >/dev/null; then
+              echo "datacharter $v is on PyPI"; exit 0
+            fi
+            echo "waiting for datacharter $v on PyPI ($i/60)"; sleep 10
+          done
+          echo "timed out waiting for datacharter $v on PyPI"; exit 1
+
       - name: Install mcp-publisher
         run: |
           curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
