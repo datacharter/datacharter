@@ -1,0 +1,35 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.datacharter/datacharter",
+  "title": "DataCharter",
+  "description": "Local-first, contract-governed data explorer with read-only, PII-masked query tools for AI agents.",
+  "repository": {
+    "url": "https://github.com/datacharter/datacharter",
+    "source": "github"
+  },
+  "version": "0.10.3",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "datacharter",
+      "version": "0.10.3",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp"
+        },
+        {
+          "type": "positional",
+          "valueHint": "workspace",
+          "description": "Path to the DataCharter workspace directory containing charter.yaml",
+          "isRequired": true
+        }
+      ]
+    }
+  ]
+}
