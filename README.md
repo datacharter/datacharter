@@ -53,7 +53,8 @@ uvx datacharter serve          # needs `uv` → https://astral.sh/uv
 # → serves at http://127.0.0.1:8321 (open it in your browser)
 
 # Or install it:
-pip install datacharter        # Python 3.11+
+brew install datacharter/tap/datacharter   # macOS (Homebrew)
+pip install datacharter                     # Python 3.11+ (any OS)
 
 # Start your own workspace:
 datacharter init               # scaffolds charter.yaml, queries/, .env.example

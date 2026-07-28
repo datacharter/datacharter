@@ -32,6 +32,11 @@ The server speaks JSON-RPC 2.0 over stdio (standard input/output). A charter is
 required — run `datacharter init` first if you don't have one. Diagnostics are
 written to standard error; standard output carries only the protocol.
 
+DataCharter is published in the official
+[MCP Registry](https://registry.modelcontextprotocol.io) as
+`io.github.datacharter/datacharter`, so MCP clients that read the registry can
+discover it directly.
+
 ## Tools exposed
 
 | Tool | Arguments | Returns |

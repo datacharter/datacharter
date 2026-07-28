@@ -27,7 +27,9 @@ and drag a CSV, Parquet, or JSON file onto the window to query it instantly.
 ## Start a real workspace
 
 ```sh
-pip install datacharter
+pip install datacharter                    # any OS (Python 3.11+)
+# ...or on macOS with Homebrew:
+brew install datacharter/tap/datacharter
 
 datacharter init      # scaffold the workspace here
 datacharter serve     # explore in your browser
