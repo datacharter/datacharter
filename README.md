@@ -2,6 +2,8 @@
 
 > **Query all your data locally — then hand your AI agents exactly the data you choose, and not one column more.**
 
+<!-- mcp-name: io.github.datacharter/datacharter -->
+
 [![PyPI](https://img.shields.io/pypi/v/datacharter)](https://pypi.org/project/datacharter/)
 [![Python](https://img.shields.io/pypi/pyversions/datacharter)](https://pypi.org/project/datacharter/)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue)](LICENSE)

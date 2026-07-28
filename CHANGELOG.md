@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.10.3] - 2026-07-28
+
+### Changed
+- Published DataCharter to the official [MCP Registry](https://registry.modelcontextprotocol.io).
+  Added the required `mcp-name` ownership marker to the package README so the registry can verify
+  the PyPI package. No functional or API changes.
+
 ## [0.10.2] - 2026-07-27
 
 ### Fixed
