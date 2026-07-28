@@ -1,0 +1,2 @@
+# built bundle artifact — regenerate with: npx @anthropic-ai/mcpb pack
+*.mcpb

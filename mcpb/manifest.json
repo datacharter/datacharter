@@ -1,0 +1,48 @@
+{
+  "manifest_version": "0.4",
+  "name": "datacharter",
+  "display_name": "DataCharter",
+  "version": "0.10.4",
+  "description": "Local-first, contract-governed data explorer with read-only, PII-masked query tools for AI agents.",
+  "long_description": "DataCharter lets a model query your own data — local files (CSV, Parquet, Excel) and databases (SQLite, DuckDB, Postgres) federated through DuckDB — while a YAML \"charter\" governs access. The agent only ever sees four read-only tools (list_sources, list_tables, describe_table, query), with automatic PII masking, read-only enforcement, and row-level security applied server-side. It runs entirely on your machine; no data leaves your control except to the sources you configure. Point it at a workspace folder that contains a charter.yaml.",
+  "author": {
+    "name": "Rishi Mashelkar",
+    "url": "https://github.com/datacharter/datacharter"
+  },
+  "homepage": "https://datacharter.github.io/datacharter/",
+  "documentation": "https://datacharter.github.io/datacharter/mcp",
+  "support": "https://github.com/datacharter/datacharter/issues",
+  "icon": "icon.png",
+  "license": "Apache-2.0",
+  "keywords": ["duckdb", "sql", "data", "database", "governance", "pii", "privacy", "local-first"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/datacharter/datacharter.git"
+  },
+  "privacy_policies": ["https://datacharter.github.io/datacharter/privacy"],
+  "server": {
+    "type": "uv",
+    "entry_point": "server/main.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": ["run", "${__dirname}/server/main.py"],
+      "env": {
+        "DATACHARTER_WORKSPACE": "${user_config.workspace}"
+      }
+    }
+  },
+  "tools": [
+    { "name": "list_sources", "description": "List configured data sources with their types." },
+    { "name": "list_tables", "description": "List all queryable tables with their fully-qualified relation names." },
+    { "name": "describe_table", "description": "Show columns and types for one relation (e.g. 'crm.customers')." },
+    { "name": "query", "description": "Run a read-only, PII-masked SQL query and return rows." }
+  ],
+  "user_config": {
+    "workspace": {
+      "type": "directory",
+      "title": "Workspace directory",
+      "description": "Folder containing your charter.yaml (and data). DataCharter serves only the sources declared there.",
+      "required": true
+    }
+  }
+}
