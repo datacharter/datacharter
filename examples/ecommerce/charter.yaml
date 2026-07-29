@@ -1,0 +1,37 @@
+# DataCharter end-to-end example: an e-commerce workspace exercising every
+# governance surface — PII, agent access, row filters, guides, tests, metrics.
+# Copy this directory as a template:  datacharter serve examples/ecommerce
+version: 1
+
+sources:
+  crm:
+    type: csv
+    path: data/customers.csv
+    pii:
+      crm: [name, email]              # masked for agents by default
+    context:
+      crm: >-
+        One row per customer. tier = 'internal' marks QA/test accounts
+        (region 'ZZ'); exclude them from any customer-facing count.
+
+  sales:
+    type: csv
+    path: data/orders.csv
+    context:
+      sales: >-
+        One row per order. amount is gross; net revenue excludes rows where
+        refunded = true. order_date is when the order was placed.
+    row_filters:
+      sales: "refunded = false"       # agents only see un-refunded orders
+
+tests:
+  order_id_unique:  { type: unique, relation: sales, columns: [order_id] }
+  amount_nonneg:    { type: expression, relation: sales, expression: "amount >= 0" }
+  region_known:     { type: accepted_values, relation: crm, column: region, values: [US, EU, APAC, ZZ] }
+  has_customers:    { type: row_count, relation: crm, min: 1 }
+
+metrics:
+  net_revenue:
+    relation: sales
+    expression: "sum(CASE WHEN refunded = false THEN amount ELSE 0 END)"
+    time_column: order_date

@@ -129,3 +129,22 @@ async def test_serve_stdio_loop_frames_one_json_per_line(toolbox):
         assert written.endswith("\n")
         assert "\n" not in written[:-1]  # no embedded newlines in the framed message
         json.loads(written)  # each line is a standalone JSON object
+
+
+async def test_initialize_instructions_carry_guides(tmp_path):
+    cli_main(["init", str(tmp_path), "--demo"])
+    (tmp_path / "guides").mkdir(exist_ok=True)
+    (tmp_path / "guides" / "overview.md").write_text("Exclude internal-tier customers.")
+    charter = load_charter(tmp_path)
+    eng = Engine(tmp_path, charter.sources).start()
+    try:
+        tb = ToolBox(eng, charter.sources, guides=charter.guides)
+        resp = await handle_message(_req(1, "initialize", {"protocolVersion": "2025-11-25"}), tb)
+        assert "Exclude internal-tier customers." in resp["result"]["instructions"]
+    finally:
+        eng.close()
+
+
+async def test_initialize_omits_instructions_without_guides(toolbox):
+    resp = await handle_message(_req(1, "initialize", {"protocolVersion": "2025-11-25"}), toolbox)
+    assert "instructions" not in resp["result"]

@@ -1,0 +1,6 @@
+customer_id,name,email,region,tier
+1,Ada Moreno,ada@volt.dev,EU,pro
+2,Grace Okafor,grace@arc.io,US,free
+3,Kat Jensen,kat@lumen.co,US,pro
+4,Lin Chen,lin@delta.sh,APAC,pro
+5,QA Robot,qa@internal.test,ZZ,internal

@@ -75,9 +75,12 @@ class ToolBox:
         *,
         auto_pii: set[str] | None = None,
         local_access: dict | None = None,
+        guides: str = "",
         timeout_s: float = _DEFAULT_TIMEOUT_S,
     ) -> None:
         self._engine = engine
+        #: Workspace guides (guides/*.md) — read by the agent loop and the MCP server.
+        self.guides = guides
         # Column names flagged PII in any source's contract, matched case-insensitively.
         self._pii: set[str] = set()
         for src in sources:
@@ -97,6 +100,12 @@ class ToolBox:
             for tbl, pred in src.row_filters.items():
                 self._row_filters[tbl.lower()] = pred
                 self._row_filters[f"{src.name}__{tbl}".lower()] = pred
+        # Per-table prose context (charter `context:`), keyed like row_filters.
+        self._table_context: dict[str, str] = {}
+        for src in sources:
+            for tbl, text in src.table_context.items():
+                self._table_context[tbl.lower()] = text
+                self._table_context[f"{src.name}__{tbl}".lower()] = text
         # Query budget: a per-query statement timeout (the 50-row result cap below
         # already bounds egress). EXPLAIN can't reliably give output cardinality —
         # aggregate roots print no estimate — so the timeout is the robust backstop.
@@ -153,6 +162,10 @@ class ToolBox:
         ]
         payload = json.loads(self._render(result, set()))  # schema always visible
         payload["masked_columns"] = masked
+        key = f"{source}__{table}".lower() if source else table.lower()
+        context = self._table_context.get(key) or self._table_context.get(table.lower())
+        if context:
+            payload["context"] = context
         return json.dumps(payload, default=str)
 
     async def _query(self, args: dict) -> str:

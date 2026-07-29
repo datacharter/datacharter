@@ -230,9 +230,11 @@ async def run_turn(
     session_id: str | None = None,
     dc_bin: str | None = None,
     deny: list[str] | None = None,
+    context: str | None = None,
 ) -> AsyncIterator[dict]:
     """Run one chat turn; yield parsed stream events. Resumes `session_id` for context.
-    `deny` is the effective deny-list from the connect-time assertion."""
+    `deny` is the effective deny-list from the connect-time assertion; `context` is
+    workspace-guide text appended to the system prompt."""
     dc_bin = dc_bin or _dc_bin()
     with tempfile.TemporaryDirectory(prefix="dc-claude-") as td:
         settings, mcp = build_configs(serve_url, dc_bin, Path(td), deny)
@@ -241,6 +243,8 @@ async def run_turn(
             "--verbose", "--include-partial-messages",
             *_base_flags(settings, mcp),
         ]
+        if context:
+            args += ["--append-system-prompt", context]
         if session_id:
             args += ["--resume", session_id]
         proc = await asyncio.create_subprocess_exec(

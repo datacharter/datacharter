@@ -19,6 +19,16 @@ version: 1
 sources: {}
 """
 
+GUIDE_TEMPLATE = """\
+<!-- Workspace guides: the context you'd explain to a colleague, served to agents.
+     Every guides/*.md file is loaded (alphabetically) into the agent's context —
+     the built-in chat, Claude Code, and any MCP client all receive it.
+     Delete this comment and describe YOUR data. Examples of what belongs here:
+     - "revenue means amount net of refunds; use orders.amount, not gross_amount"
+     - "test accounts have region = 'ZZ'; exclude them from any customer count"
+     - "order_date is when the order was placed; created_at is a system timestamp" -->
+"""
+
 DEMO_CHARTER = """\
 # DataCharter demo workspace. Run: datacharter serve
 version: 1
@@ -71,6 +81,10 @@ def _cmd_init(args: argparse.Namespace) -> int:
     charter.write_text(DEMO_CHARTER if args.demo else CHARTER_TEMPLATE)
     (ws / ".env.example").write_text(ENV_EXAMPLE)
     (ws / "queries").mkdir(exist_ok=True)
+    (ws / "guides").mkdir(exist_ok=True)
+    guide = ws / "guides" / "overview.md"
+    if not guide.exists():
+        guide.write_text(GUIDE_TEMPLATE)
     _ensure_gitignore(ws)
     if args.demo:
         write_demo_data(ws)
@@ -222,7 +236,7 @@ def _cmd_mcp(args: argparse.Namespace) -> int:
         return 1
     charter = load_charter(ws)
     engine = _open_engine(ws, charter.sources)
-    toolbox = ToolBox(engine, charter.sources)
+    toolbox = ToolBox(engine, charter.sources, guides=charter.guides)
     # stdout is the MCP protocol channel; diagnostics go to stderr.
     print(f"datacharter MCP server on stdio ({ws})", file=sys.stderr)
     try:

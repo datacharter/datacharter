@@ -142,7 +142,8 @@ def create_app(
         except Exception:  # detection must never break serving
             app.state.auto_pii = set()
         app.state.toolbox = ToolBox(
-            engine, loaded.sources, auto_pii=app.state.auto_pii, local_access=loaded.local_access
+            engine, loaded.sources, auto_pii=app.state.auto_pii,
+            local_access=loaded.local_access, guides=loaded.guides,
         )
         try:
             yield
@@ -199,6 +200,7 @@ def create_app(
         app.state.toolbox = ToolBox(
             app.state.engine, app.state.charter.sources,
             auto_pii=app.state.auto_pii, local_access=app.state.charter.local_access,
+            guides=app.state.charter.guides,
         )
 
     def _sources_payload() -> dict:
@@ -563,7 +565,10 @@ def create_app(
             async def cc_events() -> AsyncIterator[str]:
                 got_text = False
                 sid = app.state.cc_session.get("id")
-                async for ev in cc.run_turn(body.question, serve_url, sid, deny=app.state.cc_deny):
+                async for ev in cc.run_turn(
+                    body.question, serve_url, sid,
+                    deny=app.state.cc_deny, context=app.state.charter.guides or None,
+                ):
                     if ev["kind"] in ("session", "result") and ev.get("session_id"):
                         app.state.cc_session["id"] = ev["session_id"]
                     if ev["kind"] == "text":

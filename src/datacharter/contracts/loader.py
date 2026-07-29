@@ -10,6 +10,7 @@ import yaml
 from pydantic import BaseModel, Field, ValidationError
 
 from datacharter.contracts.datatests import DataTest
+from datacharter.contracts.guides import load_guides
 from datacharter.contracts.metrics import Metric, MetricJoin
 from datacharter.contracts.resolve import FULL_REF, SecretResolver, UnresolvedReference
 from datacharter.models import CONNECTOR_TYPES, FILE_TYPES, Source, SourceType
@@ -36,6 +37,8 @@ class Charter(BaseModel):
     #: Agent-access overrides for `local.*` snapshot relations (same shape as a
     #: source's `agent_access`: {source?, tables?, columns?}). `on`=real, `off`=masked.
     local_access: dict = Field(default_factory=dict)
+    #: Concatenated workspace guides (guides/*.md) — agent-surface context.
+    guides: str = ""
 
 
 def load_charter(workspace: Path | str, filename: str = CHARTER_FILE) -> Charter:
@@ -84,7 +87,7 @@ def load_charter(workspace: Path | str, filename: str = CHARTER_FILE) -> Charter
 
     return Charter(
         version=version, sources=sources, warnings=warnings, metrics=metrics,
-        tests=tests, local_access=local_access,
+        tests=tests, local_access=local_access, guides=load_guides(workspace),
     )
 
 
@@ -152,6 +155,12 @@ def _build_source(name: str, body: Any, resolver: SecretResolver, warnings: list
         path_value = resolver.interpolate(str(path_value))
         _lint_path(ctx, path_value, stype, warnings)
 
+    context_raw = body.get("context") or {}
+    if not isinstance(context_raw, dict) or not all(
+        isinstance(k, str) and isinstance(v, str) for k, v in context_raw.items()
+    ):
+        raise CharterError(f"{ctx}.context: must be a mapping of table -> text.")
+
     max_rows = body.get("max_rows")
     if max_rows is not None and stype not in CONNECTOR_TYPES:
         warnings.append(
@@ -170,6 +179,7 @@ def _build_source(name: str, body: Any, resolver: SecretResolver, warnings: list
             pii={k: list(v) for k, v in (body.get("pii") or {}).items()},
             agent_access=dict(body.get("agent_access") or {}),
             row_filters=dict(body.get("row_filters") or {}),
+            table_context=context_raw,
             max_rows=max_rows,
         )
     except ValidationError as exc:

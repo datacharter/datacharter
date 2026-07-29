@@ -39,6 +39,17 @@ Rules:
 """
 
 
+def build_system(guides: str) -> str:
+    """The system prompt, with workspace guides appended when the contract has them."""
+    if not guides:
+        return SYSTEM_PROMPT
+    return (
+        SYSTEM_PROMPT
+        + "\nWorkspace guides — context from the data owners. Follow it when writing queries:\n\n"
+        + guides
+    )
+
+
 @dataclass
 class AgentConfig:
     llm: LLMClient = field(default_factory=LLMClient)
@@ -73,7 +84,8 @@ class Agent:
                 if event.kind == "done":
                     return
 
-        messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+        system = build_system(getattr(self._tools, "guides", ""))
+        messages: list[dict[str, Any]] = [{"role": "system", "content": system}]
         messages.extend(history or [])
         messages.append({"role": "user", "content": question})
 

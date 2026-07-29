@@ -70,14 +70,17 @@ async def handle_message(message: dict, toolbox: ToolBox) -> dict | None:
     if method == "initialize":
         requested = (message.get("params") or {}).get("protocolVersion")
         version = requested if requested in _SUPPORTED_VERSIONS else PROTOCOL_VERSION
-        return _result(
-            id_,
-            {
-                "protocolVersion": version,
-                "capabilities": {"tools": {}},
-                "serverInfo": {"name": "datacharter", "version": __version__},
-            },
-        )
+        result = {
+            "protocolVersion": version,
+            "capabilities": {"tools": {}},
+            "serverInfo": {"name": "datacharter", "version": __version__},
+        }
+        # Workspace guides ride the spec's `instructions` field so any MCP client
+        # can inject the data owners' context into the model.
+        guides = getattr(toolbox, "guides", "")
+        if guides:
+            result["instructions"] = guides
+        return _result(id_, result)
     if method == "tools/list":
         return _result(id_, {"tools": mcp_tool_defs()})
     if method == "tools/call":

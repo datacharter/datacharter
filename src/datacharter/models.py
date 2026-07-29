@@ -64,6 +64,8 @@ class Source(BaseModel):
     pii: dict[str, list[str]] = Field(default_factory=dict)
     #: Agent-access overrides (on=real, off=masked) at source/table/column level.
     agent_access: dict = Field(default_factory=dict)
+    #: Per-table prose context for agents (table -> guidance), from `context:`.
+    table_context: dict[str, str] = Field(default_factory=dict)
     #: Row-level filters for the agent surface: table -> SQL boolean predicate.
     row_filters: dict[str, str] = Field(default_factory=dict)
     #: Connector-extract cap (Snowflake). Overrides the engine default; ignored
