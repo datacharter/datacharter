@@ -8,7 +8,14 @@ theme: jekyll-theme-cayman
 show_downloads: false
 
 # Blog posts live under _posts/ and publish at /blog/<title>/.
-permalink: /blog/:title/
+# Scoped to posts via defaults — a global `permalink` would switch every doc
+# page to directory-style URLs and 404 all existing *.html links.
+defaults:
+  - scope:
+      path: ""
+      type: posts
+    values:
+      permalink: /blog/:title/
 
 # Dev-internal docs live in this folder but must never be published.
 exclude:

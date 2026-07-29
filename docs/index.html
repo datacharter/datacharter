@@ -64,7 +64,7 @@
   .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 28px; }
   :focus-visible { outline: 2px solid var(--charter); outline-offset: 3px; border-radius: 4px; }
 
-  /* ————— nav ————— */
+  /* nav */
   .nav-outer { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--paper) 86%, transparent); backdrop-filter: blur(10px) saturate(140%); border-bottom: 1px solid var(--line); }
   .nav { display: flex; align-items: center; gap: 22px; height: 62px; }
   .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.06rem; letter-spacing: -0.01em; color: var(--ink); }
@@ -75,7 +75,7 @@
   .nav a.nl:hover { color: var(--ink); text-decoration: none; }
   .nav a.gh { color: var(--ink); font-weight: 600; font-size: 0.93rem; }
 
-  /* ————— hero ————— */
+  /* hero */
   .hero { padding: 84px 0 72px; }
   .hero-grid { display: grid; grid-template-columns: minmax(0, 0.96fr) minmax(0, 1.04fr); gap: 56px; align-items: center; }
   .kicker { font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 22px; }
@@ -112,7 +112,7 @@
   .hero-note { font-size: 0.87rem; color: var(--muted); margin: 0; }
   .hero-note b { color: var(--ink); font-weight: 600; }
 
-  /* ————— the governed grid (signature) ————— */
+  /* the governed grid (signature) */
   .gov { border: 1px solid var(--panel-line); border-radius: var(--r); background: var(--panel); overflow: hidden; box-shadow: 0 24px 60px -18px rgba(9, 20, 34, 0.45); }
   .gov-top { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--panel-line); background: var(--panel-2); }
   .gov-title { font-family: var(--mono); font-size: 0.78rem; color: var(--panel-muted); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -155,7 +155,7 @@
   .gov-foot .st b { color: var(--panel-ink); font-weight: 600; }
   .gov-hint { color: var(--panel-muted); opacity: 0.8; }
 
-  /* ————— clauses ————— */
+  /* clauses */
   .section { padding: 78px 0; }
   .section--alt { background: var(--paper-2); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
   .clause { font-family: var(--mono); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.1em; color: var(--charter); text-transform: uppercase; margin: 0 0 14px; }
@@ -239,7 +239,7 @@
   .foot a { color: var(--muted); }
   .foot a:hover { color: var(--ink); }
 
-  /* ————— motion ————— */
+  /* motion */
   @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
   .hero .rise { animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
   .hero .r1 { animation-delay: 0.05s; } .hero .r2 { animation-delay: 0.14s; }
@@ -259,7 +259,7 @@
     .switch span, .gov-foot .dot { transition: none; }
   }
 
-  /* ————— responsive ————— */
+  /* responsive */
   @media (max-width: 980px) {
     .hero { padding: 56px 0 52px; }
     .hero-grid { grid-template-columns: 1fr; gap: 40px; }
@@ -294,9 +294,9 @@
     <a class="nl" href="#govern">Govern</a>
     <a class="nl" href="#agents">Agents</a>
     <a class="nl" href="#install">Install</a>
-    <a class="nl" href="#about">About</a>
     <a class="nl" href="blog/">Blog</a>
     <a class="nl" href="quickstart.html">Docs</a>
+    <a class="nl" href="#about">About</a>
     <a class="gh" href="https://github.com/datacharter/datacharter">GitHub</a>
   </div>
 </div>
@@ -340,7 +340,7 @@
         </table>
         <div class="gov-foot">
           <span class="dot" aria-hidden="true"></span>
-          <span class="st" id="govstatus"><b>your view</b> — unrestricted</span>
+          <span class="st" id="govstatus"><b>your view</b> · unrestricted</span>
           <span class="gov-hint">flip it ↑</span>
         </div>
       </div>
@@ -366,9 +366,9 @@
       </div>
       <div>
         <ul class="fed-points">
-          <li><b>No pipelines, no warehouse, no waiting.</b> The engine is embedded DuckDB — one process on your machine.</li>
+          <li><b>No pipelines, no warehouse, no waiting.</b> The engine is embedded DuckDB, one process on your machine.</li>
           <li><b>Drag a file onto the window</b> and it's queryable instantly. Or declare sources in <code class="i">charter.yaml</code>.</li>
-          <li><b>Read-only by construction.</b> No query can write, delete, or touch the filesystem — pointing anything at your production replica can't do damage.</li>
+          <li><b>Read-only by construction.</b> No query can write, delete, or touch the filesystem, so pointing anything at your production replica can't do damage.</li>
         </ul>
         <div class="chips" aria-label="Supported sources">
           <span class="chip">CSV</span><span class="chip">Parquet</span><span class="chip">JSON</span><span class="chip">Excel</span><span class="chip">SQLite</span><span class="chip">DuckDB</span><span class="chip">Postgres</span><span class="chip">MySQL</span><span class="chip">SQL Server</span><span class="chip">BigQuery</span><span class="chip">Snowflake</span><span class="chip">Iceberg</span><span class="chip">Delta</span>
@@ -408,7 +408,7 @@
         </li>
         <li>
           <h3>Row-level security on every agent query</h3>
-          <p>Predicates from the charter are applied to any query an agent runs — fail-closed, composed with masking.</p>
+          <p>Predicates from the charter are applied to any query an agent runs: fail-closed, composed with masking.</p>
         </li>
         <li>
           <h3>Predicates can't leak what masking hides</h3>
@@ -470,9 +470,9 @@
     <h2>Charter your data</h2>
     <p class="sub">One package, one process, works offline. Python 3.11+.</p>
     <div class="install-cols">
-      <div class="inst"><span class="lab">Try it — no install</span><code>uvx datacharter serve</code></div>
-      <div class="inst"><span class="lab">macOS — Homebrew</span><code>brew install datacharter/tap/datacharter</code></div>
-      <div class="inst"><span class="lab">Everywhere — pip</span><code>pip install datacharter</code></div>
+      <div class="inst"><span class="lab">Try it · no install</span><code>uvx datacharter serve</code></div>
+      <div class="inst"><span class="lab">macOS · Homebrew</span><code>brew install datacharter/tap/datacharter</code></div>
+      <div class="inst"><span class="lab">Everywhere · pip</span><code>pip install datacharter</code></div>
     </div>
     <p class="fine">Then <code class="i">datacharter init</code> scaffolds <code class="i">charter.yaml</code> + <code class="i">queries/</code>. Commit it, clone it, <code class="i">serve</code> it. The whole environment travels as a repo; secrets never do. <a href="quickstart.html">Read the quick start →</a></p>
     <div class="listed">
@@ -491,12 +491,12 @@
     <p class="clause">The maker</p>
     <h2>Why DataCharter exists</h2>
     <div class="maker" style="margin-top:26px">
-      <img class="maker-photo" src="https://github.com/rishi-mashelkar.png?size=256" alt="Rishi Mashelkar" width="128" height="128">
+      <img class="maker-photo" src="assets/rishi.jpg" alt="Rishi Mashelkar" width="128" height="128">
       <div>
         <p>Hi, I'm Rishi. I'm a data engineer, and I built DataCharter because I kept hitting the same wall: I wanted to point an AI agent at real data, and there was no way to do it I could defend. Handing a model warehouse credentials is a governance nightmare. Pasting CSVs into a chat window is not an alternative.</p>
         <p>Meanwhile, the data contracts my team already wrote (sources, tables, PII fields) just sat there <b>describing</b> data instead of <b>protecting</b> it. DataCharter is the tool I wanted to exist: everything queryable locally in one grid, and the contract turned into an enforcement point, so an agent can be genuinely useful without ever seeing more than it should.</p>
         <p>It's open source because governance you can't inspect isn't governance. If DataCharter is useful to you, a GitHub star helps more than you'd think, and an issue or PR helps even more.</p>
-        <p class="maker-sig"><span class="nm">Rishi Mashelkar</span><br>data engineer · maker of DataCharter · <a href="https://github.com/rishi-mashelkar">github.com/rishi-mashelkar</a></p>
+        <p class="maker-sig"><span class="nm">Rishi Mashelkar</span><br>data engineer · maker of DataCharter · <a href="https://github.com/rishi-mashelkar">GitHub</a> · <a href="https://www.linkedin.com/in/rishimashelkar/">LinkedIn</a></p>
       </div>
     </div>
   </div>
