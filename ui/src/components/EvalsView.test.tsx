@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import EvalsView from "./EvalsView";
 
 beforeEach(() => {
-  global.fetch = vi.fn(async (url: string) => {
+  globalThis.fetch = vi.fn(async (url: string) => {
     if (url.endsWith("/api/evals"))
       return new Response(
         JSON.stringify({ suites: [{ name: "analytics", cases: [{ question: "q1" }] }] }),
