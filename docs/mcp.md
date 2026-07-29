@@ -35,7 +35,10 @@ written to standard error; standard output carries only the protocol.
 DataCharter is published in the official
 [MCP Registry](https://registry.modelcontextprotocol.io) as
 `io.github.datacharter/datacharter`, so MCP clients that read the registry can
-discover it directly.
+discover it directly. It is also listed on
+[Glama](https://glama.ai/mcp/servers/datacharter/datacharter):
+
+[![DataCharter MCP server on Glama](https://glama.ai/mcp/servers/datacharter/datacharter/badges/score.svg)](https://glama.ai/mcp/servers/datacharter/datacharter)
 
 ## Tools exposed
 
