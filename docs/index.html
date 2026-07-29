@@ -515,7 +515,7 @@
         <p>Hi, I'm Rishi. I'm a data engineer, and I built DataCharter after hitting a wall I suspect you've met too: I wanted to point an AI agent at real data, and every way of doing it felt indefensible. Handing a model your database credentials is a governance incident with extra steps. Pasting CSVs into a chat window is&hellip; not a data platform.</p>
         <p>Meanwhile, every data contract I'd ever written (sources, tables, PII fields) just sat in a repo <b>describing</b> data instead of <b>protecting</b> it. DataCharter is the tool I wanted to exist: everything queryable locally in one grid, and the contract promoted from documentation to law, so an agent can be genuinely useful without ever seeing more than it should.</p>
         <p>It's open source because governance you can't inspect isn't governance. If DataCharter is useful to you, a GitHub star helps more than you'd think, and an issue or PR helps even more.</p>
-        <p class="maker-sig"><span class="nm">Rishi Mashelkar</span><br>data engineer · <a href="https://github.com/rishi-mashelkar">GitHub</a> · <a href="https://www.linkedin.com/in/rishimashelkar/">LinkedIn</a> · <a href="mailto:hello@datacharter.dev">hello@datacharter.dev</a></p>
+        <p class="maker-sig"><span class="nm">Rishi Mashelkar</span><br>data engineer · <a href="https://github.com/rishi-mashelkar">GitHub</a> · <a href="https://www.linkedin.com/in/rishimashelkar/">LinkedIn</a> · <a href="mailto:hello@datacharter.dev" class="copy-mail" title="Click to copy">hello@datacharter.dev</a></p>
       </div>
     </div>
   </div>
@@ -537,7 +537,7 @@
 
 <footer>
   <div class="wrap foot">
-    <span>© DataCharter · <a href="https://github.com/datacharter/datacharter/blob/main/LICENSE">Apache-2.0</a> · <a href="privacy.html">Privacy</a> · <a href="mailto:hello@datacharter.dev">Contact</a></span>
+    <span>© DataCharter · <a href="https://github.com/datacharter/datacharter/blob/main/LICENSE">Apache-2.0</a> · <a href="privacy.html">Privacy</a> · <a href="mailto:hello@datacharter.dev" class="copy-mail" title="Click to copy">hello@datacharter.dev</a></span>
     <span class="spacer"></span>
     <a href="quickstart.html">Quick start</a>
     <a href="charter-yaml.html">charter.yaml</a>
@@ -578,6 +578,17 @@
     navigator.clipboard.writeText(document.getElementById("cmdtext").textContent).then(function () {
       copybtn.textContent = "copied";
       setTimeout(function () { copybtn.textContent = "copy"; }, 1600);
+    });
+  });
+
+  document.querySelectorAll(".copy-mail").forEach(function (el) {
+    el.addEventListener("click", function (e) {
+      e.preventDefault();
+      navigator.clipboard.writeText("hello@datacharter.dev").then(function () {
+        var t = el.textContent;
+        el.textContent = "copied \u2713";
+        setTimeout(function () { el.textContent = t; }, 1500);
+      });
     });
   });
 
