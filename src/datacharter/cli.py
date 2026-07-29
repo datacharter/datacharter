@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from datacharter import __version__
+from datacharter.agent.llm import LLMClient
 from datacharter.demo import write_demo_data
 
 CHARTER_TEMPLATE = """\
@@ -668,6 +669,100 @@ def _cmd_test(args: argparse.Namespace) -> int:
     return 1 if failures else 0
 
 
+def _cmd_eval(args: argparse.Namespace) -> int:
+    import asyncio
+
+    from datacharter.agent.eval_runner import run_suite
+    from datacharter.agent.tools import ToolBox
+    from datacharter.contracts import load_charter
+    from datacharter.contracts.evals import EvalError, load_suites
+
+    ws = Path(args.directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+
+    if args.history:
+        return _eval_history(ws)
+
+    charter = load_charter(ws)
+    try:
+        suites = load_suites(ws)
+    except EvalError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    if args.suite:
+        suites = [s for s in suites if s.name == args.suite]
+    if not suites:
+        print("No eval suites in evals/*.yaml.", file=sys.stderr)
+        return 1
+
+    llm = _local_llm(args.model) if args.local else LLMClient()
+    engine = _open_engine(ws, charter.sources)
+    box = ToolBox(engine, charter.sources, guides=charter.guides)
+    box_off = ToolBox(engine, charter.sources, guides="") if args.compare_guides else None
+
+    worst = 1.0
+    try:
+        for suite in suites:
+            record = asyncio.run(
+                run_suite(suite, box, llm=llm, toolbox_off=box_off, samples=args.samples)
+            )
+            _print_scorecard(record)
+            from datacharter.agent.eval_store import save_run
+
+            save_run(ws, record)
+            worst = min(worst, record.overall["with_guides"])
+    finally:
+        engine.close()
+
+    if args.threshold is not None and worst < args.threshold:
+        print(f"\nBelow threshold ({worst:.0%} < {args.threshold:.0%}).", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _print_scorecard(record) -> None:
+    print(f"\nSuite: {record.suite}")
+    for case in record.cases:
+        mark = "✓" if case.with_guides.passed else "✗"
+        print(f"  {mark} {case.question}")
+        if case.without_guides is not None:
+            off = "✓" if case.without_guides.passed else "✗"
+            print(f"      guides on: {mark}   guides off: {off}")
+    o = record.overall
+    print(f"\n  {o['with_guides']:.0%} passed", end="")
+    if "lift" in o:
+        print(
+            f"  (guides off: {o['without_guides']:.0%}  →  lift: {o['lift']:+.0%})", end=""
+        )
+    print()
+
+
+def _eval_history(ws: Path) -> int:
+    from datacharter.agent.eval_store import load_history, regression_diff
+
+    hist = load_history(ws)
+    if not hist:
+        print("No eval history yet. Run `datacharter eval` first.")
+        return 0
+    print("Pass rate over time:")
+    for run in hist:
+        o = run.get("overall", {})
+        lift = f"  lift {o['lift']:+.0%}" if "lift" in o else ""
+        print(
+            f"  {run.get('started_at', '?')}  {o.get('with_guides', 0):.0%}{lift}  "
+            f"[{run.get('suite', '?')}]"
+        )
+    if len(hist) >= 2:
+        regressed = regression_diff(hist[-2], hist[-1])
+        if regressed:
+            print("\nRegressed since the previous run:")
+            for q in regressed:
+                print(f"  ✗ {q}")
+    return 0
+
+
 def _cmd_lineage(args: argparse.Namespace) -> int:
     import json as _json
 
@@ -817,6 +912,29 @@ def main(argv: list[str] | None = None) -> int:
     p_test.add_argument("directory", nargs="?", default=".")
     p_test.add_argument("--select", help="Run only the named test")
     p_test.set_defaults(func=_cmd_test)
+
+    p_eval = sub.add_parser(
+        "eval", help="Run agent eval suites (evals/*.yaml) and score answers"
+    )
+    p_eval.add_argument("directory", nargs="?", default=".")
+    p_eval.add_argument("--suite", help="Run only this suite (filename stem)")
+    p_eval.add_argument(
+        "--compare-guides", action="store_true",
+        help="Run with and without guides and report the lift",
+    )
+    p_eval.add_argument(
+        "--judge", action="store_true", help="Also score freeform answers with an LLM judge"
+    )
+    p_eval.add_argument("--samples", type=int, default=1, help="Runs per case; pass = majority")
+    p_eval.add_argument(
+        "--threshold", type=float, help="Exit nonzero if the pass rate is below this (0..1)"
+    )
+    p_eval.add_argument("--local", action="store_true", help="Use a local Ollama model")
+    p_eval.add_argument("--model", help="Model id (overrides DATACHARTER_MODEL)")
+    p_eval.add_argument(
+        "--history", action="store_true", help="Show the eval-run trend for this workspace"
+    )
+    p_eval.set_defaults(func=_cmd_eval)
 
     p_lineage = sub.add_parser(
         "lineage", help="Show cross-source lineage aggregated from query history"
