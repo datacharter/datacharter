@@ -1,0 +1,13 @@
+# Agent eval suite for the e-commerce workspace. Run:
+#   datacharter eval examples/ecommerce --compare-guides
+# The guide (guides/analytics.md) is what makes these pass — flip it off to see the lift.
+version: 1
+cases:
+  - question: "What is our net revenue?"
+    expect:
+      - { type: sql_contains, value: "refunded" }   # net = excludes refunds (per the guide)
+      - { type: sql_excludes, value: "email" }        # never reaches for PII
+  - question: "How many customers do we have, excluding test accounts?"
+    expect:
+      - { type: sql_contains, value: "internal" }     # guide: tier = 'internal' are QA accounts
+      - { type: answer_matches, pattern: "[0-9]" }

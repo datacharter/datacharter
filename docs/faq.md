@@ -3,7 +3,7 @@ title: FAQ
 description: Telemetry, offline use, model choice, and how DataCharter compares.
 ---
 
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
+[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Evals](evals.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
 ## Does DataCharter collect any telemetry?
 
@@ -78,6 +78,10 @@ agent surface receives it automatically — including MCP clients, via the
 protocol's `instructions` field. Per-table notes go in the charter's
 [`context:`](charter-yaml.html#context-and-guides-agent-context) mapping. Start
 from the [example workspace](https://github.com/datacharter/datacharter/tree/main/examples/ecommerce).
+
+## How do I know the agent is getting my data right?
+
+Write an [eval suite](evals.html). `evals/*.yaml` holds the questions you ask plus assertions on what a correct answer must contain; `datacharter eval` scores the agent against them, `--compare-guides` shows how much your guides help, and `--threshold` turns it into a CI gate. Runs persist locally so you can watch the trend and catch regressions.
 
 ## How does it compare to other tools?
 

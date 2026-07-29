@@ -3,7 +3,7 @@ title: charter.yaml reference
 description: Every field of a source contract, plus how credentials resolve.
 ---
 
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
+[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Evals](evals.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
 `charter.yaml` is the heart of a workspace. It describes your sources the way a
 data contract does: connection shape, which tables to expose, and which columns
@@ -207,7 +207,7 @@ root. Every file is loaded (alphabetically, capped at 8,000 characters) into the
 agent's system context; MCP clients receive it through the protocol's
 `initialize` `instructions` field. HTML comments in guides are stripped and
 never reach the model. Guides are trusted contract content: version them,
-review them in PRs, and they travel with the workspace.
+review them in PRs, and they travel with the workspace. See [Agent evals](evals.html) to measure the lift your guides provide.
 
 ## Metrics
 

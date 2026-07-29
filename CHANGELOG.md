@@ -5,6 +5,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-07-29
+
+### Added
+- **Agent evals.** Eval suites in `evals/*.yaml` score how well agents answer
+  questions over your data. Assertions bind to the answer text, the SQL the agent
+  ran, or the last query's scalar (`answer_contains`/`answer_matches`/
+  `sql_contains`/`sql_excludes`/`result_scalar`). `datacharter eval` prints a
+  scorecard; `--compare-guides` runs the suite with and without guides and
+  reports the **lift**; `--threshold` gates CI; `--history` shows the trend and
+  what regressed. Runs persist to a local `.datacharter/eval-runs/` ledger.
+- **In-browser authoring.** `datacharter serve` gains an **Evals** panel (author,
+  run, lift bar, trend, drilldown) and a **Guides** editor for `guides/*.md` and
+  per-table context. Editing is restricted to a loopback server.
+- New server endpoints: `GET/PUT /api/guides`, `GET /api/evals`,
+  `POST /api/evals/run` (SSE), `GET /api/evals/history`.
+- An eval suite in the `examples/ecommerce` template.
+
 ## [0.11.0] - 2026-07-29
 
 ### Added

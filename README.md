@@ -30,6 +30,7 @@ actually means 👇
 - Grant or deny access in the UI *or* right in your data contracts, at every level: whole **sources** → individual **tables** → individual **columns**
 - **PII is auto-detected and defaulted to *no agent access*** — override per field if you really mean to
 - **Teach it your data's quirks.** Markdown guides in `guides/*.md` ("revenue is net of refunds", "exclude QA accounts") reach every agent — chat, Claude Code, and MCP clients alike. Start from the [end-to-end example](examples/ecommerce).
+- **Measure the lift.** `datacharter eval --compare-guides` scores the agent on questions you write and shows how much your guides moved accuracy — locally, and as a CI gate. See [Agent evals](https://datacharter.dev/evals.html).
 - Don't take our word for it: flip on **Agent view** and see, column by column, exactly what your agent gets back when it runs a query. *(Spoiler: the PII comes back `•••`.)*
 
 ## Wait, there's more!
