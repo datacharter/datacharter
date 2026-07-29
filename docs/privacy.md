@@ -48,5 +48,5 @@ nothing for us to share.
 
 ## Contact
 
-Questions or concerns: open an issue at
+Questions or concerns: email <hello@datacharter.dev>, or open an issue at
 <https://github.com/datacharter/datacharter/issues>.
