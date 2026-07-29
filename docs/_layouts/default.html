@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="{{ site.lang | default: "en-US" }}">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    {% seo %}
+    <link rel="stylesheet" href="{{ "/assets/css/style.css?v=" | append: site.github.build_revision | relative_url }}">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20128%20128'%3E%3Ccircle%20cx='64'%20cy='64'%20r='56'%20fill='none'%20stroke='%233B82C4'%20stroke-width='7'/%3E%3Cpath%20d='M30%2084%20L52%2060%20L66%2072%20L92%2042'%20fill='none'%20stroke='%233B82C4'%20stroke-width='11'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3Cpath%20d='M78%2038%20L96%2038%20L96%2056'%20fill='none'%20stroke='%233B82C4'%20stroke-width='11'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3C/svg%3E">
+    {% include head-custom.html %}
+  </head>
+  <body>
+    <a id="skip-to-content" href="#content">Skip to the content.</a>
+
+    <header class="page-header" role="banner">
+      <a class="site-home" href="{{ "/" | relative_url }}" aria-label="DataCharter home">
+        <svg viewBox="0 0 128 128" aria-hidden="true"><circle cx="64" cy="64" r="56" fill="none" stroke="currentColor" stroke-width="7"/><path d="M30 84 L52 60 L66 72 L92 42" fill="none" stroke="currentColor" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/><path d="M78 38 L96 38 L96 56" fill="none" stroke="currentColor" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        DataCharter
+      </a>
+      <h1 class="project-name">{{ page.title | default: site.title }}</h1>
+      <h2 class="project-tagline">{{ page.description | default: site.description }}</h2>
+      {% if site.github.is_project_page %}
+        <a href="{{ site.github.repository_url }}" class="btn">View on GitHub</a>
+      {% endif %}
+    </header>
+
+    <main id="content" class="main-content" role="main">
+      {{ content }}
+
+      <footer class="site-footer">
+        <span class="site-footer-owner"><a href="{{ "/" | relative_url }}">datacharter.dev</a> · <a href="{{ site.github.repository_url }}">GitHub</a> · Apache-2.0</span>
+      </footer>
+    </main>
+  </body>
+</html>
