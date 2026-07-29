@@ -46,6 +46,17 @@
   .nav-spacer { flex: 1; }
   .nav a.nl { color: var(--muted); font-size: 0.93rem; font-weight: 500; }
   .nav a.nl:hover { color: var(--ink); text-decoration: none; }
+  .nav a.gh { color: var(--ink); font-weight: 600; font-size: 0.93rem; }
+  .dd { position: relative; }
+  .dd summary { list-style: none; cursor: pointer; color: var(--muted); font-size: 0.93rem; font-weight: 500; }
+  .dd summary::-webkit-details-marker { display: none; }
+  .dd summary::after { content: " \25BE"; font-size: 0.7em; }
+  .dd summary:hover, .dd[open] summary { color: var(--ink); }
+  .dd-menu { position: absolute; right: 0; top: calc(100% + 12px); background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 7px; min-width: 230px; box-shadow: 0 18px 44px -14px rgba(9, 20, 34, 0.35); display: flex; flex-direction: column; gap: 1px; z-index: 30; }
+  .dd-menu a { padding: 8px 12px; border-radius: 7px; color: var(--muted); font-size: 0.9rem; font-weight: 500; }
+  .dd-menu a:hover { background: var(--paper-2); color: var(--ink); text-decoration: none; }
+  .dd-menu .dd-note { font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 6px 12px 3px; }
+  @media (max-width: 560px) { .nav a.nl, .nav .dd { display: none; } }
   article { max-width: 46rem; margin: 0 auto; padding: 64px 28px 40px; }
   .post-kicker { font-family: var(--mono); font-size: 0.76rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--charter); margin: 0 0 16px; }
   h1 { font-family: var(--serif); font-optical-sizing: auto; font-size: clamp(2rem, 4.6vw, 2.9rem); font-weight: 500; line-height: 1.12; letter-spacing: -0.012em; margin: 0 0 14px; }
@@ -87,10 +98,23 @@
     <span class="nav-spacer"></span>
     <a class="nl" href="/#federate">Federate</a>
     <a class="nl" href="/#govern">Govern</a>
+    <a class="nl" href="/#agents">Agents</a>
+    <a class="nl" href="/#install">Install</a>
     <a class="nl" href="/blog/">Blog</a>
-    <a class="nl" href="/quickstart">Docs</a>
+    <a class="nl" href="/quickstart.html">Docs</a>
+    <details class="dd">
+      <summary aria-label="Featured in">Featured in</summary>
+      <div class="dd-menu">
+        <span class="dd-note">Listed in</span>
+        <a href="https://github.com/davidgasquez/awesome-duckdb">awesome-duckdb</a>
+        <a href="https://pypi.org/project/datacharter/">PyPI</a>
+        <a href="https://github.com/datacharter/homebrew-tap">Homebrew</a>
+        <a href="https://registry.modelcontextprotocol.io">Official MCP Registry</a>
+        <a href="https://glama.ai/mcp/servers/datacharter/datacharter">Glama</a>
+      </div>
+    </details>
     <a class="nl" href="/#about">About</a>
-    <a class="nl" href="https://github.com/datacharter/datacharter">GitHub</a>
+    <a class="gh" href="https://github.com/datacharter/datacharter">GitHub</a>
   </div>
 </div>
 
@@ -122,6 +146,11 @@
   </div>
 </footer>
 <script>
+var dd = document.querySelector(".dd");
+if (dd) {
+  document.addEventListener("click", function (e) { if (dd.open && !dd.contains(e.target)) dd.open = false; });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") dd.open = false; });
+}
 document.querySelectorAll(".copy-mail").forEach(function (el) {
   el.addEventListener("click", function (e) {
     e.preventDefault();
