@@ -70,6 +70,15 @@ Yes. A statement allowlist is enforced in the engine, so queries cannot modify
 your sources. The only write path is `local.*` DDL, used for snapshots into the
 workspace's encrypted local catalog.
 
+## How do I make the agent smarter about *my* data?
+
+Write guides. `guides/*.md` in the workspace holds the context you'd explain to
+a colleague ("revenue is net of refunds", "exclude tier = 'internal'"); the
+agent surface receives it automatically — including MCP clients, via the
+protocol's `instructions` field. Per-table notes go in the charter's
+[`context:`](charter-yaml.html#context-and-guides-agent-context) mapping. Start
+from the [example workspace](https://github.com/datacharter/datacharter/tree/main/examples/ecommerce).
+
 ## How does it compare to other tools?
 
 At a high level, and without disparaging any of them (they are good tools):

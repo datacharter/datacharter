@@ -71,6 +71,16 @@ key and no per-token billing. In the chat panel, click **Connect Claude Code**
   under your Claude subscription. Use `--local` (Mode 2) if no data may leave your
   machine.
 
+## Guides: tell the agent what you'd tell a colleague
+
+Schema alone doesn't say that revenue means *net of refunds* or that QA
+accounts must be excluded. Put that in `guides/*.md` (and per-table
+[`context:`](charter-yaml.html#context-and-guides-agent-context)) and every
+agent — the built-in chat, Claude Code, and any MCP client — receives it before
+writing a query. See the end-to-end
+[example workspace](https://github.com/datacharter/datacharter/tree/main/examples/ecommerce)
+for a working guide.
+
 ## How the agent works
 
 The agent runs a short tool loop over a small set of **read-only** tools:

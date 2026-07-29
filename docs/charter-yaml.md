@@ -184,6 +184,31 @@ local_access:
     snap.email: true    # let the agent see a snapshotted email column
 ```
 
+## `context` and guides (agent context)
+
+Two ways to hand agents the context you'd explain to a colleague; both are
+served only to the agent surface (built-in chat, Claude Code, and MCP clients),
+never injected into the human SQL editor.
+
+**Per-table `context:`** — a sibling mapping in a source (same shape as `pii:`);
+`describe_table` returns it alongside the schema:
+
+```yaml
+sources:
+  crm:
+    type: postgres
+    tables: [customers]
+    context:
+      customers: "One row per customer; tier = 'internal' marks QA accounts — exclude them."
+```
+
+**Workspace guides** — free-form markdown in `guides/*.md` at the workspace
+root. Every file is loaded (alphabetically, capped at 8,000 characters) into the
+agent's system context; MCP clients receive it through the protocol's
+`initialize` `instructions` field. HTML comments in guides are stripped and
+never reach the model. Guides are trusted contract content: version them,
+review them in PRs, and they travel with the workspace.
+
 ## Metrics
 
 Optional, top-level. Declare named, governed aggregations so the agent, the

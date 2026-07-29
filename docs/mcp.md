@@ -40,6 +40,11 @@ discover it directly. It is also listed on
 
 [![DataCharter MCP server on Glama](https://glama.ai/mcp/servers/datacharter/datacharter/badges/score.svg)](https://glama.ai/mcp/servers/datacharter/datacharter)
 
+Workspace [guides](charter-yaml.html#context-and-guides-agent-context) ride the
+protocol's `initialize` `instructions` field, so clients inject your data
+owners' context into the model automatically; `describe_table` includes a
+`context` key for tables with declared context.
+
 ## Tools exposed
 
 | Tool | Arguments | Returns |
