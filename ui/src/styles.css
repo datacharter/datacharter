@@ -1078,3 +1078,48 @@ table.grid td.rownum, table.grid th.rownum {
 .cmdk-item.active { background: var(--accent-soft); }
 .cmdk-hint { color: var(--text-dim); font-size: 12px; }
 .cmdk-empty { padding: 10px 12px; color: var(--text-dim); }
+
+/* Evals + Guides views */
+.evals-view, .guides-editor { padding: 16px 20px; overflow: auto; flex: 1; min-height: 0; }
+.evals-header, .guides-header { display: flex; align-items: baseline; gap: 14px; }
+.evals-header h2, .guides-header h2 { margin: 0; }
+.evals-compare { font-size: 13px; color: var(--text-dim); margin-left: auto; }
+.guides-sub { margin: 0; color: var(--text-dim); font-size: 13px; }
+.evals-empty, .guides-error, .evals-error { color: var(--text-dim); font-size: 13px; }
+.evals-error, .guides-error { color: #c0392b; }
+.evals-suite { margin-top: 14px; }
+.evals-suite h3 { margin: 0 0 6px; font-size: 14px; }
+.evals-suite ul { margin: 0; padding-left: 18px; font-size: 13px; }
+.evals-scorecard {
+  margin-top: 16px; padding: 12px 14px; background: var(--bg-panel);
+  border: 1px solid var(--border); border-radius: 8px;
+}
+.evals-scorecard ul { list-style: none; margin: 10px 0 0; padding: 0; font-size: 13px; }
+.evals-scorecard li { margin-bottom: 6px; }
+.evals-scorecard pre {
+  margin: 4px 0 0; padding: 6px 8px; background: var(--bg-raised);
+  border-radius: 5px; font-size: 12px; overflow-x: auto;
+}
+.evals-lift { color: var(--accent); }
+.evals-trend { margin-top: 18px; max-width: 620px; }
+.guides-tabs { display: flex; gap: 6px; margin: 12px 0 8px; flex-wrap: wrap; }
+.guides-tab {
+  padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg-panel); color: var(--text); cursor: pointer; font-size: 13px;
+}
+.guides-tab.active { background: var(--accent-soft); border-color: var(--accent); }
+.guides-name {
+  display: block; width: min(320px, 100%); margin: 8px 0; padding: 6px 10px;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--bg-panel); color: var(--text);
+}
+.guides-content {
+  display: block; width: 100%; max-width: 720px; padding: 10px 12px; font-family: inherit;
+  font-size: 13px; line-height: 1.5; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg-panel); color: var(--text); resize: vertical;
+}
+.guides-actions { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+.guides-saved { color: var(--accent); font-size: 13px; }
+.guides-contexts { margin-top: 20px; }
+.guides-contexts h3 { font-size: 14px; margin: 0 0 6px; }
+.guides-contexts ul { margin: 0; padding-left: 18px; font-size: 13px; }
+.guides-contexts li { margin-bottom: 4px; }

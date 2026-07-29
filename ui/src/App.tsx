@@ -7,6 +7,8 @@ import QueryFiles from "./components/QueryFiles";
 import ResultsGrid from "./components/ResultsGrid";
 import SourceTree from "./components/SourceTree";
 import SourcesView from "./components/SourcesView";
+import EvalsView from "./components/EvalsView";
+import GuidesEditor from "./components/GuidesEditor";
 import HelpModal from "./components/HelpModal";
 import EmptyState from "./components/EmptyState";
 import Toast from "./components/Toast";
@@ -43,7 +45,7 @@ export default function App() {
   const [dragging, setDragging] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [catalogLoaded, setCatalogLoaded] = useState(false);
-  const [view, setView] = useState<"explorer" | "sources">("explorer");
+  const [view, setView] = useState<"explorer" | "sources" | "evals" | "guides">("explorer");
   const [showHelp, setShowHelp] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [estimate, setEstimate] = useState<number | null | undefined>(undefined);
@@ -397,6 +399,20 @@ export default function App() {
           {view === "sources" ? "Explorer" : "Sources"}
         </button>
         <button
+          className="topbar-btn"
+          onClick={() => setView(view === "evals" ? "explorer" : "evals")}
+          title="Run agent evals and measure guide-lift"
+        >
+          {view === "evals" ? "Explorer" : "Evals"}
+        </button>
+        <button
+          className="topbar-btn"
+          onClick={() => setView(view === "guides" ? "explorer" : "guides")}
+          title="Edit workspace guides (agent context)"
+        >
+          {view === "guides" ? "Explorer" : "Guides"}
+        </button>
+        <button
           className="help-btn"
           onClick={() => setShowTutorial(true)}
           title="Getting started"
@@ -419,6 +435,10 @@ export default function App() {
         <main className="main">
           {view === "sources" ? (
             <SourcesView onChange={refreshCatalog} />
+          ) : view === "evals" ? (
+            <EvalsView />
+          ) : view === "guides" ? (
+            <GuidesEditor />
           ) : shouldShowLaunchpad(catalogLoaded, sources.length, tables.length) ? (
             <EmptyState
               onAddSource={() => setView("sources")}

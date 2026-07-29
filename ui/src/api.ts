@@ -142,7 +142,45 @@ export const api = {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ backend }),
     }),
+  listEvals: () => request<{ suites: EvalSuite[] }>("/api/evals"),
+  evalHistory: () => request<{ runs: EvalRun[] }>("/api/evals/history"),
+  listGuides: () => request<GuidesPayload>("/api/guides"),
+  saveGuide: (body: {
+    name?: string;
+    content?: string;
+    source?: string;
+    table?: string;
+    context?: string;
+  }) =>
+    request<{ saved: boolean }>("/api/guides", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    }),
 };
+
+export interface EvalSuite {
+  name: string;
+  cases: { question: string }[];
+}
+
+export interface EvalCaseOutcome {
+  passed: boolean;
+  answer: string;
+  sqls: string[];
+}
+
+export interface EvalRun {
+  started_at?: string;
+  suite: string;
+  overall: { with_guides: number; without_guides?: number; lift?: number };
+  cases: { question: string; with_guides: EvalCaseOutcome }[];
+}
+
+export interface GuidesPayload {
+  guides: { name: string; content: string }[];
+  contexts: { source: string; table: string; context: string }[];
+}
 
 export interface AgentStatus {
   available: boolean;
