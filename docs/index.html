@@ -3,312 +3,470 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DataCharter — Charter your data</title>
-<meta name="description" content="Query all your data locally, then give AI agents governed, PII-safe access to exactly the data you choose. Contract-governed, powered by DuckDB.">
+<title>DataCharter — your data, explored locally. Your agents, on a leash.</title>
+<meta name="description" content="A local SQL workspace over every file and database you have, federated by DuckDB and governed by a contract. AI agents get read-only, PII-masked access to exactly what the charter grants. Not one column more.">
+<link rel="canonical" href="https://datacharter.dev/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="DataCharter — your data, explored locally. Your agents, on a leash.">
+<meta property="og:description" content="One local SQL grid over every source you have, governed by a contract. Agents see exactly what the charter grants. Not one column more.">
+<meta property="og:url" content="https://datacharter.dev/">
+<meta property="og:image" content="https://raw.githubusercontent.com/datacharter/datacharter/main/brand/hero.png">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20128%20128'%3E%3Ccircle%20cx='64'%20cy='64'%20r='56'%20fill='none'%20stroke='%233B82C4'%20stroke-width='7'/%3E%3Cpath%20d='M30%2084%20L52%2060%20L66%2072%20L92%2042'%20fill='none'%20stroke='%233B82C4'%20stroke-width='11'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3Cpath%20d='M78%2038%20L96%2038%20L96%2056'%20fill='none'%20stroke='%233B82C4'%20stroke-width='11'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --accent: #3B82C4;
-    --accent-strong: #2f6da8;
-    --bg: #ffffff;
-    --surface: #f6f8fa;
-    --surface-2: #eef2f6;
-    --text: #14202b;
-    --muted: #566575;
-    --border: #e2e8f0;
-    --code-bg: #0d1117;
-    --code-text: #e6edf3;
-    --radius: 14px;
-    --maxw: 1080px;
+    --paper: #F3F6F9;
+    --paper-2: #EAEFF4;
+    --ink: #15202B;
+    --muted: #5A6B7C;
+    --line: #D8E0E8;
+    --charter: #3B82C4;
+    --charter-deep: #2E6CA6;
+    --panel: #0F1722;
+    --panel-2: #151F2C;
+    --panel-line: #24303F;
+    --panel-ink: #D8E2EC;
+    --panel-muted: #7E90A3;
+    --pii: #D9822B;
+    --serif: "Newsreader", Georgia, serif;
+    --sans: "Public Sans", -apple-system, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --maxw: 1104px;
+    --r: 12px;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #0d1117;
-      --surface: #161b22;
-      --surface-2: #1c232d;
-      --text: #e6edf3;
-      --muted: #9aa5b1;
-      --border: #262d36;
-      --code-bg: #010409;
-      --code-text: #e6edf3;
+      --paper: #0D141D;
+      --paper-2: #111A25;
+      --ink: #DCE6EF;
+      --muted: #8FA1B3;
+      --line: #223040;
+      --panel: #0A1119;
+      --panel-2: #101A26;
+      --panel-line: #22303F;
+      --charter-deep: #5DA0DC;
     }
   }
+
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
   body {
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    color: var(--text);
-    background: var(--bg);
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: var(--sans); font-size: 16.5px; line-height: 1.62;
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
   }
-  a { color: var(--accent); text-decoration: none; }
-  a:hover { text-decoration: underline; }
-  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
-  img { max-width: 100%; height: auto; }
+  a { color: var(--charter); text-decoration: none; }
+  a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  img { max-width: 100%; height: auto; display: block; }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 28px; }
+  :focus-visible { outline: 2px solid var(--charter); outline-offset: 3px; border-radius: 4px; }
 
-  /* Header */
-  header {
-    position: sticky; top: 0; z-index: 10;
-    backdrop-filter: saturate(140%) blur(8px);
-    background: color-mix(in srgb, var(--bg) 82%, transparent);
-    border-bottom: 1px solid var(--border);
-  }
-  .nav { display: flex; align-items: center; gap: 16px; height: 60px; }
-  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.1rem; letter-spacing: -0.01em; }
-  .brand svg { width: 26px; height: 26px; color: var(--text); }
-  .nav .spacer { flex: 1; }
-  .nav a { color: var(--muted); font-size: 0.94rem; font-weight: 500; }
-  .nav a:hover { color: var(--text); text-decoration: none; }
-  .nav .ghlink { color: var(--text); }
+  /* ————— nav ————— */
+  .nav-outer { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--paper) 86%, transparent); backdrop-filter: blur(10px) saturate(140%); border-bottom: 1px solid var(--line); }
+  .nav { display: flex; align-items: center; gap: 22px; height: 62px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.06rem; letter-spacing: -0.01em; color: var(--ink); }
+  .brand:hover { text-decoration: none; }
+  .brand svg { width: 26px; height: 26px; }
+  .nav-spacer { flex: 1; }
+  .nav a.nl { color: var(--muted); font-size: 0.93rem; font-weight: 500; }
+  .nav a.nl:hover { color: var(--ink); text-decoration: none; }
+  .nav a.gh { color: var(--ink); font-weight: 600; font-size: 0.93rem; }
 
-  /* Hero */
-  .hero { position: relative; overflow: hidden; }
-  .hero::before {
-    content: ""; position: absolute; inset: 0;
-    background:
-      radial-gradient(720px 360px at 78% 12%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%),
-      radial-gradient(600px 420px at 10% 90%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 70%);
-    pointer-events: none;
+  /* ————— hero ————— */
+  .hero { padding: 84px 0 72px; }
+  .hero-grid { display: grid; grid-template-columns: minmax(0, 0.96fr) minmax(0, 1.04fr); gap: 56px; align-items: center; }
+  .kicker { font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 22px; }
+  .kicker b { color: var(--charter); font-weight: 600; }
+  h1 {
+    font-family: var(--serif); font-optical-sizing: auto;
+    font-size: clamp(2.5rem, 5.2vw, 3.55rem); font-weight: 500;
+    line-height: 1.06; letter-spacing: -0.015em; margin: 0 0 20px;
   }
-  .hero-grid {
-    position: relative;
-    display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 40px; align-items: center;
-    padding: 72px 0 64px;
+  h1 em { font-style: italic; color: var(--charter); font-weight: 500; }
+  .lede { font-size: 1.11rem; color: var(--muted); max-width: 46ch; margin: 0 0 30px; }
+  .lede b { color: var(--ink); font-weight: 600; }
+  .cta-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; margin-bottom: 18px; }
+  .cmd {
+    display: inline-flex; align-items: center; gap: 14px;
+    font-family: var(--mono); font-size: 0.95rem; font-weight: 500;
+    background: var(--panel); color: var(--panel-ink);
+    border: 1px solid var(--panel-line); border-radius: 10px; padding: 12px 16px;
   }
-  .eyebrow {
-    display: inline-block; font-size: 0.8rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
-    color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent);
-    padding: 5px 12px; border-radius: 999px; margin-bottom: 18px;
+  .cmd .dollar { color: var(--panel-muted); user-select: none; }
+  .cmd button {
+    font: inherit; font-size: 0.78rem; color: var(--panel-muted);
+    background: var(--panel-2); border: 1px solid var(--panel-line); border-radius: 6px;
+    padding: 4px 10px; cursor: pointer;
   }
-  h1 { font-size: clamp(2.3rem, 5vw, 3.4rem); line-height: 1.08; letter-spacing: -0.025em; margin: 0 0 8px; }
-  h1 .accent { color: var(--accent); }
-  .lede { font-size: clamp(1.05rem, 2.2vw, 1.2rem); color: var(--muted); max-width: 40ch; margin: 12px 0 28px; }
-  .cta { display: flex; flex-wrap: wrap; gap: 12px; }
-  .btn {
-    display: inline-flex; align-items: center; gap: 8px;
-    padding: 11px 20px; border-radius: 10px; font-weight: 600; font-size: 0.97rem;
-    border: 1px solid transparent; cursor: pointer;
+  .cmd button:hover { color: var(--panel-ink); border-color: var(--panel-muted); }
+  .btn-gh {
+    display: inline-flex; align-items: center; gap: 9px; padding: 12px 20px;
+    border: 1px solid var(--line); border-radius: 10px;
+    color: var(--ink); font-weight: 600; font-size: 0.95rem; background: transparent;
   }
-  .btn:hover { text-decoration: none; }
-  .btn-primary { background: var(--accent); color: #fff; }
-  .btn-primary:hover { background: var(--accent-strong); }
-  .btn-ghost { background: transparent; color: var(--text); border-color: var(--border); }
-  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
-  .hero-badge { text-align: center; }
-  .hero-badge img { width: min(360px, 80%); filter: drop-shadow(0 18px 40px rgba(0,0,0,0.18)); }
-  .status { margin-top: 22px; font-size: 0.85rem; color: var(--muted); }
-  .status b { color: var(--text); font-weight: 600; }
+  .btn-gh:hover { border-color: var(--charter); color: var(--charter); text-decoration: none; }
+  .btn-gh svg { width: 18px; height: 18px; }
+  .hero-note { font-size: 0.87rem; color: var(--muted); margin: 0; }
+  .hero-note b { color: var(--ink); font-weight: 600; }
 
-  /* Sections */
-  section { padding: 56px 0; }
-  section.alt { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-  h2 { font-size: clamp(1.5rem, 3vw, 2rem); letter-spacing: -0.02em; margin: 0 0 8px; }
-  .section-sub { color: var(--muted); margin: 0 0 32px; max-width: 60ch; }
+  /* ————— the governed grid (signature) ————— */
+  .gov { border: 1px solid var(--panel-line); border-radius: var(--r); background: var(--panel); overflow: hidden; box-shadow: 0 24px 60px -18px rgba(9, 20, 34, 0.45); }
+  .gov-top { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--panel-line); background: var(--panel-2); }
+  .gov-title { font-family: var(--mono); font-size: 0.78rem; color: var(--panel-muted); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .switch { display: inline-flex; border: 1px solid var(--panel-line); border-radius: 999px; padding: 3px; background: var(--panel); cursor: pointer; font: inherit; }
+  .switch span {
+    font-family: var(--mono); font-size: 0.76rem; font-weight: 600;
+    padding: 4px 13px; border-radius: 999px; color: var(--panel-muted);
+    transition: background 0.25s, color 0.25s;
+  }
+  .switch span.on { background: var(--charter); color: #fff; }
+  .gov.agent .switch span.you-l { background: transparent; color: var(--panel-muted); }
+  .gov.agent .switch span.agent-l { background: var(--pii); color: #fff; }
+  .gov:not(.agent) .switch span.you-l { background: var(--charter); color: #fff; }
+  .gov:not(.agent) .switch span.agent-l { background: transparent; color: var(--panel-muted); }
+  .gov-sql { font-family: var(--mono); font-size: 0.8rem; line-height: 1.6; color: var(--panel-muted); padding: 13px 16px 11px; border-bottom: 1px solid var(--panel-line); white-space: pre; overflow-x: auto; }
+  .gov-sql .k { color: #6CB6FF; }
+  .gov-sql .t { color: var(--panel-ink); }
+  table.grid { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 0.82rem; }
+  .grid th {
+    text-align: left; font-weight: 500; color: var(--panel-muted);
+    padding: 9px 16px; border-bottom: 1px solid var(--panel-line);
+    font-size: 0.73rem; letter-spacing: 0.04em;
+  }
+  .grid th .tag {
+    display: inline-block; margin-left: 7px; padding: 1px 6px; border-radius: 4px;
+    font-size: 0.62rem; font-weight: 600; letter-spacing: 0.05em;
+    color: var(--pii); border: 1px solid color-mix(in srgb, var(--pii) 45%, transparent);
+  }
+  .grid td { padding: 9px 16px; color: var(--panel-ink); border-bottom: 1px solid color-mix(in srgb, var(--panel-line) 55%, transparent); white-space: nowrap; }
+  .grid tr:last-child td { border-bottom: none; }
+  .grid td.num { text-align: right; }
+  .grid td.pii .real { display: inline; }
+  .grid td.pii .dots { display: none; color: var(--panel-muted); letter-spacing: 0.18em; }
+  .gov.agent td.pii .real { display: none; }
+  .gov.agent td.pii .dots { display: inline; }
+  .gov-foot { display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-top: 1px solid var(--panel-line); background: var(--panel-2); font-family: var(--mono); font-size: 0.74rem; }
+  .gov-foot .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--charter); flex: none; transition: background 0.25s; }
+  .gov.agent .gov-foot .dot { background: var(--pii); }
+  .gov-foot .st { color: var(--panel-muted); flex: 1; }
+  .gov-foot .st b { color: var(--panel-ink); font-weight: 600; }
+  .gov-hint { color: var(--panel-muted); opacity: 0.8; }
 
-  /* Quick start */
-  .quick { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
-  pre {
-    background: var(--code-bg); color: var(--code-text);
-    padding: 20px 22px; border-radius: var(--radius); overflow-x: auto;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 0.9rem; line-height: 1.7; margin: 0;
-    border: 1px solid var(--border);
-  }
-  pre .c { color: #7d8ea3; }
-  pre .p { color: #6cb6ff; }
-  .steps { list-style: none; margin: 0; padding: 0; counter-reset: step; }
-  .steps li { position: relative; padding: 0 0 20px 44px; }
-  .steps li::before {
-    counter-increment: step; content: counter(step);
-    position: absolute; left: 0; top: 0;
-    width: 28px; height: 28px; border-radius: 50%;
-    background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent);
-    display: grid; place-items: center; font-weight: 700; font-size: 0.85rem;
-  }
-  .steps li:last-child { padding-bottom: 0; }
-  .steps h3 { margin: 2px 0 2px; font-size: 1.02rem; }
-  .steps p { margin: 0; color: var(--muted); font-size: 0.94rem; }
-  code.inline {
-    background: var(--surface-2); padding: 1px 6px; border-radius: 5px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.88em;
-  }
+  /* ————— clauses ————— */
+  .section { padding: 78px 0; }
+  .section--alt { background: var(--paper-2); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .clause { font-family: var(--mono); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.1em; color: var(--charter); text-transform: uppercase; margin: 0 0 14px; }
+  h2 { font-family: var(--serif); font-optical-sizing: auto; font-size: clamp(1.7rem, 3.2vw, 2.3rem); font-weight: 500; letter-spacing: -0.012em; line-height: 1.15; margin: 0 0 14px; }
+  .sub { color: var(--muted); max-width: 62ch; margin: 0 0 36px; }
+  .sub b, .sub code { color: var(--ink); }
+  code.i { font-family: var(--mono); font-size: 0.85em; background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 1px 6px; border-radius: 5px; }
 
-  /* Features */
-  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
-  .card {
-    background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 22px 20px;
-  }
-  section.alt .card { background: var(--bg); }
-  .card .ico {
-    width: 38px; height: 38px; border-radius: 9px; margin-bottom: 14px;
-    display: grid; place-items: center;
-    background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent);
-  }
-  .card .ico svg { width: 20px; height: 20px; }
-  .card h3 { margin: 0 0 6px; font-size: 1.03rem; }
-  .card p { margin: 0; color: var(--muted); font-size: 0.92rem; }
+  .panel { background: var(--panel); border: 1px solid var(--panel-line); border-radius: var(--r); overflow: hidden; }
+  .panel pre { margin: 0; padding: 20px 22px; overflow-x: auto; font-family: var(--mono); font-size: 0.85rem; line-height: 1.75; color: var(--panel-ink); }
+  .panel .c { color: var(--panel-muted); }
+  .panel .k { color: #6CB6FF; }
+  .panel .s { color: #9CD1A4; }
+  .panel .y { color: #E3B341; }
+  .panel-cap { font-family: var(--mono); font-size: 0.74rem; color: var(--panel-muted); padding: 10px 16px; border-bottom: 1px solid var(--panel-line); background: var(--panel-2); }
 
-  /* Screenshot */
-  .shot {
-    border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.22); margin-top: 8px;
-  }
-  .shot img { display: block; width: 100%; }
+  .fed-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 40px; align-items: start; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+  .chip { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; background: var(--paper); }
+  .fed-points { list-style: none; margin: 0; padding: 0; }
+  .fed-points li { padding: 0 0 18px 30px; position: relative; color: var(--muted); font-size: 0.96rem; }
+  .fed-points li::before { content: "→"; position: absolute; left: 2px; color: var(--charter); font-family: var(--mono); }
+  .fed-points b { color: var(--ink); font-weight: 600; }
 
-  /* Built-on */
-  .builton { display: flex; flex-wrap: wrap; gap: 12px; margin: 4px 0 24px; }
-  .chip {
-    display: inline-flex; align-items: center; gap: 8px;
-    border: 1px solid var(--border); border-radius: 999px; padding: 8px 16px;
-    font-size: 0.9rem; font-weight: 500; background: var(--bg);
+  .gov2 { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 40px; align-items: start; }
+  .law { list-style: none; margin: 0; padding: 0; }
+  .law li { padding: 16px 0 16px 34px; position: relative; border-bottom: 1px solid var(--line); }
+  .law li:last-child { border-bottom: none; }
+  .law li::before {
+    content: "§"; position: absolute; left: 0; top: 14px;
+    font-family: var(--serif); font-size: 1.15rem; color: var(--charter);
   }
-  .note { color: var(--muted); font-size: 0.88rem; max-width: 70ch; }
+  .law h3 { margin: 0 0 3px; font-size: 1rem; font-weight: 600; }
+  .law p { margin: 0; color: var(--muted); font-size: 0.93rem; }
 
-  /* Footer */
-  footer { border-top: 1px solid var(--border); padding: 32px 0; color: var(--muted); font-size: 0.9rem; }
-  .foot { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+  .tools { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 0 0 26px; }
+  .tool { border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); padding: 18px 16px; }
+  .section--alt .tool { background: var(--paper); }
+  .tool .tn { font-family: var(--mono); font-size: 0.86rem; font-weight: 600; color: var(--charter); display: block; margin-bottom: 6px; }
+  .tool p { margin: 0; font-size: 0.86rem; color: var(--muted); }
+  .tool .ro { display: inline-block; margin-top: 10px; font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.06em; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; }
+  .mcp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+  .mcp-row .cmd { font-size: 0.88rem; }
+
+  .work-grid { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 44px; align-items: center; }
+  .shot { border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; box-shadow: 0 24px 60px -20px rgba(9, 20, 34, 0.35); }
+  .checks { list-style: none; margin: 0; padding: 0; columns: 2; column-gap: 28px; }
+  .checks li { padding: 0 0 12px 26px; position: relative; font-size: 0.93rem; color: var(--muted); break-inside: avoid; }
+  .checks li::before { content: "✓"; position: absolute; left: 0; color: var(--charter); font-weight: 700; }
+
+  .install-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 22px; }
+  .inst { border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); padding: 18px; }
+  .inst .lab { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 10px; }
+  .inst code { font-family: var(--mono); font-size: 0.84rem; color: var(--ink); display: block; overflow-x: auto; white-space: nowrap; }
+  .fine { font-size: 0.86rem; color: var(--muted); }
+  .fine a { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+  .fine a:hover { color: var(--charter); }
+
+  .builton { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 20px; }
+  .note { color: var(--muted); font-size: 0.84rem; max-width: 72ch; }
+
+  footer { border-top: 1px solid var(--line); padding: 34px 0 40px; color: var(--muted); font-size: 0.89rem; }
+  .foot { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
   .foot .spacer { flex: 1; }
   .foot a { color: var(--muted); }
-  .foot a:hover { color: var(--text); }
+  .foot a:hover { color: var(--ink); }
 
-  @media (max-width: 860px) {
-    .hero-grid { grid-template-columns: 1fr; gap: 24px; padding: 48px 0 44px; }
-    .hero-badge { order: -1; }
-    .hero-badge img { width: 200px; }
-    .quick { grid-template-columns: 1fr; }
-    .features { grid-template-columns: 1fr; }
+  /* ————— motion ————— */
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  .hero .rise { animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .hero .r1 { animation-delay: 0.05s; } .hero .r2 { animation-delay: 0.14s; }
+  .hero .r3 { animation-delay: 0.23s; } .hero .r4 { animation-delay: 0.32s; }
+  .hero .r5 { animation-delay: 0.41s; } .hero .r6 { animation-delay: 0.28s; }
+  .grid tbody tr { animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .grid tbody tr:nth-child(1) { animation-delay: 0.55s; }
+  .grid tbody tr:nth-child(2) { animation-delay: 0.67s; }
+  .grid tbody tr:nth-child(3) { animation-delay: 0.79s; }
+  .grid tbody tr:nth-child(4) { animation-delay: 0.91s; }
+  .js-anim .rv { opacity: 0; transform: translateY(12px); transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1); }
+  .js-anim .rv.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .hero .rise, .grid tbody tr { animation: none; }
+    .js-anim .rv { opacity: 1; transform: none; transition: none; }
+    .switch span, .gov-foot .dot { transition: none; }
+  }
+
+  /* ————— responsive ————— */
+  @media (max-width: 980px) {
+    .hero { padding: 56px 0 52px; }
+    .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+    .fed-grid, .gov2, .work-grid { grid-template-columns: 1fr; gap: 28px; }
+    .tools { grid-template-columns: repeat(2, 1fr); }
+    .install-cols { grid-template-columns: 1fr; }
+    .checks { columns: 1; }
+  }
+  @media (max-width: 560px) {
+    body { font-size: 16px; }
+    .tools { grid-template-columns: 1fr; }
+    .nav a.nl { display: none; }
+    .gov-sql { font-size: 0.72rem; }
+    .grid th, .grid td { padding: 8px 10px; }
   }
 </style>
 </head>
 <body>
-<header>
+
+<div class="nav-outer">
   <div class="wrap nav">
-    <span class="brand">
-      <svg viewBox="0 0 128 128" role="img" aria-label="DataCharter">
+    <a class="brand" href="#">
+      <svg viewBox="0 0 128 128" role="img" aria-label="DataCharter mark">
         <circle cx="64" cy="64" r="56" fill="none" stroke="currentColor" stroke-width="7"/>
         <path d="M30 84 L52 60 L66 72 L92 42" fill="none" stroke="#3B82C4" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
         <path d="M78 38 L96 38 L96 56" fill="none" stroke="#3B82C4" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
       DataCharter
-    </span>
-    <span class="spacer"></span>
-    <a href="#quickstart">Quick start</a>
-    <a href="quickstart.html">Docs</a>
-    <a href="faq.html">FAQ</a>
-    <a class="ghlink" href="https://github.com/datacharter/datacharter">GitHub</a>
+    </a>
+    <span class="nav-spacer"></span>
+    <a class="nl" href="#federate">Federate</a>
+    <a class="nl" href="#govern">Govern</a>
+    <a class="nl" href="#agents">Agents</a>
+    <a class="nl" href="#install">Install</a>
+    <a class="nl" href="quickstart.html">Docs</a>
+    <a class="gh" href="https://github.com/datacharter/datacharter">GitHub</a>
   </div>
-</header>
+</div>
 
 <section class="hero">
   <div class="wrap hero-grid">
-    <div>
-      <span class="eyebrow">Pre-release &middot; V1 in development</span>
-      <h1>Charter <span class="accent">your data.</span></h1>
-      <p class="lede">Query all your data locally — then hand AI agents exactly the data you choose, and not one column more.</p>
-      <div class="cta">
-        <a class="btn btn-primary" href="#quickstart">Get started</a>
-        <a class="btn btn-ghost" href="https://github.com/datacharter/datacharter">View on GitHub</a>
+    <div class="hero-copy">
+      <p class="kicker rise r1"><b>Open source</b> · Apache-2.0 · runs entirely on your machine</p>
+      <h1 class="rise r2">Your data, explored locally. Your agents, <em>on&nbsp;a&nbsp;leash.</em></h1>
+      <p class="lede rise r3">One SQL workspace over every file and database you have, federated by DuckDB and governed by a contract. An AI agent sees exactly what the charter grants it, <b>and not one column more.</b></p>
+      <div class="cta-row rise r4">
+        <span class="cmd"><span class="dollar">$</span><span id="cmdtext">uvx datacharter serve</span><button id="copybtn" type="button" aria-label="Copy command">copy</button></span>
+        <a class="btn-gh" href="https://github.com/datacharter/datacharter">
+          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+          Star on GitHub
+        </a>
       </div>
-      <p class="status"><b>One process, your machine, no cloud dependency.</b> Zero telemetry. Connect an agent — Claude Code, a local model, or any OpenAI-compatible endpoint.</p>
+      <p class="hero-note rise r5"><b>No cloud, no telemetry, no API key required:</b> the chat agent can run on your Claude&nbsp;Code subscription or a fully local model.</p>
     </div>
-    <div class="hero-badge">
-      <img src="assets/hero.png" alt="DataCharter badge — a rising chart arrow inside a ring" width="360">
-    </div>
-  </div>
-</section>
 
-<section id="quickstart" class="alt">
-  <div class="wrap">
-    <h2>Up and running in 60 seconds</h2>
-    <p class="section-sub">No global install, no config, nothing to sign up for. If you have <code class="inline">uv</code>, you have a workspace.</p>
-    <div class="quick">
-      <pre><span class="c"># Try it instantly on generated demo data:</span>
-uvx datacharter serve
-<span class="c"># &rarr; opens http://127.0.0.1:8321</span>
-
-<span class="c"># Or install it:</span>
-pip install datacharter
-
-<span class="c"># Start a real workspace:</span>
-datacharter init     <span class="c"># scaffolds charter.yaml, queries/, .env.example</span>
-datacharter serve    <span class="c"># explore in your browser</span></pre>
-      <ol class="steps">
-        <li>
-          <h3>Run one command</h3>
-          <p><code class="inline">uvx datacharter serve</code> launches a local workspace on generated demo data. The engine, API, and web UI all run in one process.</p>
-        </li>
-        <li>
-          <h3>Explore in your browser</h3>
-          <p>Browse the source tree, write SQL in the editor, chart and profile results, and drag a CSV, Parquet, or JSON file onto the window to query it instantly.</p>
-        </li>
-        <li>
-          <h3>Make it yours</h3>
-          <p><code class="inline">datacharter init</code> scaffolds a workspace: <code class="inline">charter.yaml</code> + <code class="inline">queries/*.sql</code> + <code class="inline">.env.example</code>. Commit it, clone it, <code class="inline">serve</code> it. The whole environment travels as a repo.</p>
-        </li>
-      </ol>
-    </div>
-  </div>
-</section>
-
-<section>
-  <div class="wrap">
-    <h2>What you get</h2>
-    <p class="section-sub">A single local tool for querying, charting, and understanding every source your data team already describes.</p>
-    <div class="features">
-      <div class="card">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v4H4zM4 10h16v4H4zM4 16h10v4H4z" stroke-linejoin="round"/></svg></div>
-        <h3>Your contracts are the catalog</h3>
-        <p><code class="inline">charter.yaml</code> describes sources, tables, and PII fields: the same ODCS-compatible contract spec your data team already writes.</p>
-      </div>
-      <div class="card">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.5 2.5 15 0 18M12 3c-2.5 2.5-2.5 15 0 18"/></svg></div>
-        <h3>One engine, every source</h3>
-        <p>Postgres, MySQL, SQLite, DuckDB, BigQuery, SQL Server, Snowflake, CSV/Parquet/JSON/Excel files, Iceberg, and Delta. Federated joins across all of them, with filters and projections pushed down to each source.</p>
-      </div>
-      <div class="card">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z" stroke-linejoin="round"/></svg></div>
-        <h3>Local-first, zero telemetry</h3>
-        <p>One process on your machine, no cloud dependency, no phone-home of any kind. Binds to localhost by default; the engine is read-only.</p>
-      </div>
-      <div class="card">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h6l2 2h10v10H3z" stroke-linejoin="round"/></svg></div>
-        <h3>The workspace is a directory</h3>
-        <p>Contract, queries, and example env travel together as a repo. Secrets and local state never do; <code class="inline">git clone &amp;&amp; datacharter serve</code> reproduces the whole environment.</p>
-      </div>
-      <div class="card">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5m0 14h16M8 15l3-4 3 3 4-6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <h3>Charts, profiling, SQL editor</h3>
-        <p>A Monaco SQL editor with catalog autocomplete, a ⌘K command palette, query history, a virtualized results grid, Vega-Lite charts, a profiling panel with top-value bars, EXPLAIN and row-estimate pre-flight, and CSV/Parquet/JSON/XLSX export.</p>
-      </div>
-      <div class="card">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l-1 3 3-1M4 5h16v11H8z" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="10" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r="1" fill="currentColor" stroke="none"/></svg></div>
-        <h3>Connect an agent, on a leash</h3>
-        <p>Ask in plain language via your <b>Claude Code</b> subscription, a local Ollama model, or any OpenAI-compatible endpoint — then choose exactly what it sees, per source, table, or column. PII is auto-detected and masked by default; flip <b>Agent view</b> to confirm what it gets back.</p>
+    <div class="rise r6">
+      <div class="gov" id="gov">
+        <div class="gov-top">
+          <span class="gov-title">crm.customers ⨝ sales.orders · governed result</span>
+          <button class="switch" id="switch" type="button" role="switch" aria-checked="false" aria-label="Toggle between your view and the agent's view">
+            <span class="you-l on">You</span><span class="agent-l">Agent</span>
+          </button>
+        </div>
+        <div class="gov-sql"><span class="k">SELECT</span> <span class="t">name, email, region, amount</span>
+<span class="k">FROM</span> <span class="t">crm.customers</span> <span class="k">JOIN</span> <span class="t">sales.orders</span> <span class="k">USING</span> <span class="t">(customer_id)</span></div>
+        <table class="grid" aria-live="polite">
+          <thead>
+            <tr><th>name</th><th>email<span class="tag">PII</span></th><th>region</th><th style="text-align:right">amount</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Ada Moreno</td><td class="pii"><span class="real">ada@volt.dev</span><span class="dots">•••</span></td><td>EU</td><td class="num">1,204.50</td></tr>
+            <tr><td>Grace Okafor</td><td class="pii"><span class="real">grace@arc.io</span><span class="dots">•••</span></td><td>US</td><td class="num">986.00</td></tr>
+            <tr><td>Kat Jensen</td><td class="pii"><span class="real">kat@lumen.co</span><span class="dots">•••</span></td><td>US</td><td class="num">2,410.75</td></tr>
+            <tr><td>Lin Chen</td><td class="pii"><span class="real">lin@delta.sh</span><span class="dots">•••</span></td><td>APAC</td><td class="num">1,877.25</td></tr>
+          </tbody>
+        </table>
+        <div class="gov-foot">
+          <span class="dot" aria-hidden="true"></span>
+          <span class="st" id="govstatus"><b>your view</b> — unrestricted</span>
+          <span class="gov-hint">flip it ↑</span>
+        </div>
       </div>
     </div>
   </div>
 </section>
 
-<section class="alt">
-  <div class="wrap">
+<section class="section section--alt" id="federate">
+  <div class="wrap rv">
+    <p class="clause">§1 · Federate</p>
+    <h2>One query over everything you have</h2>
+    <p class="sub">A local CSV, a Postgres table, and a Parquet file on S3: joined in <b>one SQL statement, on your laptop.</b> Filters and projections are pushed down to each source, so every leg of a cross-source join is filtered where its data lives.</p>
+    <div class="fed-grid">
+      <div class="panel">
+        <div class="panel-cap">query.sql · three sources, one join</div>
+        <pre><span class="k">SELECT</span> c.region, <span class="k">sum</span>(o.amount) <span class="k">AS</span> revenue
+<span class="k">FROM</span> <span class="s">'leads.csv'</span> l            <span class="c">-- local file</span>
+<span class="k">JOIN</span> crm.customers c         <span class="c">-- Postgres</span>
+  <span class="k">ON</span> c.email = l.email
+<span class="k">JOIN</span> sales.orders o          <span class="c">-- Parquet on S3</span>
+  <span class="k">ON</span> o.customer_id = c.id
+<span class="k">GROUP BY</span> <span class="y">1</span> <span class="k">ORDER BY</span> <span class="y">2</span> <span class="k">DESC</span>;</pre>
+      </div>
+      <div>
+        <ul class="fed-points">
+          <li><b>No pipelines, no warehouse, no waiting.</b> The engine is embedded DuckDB — one process on your machine.</li>
+          <li><b>Drag a file onto the window</b> and it's queryable instantly. Or declare sources in <code class="i">charter.yaml</code>.</li>
+          <li><b>Read-only by construction.</b> No query can write, delete, or touch the filesystem — pointing anything at your production replica can't do damage.</li>
+        </ul>
+        <div class="chips" aria-label="Supported sources">
+          <span class="chip">CSV</span><span class="chip">Parquet</span><span class="chip">JSON</span><span class="chip">Excel</span><span class="chip">SQLite</span><span class="chip">DuckDB</span><span class="chip">Postgres</span><span class="chip">MySQL</span><span class="chip">SQL Server</span><span class="chip">BigQuery</span><span class="chip">Snowflake</span><span class="chip">Iceberg</span><span class="chip">Delta</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="govern">
+  <div class="wrap rv">
+    <p class="clause">§2 · Govern</p>
+    <h2>The contract is the catalog — and the law</h2>
+    <p class="sub"><code class="i">charter.yaml</code> is the same ODCS-style contract your data team already writes: sources, tables, PII. DataCharter is what makes it <b>enforceable</b>, for humans and agents alike.</p>
+    <div class="gov2">
+      <div class="panel">
+        <div class="panel-cap">charter.yaml · the part that governs</div>
+        <pre><span class="k">sources</span>:
+  <span class="k">crm</span>:
+    <span class="k">type</span>: <span class="s">postgres</span>
+    <span class="k">tables</span>:
+      <span class="k">customers</span>:
+        <span class="k">pii</span>: [<span class="s">email</span>, <span class="s">phone</span>]   <span class="c"># masked for agents by default</span>
+
+<span class="k">agent_access</span>:
+  <span class="k">crm</span>:
+    <span class="k">customers</span>:
+      <span class="k">email</span>: <span class="s">deny</span>            <span class="c"># not one column more</span>
+
+<span class="k">row_filters</span>:
+  <span class="k">orders</span>: <span class="s">"region = 'US'"</span>    <span class="c"># the rows an agent may see</span></pre>
+      </div>
+      <ul class="law">
+        <li>
+          <h3>PII is auto-detected and denied by default</h3>
+          <p>Declared and detected PII comes back masked (<code class="i">•••</code>) unless you grant it, per source, table, or column.</p>
+        </li>
+        <li>
+          <h3>Row-level security on every agent query</h3>
+          <p>Predicates from the charter are applied to any query an agent runs — fail-closed, composed with masking.</p>
+        </li>
+        <li>
+          <h3>Predicates can't leak what masking hides</h3>
+          <p>A masked column can't be used in WHERE, JOIN, or ORDER BY to reconstruct values. The guard reads the whole query tree.</p>
+        </li>
+        <li>
+          <h3>Proof, not promises</h3>
+          <p>Flip <b>Agent view</b> on any result and see, column by column, exactly what the model receives.</p>
+        </li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="section section--alt" id="agents">
+  <div class="wrap rv">
+    <p class="clause">§3 · Serve agents</p>
+    <h2>Four read-only tools. Any MCP client.</h2>
+    <p class="sub">The built-in chat agent and the MCP server share one governed surface. Chat in the UI, or wire your workspace into <b>Claude Code, Claude Desktop, Cursor, Cline, or Gemini CLI.</b> Listed in the official <a href="https://registry.modelcontextprotocol.io">MCP Registry</a>.</p>
+    <div class="tools">
+      <div class="tool"><span class="tn">list_sources</span><p>The data sources the charter declares, with their types.</p><span class="ro">read-only</span></div>
+      <div class="tool"><span class="tn">list_tables</span><p>Every queryable table, with fully-qualified relation names.</p><span class="ro">read-only</span></div>
+      <div class="tool"><span class="tn">describe_table</span><p>Columns and types for one relation, masked columns flagged.</p><span class="ro">read-only</span></div>
+      <div class="tool"><span class="tn">query</span><p>Read-only SQL, PII-masked, row-filtered, cost-guarded.</p><span class="ro">read-only</span></div>
+    </div>
+    <div class="mcp-row">
+      <span class="cmd"><span class="dollar">$</span>datacharter mcp /path/to/workspace</span>
+      <span class="fine">…or one-click via the <a href="https://github.com/datacharter/datacharter/releases/latest">Claude Desktop extension</a>. Every answer shows the exact SQL it ran.</span>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap rv">
+    <p class="clause">The workspace</p>
     <h2>A workspace, not a dashboard</h2>
-    <p class="section-sub">Source tree, SQL editor, results, charts, profiling, and an optional chat rail: one local window over all your data.</p>
-    <div class="shot">
-      <img src="assets/screenshot.png" alt="The DataCharter workspace: a source tree on the left, a SQL editor, and Results, Chart, Profile, and Plan tabs">
+    <p class="sub">Everything you reach for daily, in one local window. And every agent answer is reproducible: the SQL it ran, one click from the editor.</p>
+    <div class="work-grid">
+      <ul class="checks">
+        <li>Monaco SQL editor with catalog autocomplete</li>
+        <li>Live results preview as you type</li>
+        <li>⌘K command palette</li>
+        <li>Auto-charts (Vega-Lite) &amp; profiling with top-value bars</li>
+        <li>Query history &amp; cross-source lineage</li>
+        <li>Cost pre-flight: row estimates before you run</li>
+        <li>Schema &amp; PII drift checks for CI</li>
+        <li>Data tests: <code class="i">datacharter test</code></li>
+        <li>Snapshots &amp; CSV/Parquet/JSON/XLSX export</li>
+        <li>Certified metrics with joins &amp; time grains</li>
+      </ul>
+      <div class="shot"><img src="assets/screenshot.png" alt="The DataCharter workspace: source tree, SQL editor, and Results, Chart, Profile, and Plan tabs" width="1440" height="900"></div>
     </div>
   </div>
 </section>
 
-<section>
-  <div class="wrap">
-    <h2>Built on</h2>
-    <p class="section-sub">DataCharter stands on excellent open-source foundations.</p>
-    <div class="builton">
+<section class="section section--alt" id="install">
+  <div class="wrap rv">
+    <p class="clause">Get started</p>
+    <h2>Charter your data</h2>
+    <p class="sub">One package, one process, works offline. Python 3.11+.</p>
+    <div class="install-cols">
+      <div class="inst"><span class="lab">Try it — no install</span><code>uvx datacharter serve</code></div>
+      <div class="inst"><span class="lab">macOS — Homebrew</span><code>brew install datacharter/tap/datacharter</code></div>
+      <div class="inst"><span class="lab">Everywhere — pip</span><code>pip install datacharter</code></div>
+    </div>
+    <p class="fine">Then <code class="i">datacharter init</code> scaffolds <code class="i">charter.yaml</code> + <code class="i">queries/</code>. Commit it, clone it, <code class="i">serve</code> it. The whole environment travels as a repo; secrets never do. <a href="quickstart.html">Read the quick start →</a></p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap rv">
+    <h2 style="font-size:1.35rem">Built on</h2>
+    <div class="builton" style="margin-top:16px">
       <a class="chip" href="https://duckdb.org">DuckDB, the analytical engine at our core</a>
       <a class="chip" href="https://bitol-io.github.io/open-data-contract-standard/">Open Data Contract Standard</a>
+      <a class="chip" href="https://modelcontextprotocol.io">Model Context Protocol</a>
       <a class="chip" href="https://vega.github.io/vega-lite/">Vega-Lite</a>
       <a class="chip" href="https://microsoft.github.io/monaco-editor/">Monaco Editor</a>
     </div>
@@ -318,7 +476,7 @@ datacharter serve    <span class="c"># explore in your browser</span></pre>
 
 <footer>
   <div class="wrap foot">
-    <span>&copy; DataCharter &middot; <a href="https://github.com/datacharter/datacharter/blob/main/LICENSE">Apache-2.0</a></span>
+    <span>© DataCharter · <a href="https://github.com/datacharter/datacharter/blob/main/LICENSE">Apache-2.0</a> · <a href="privacy.html">Privacy</a></span>
     <span class="spacer"></span>
     <a href="quickstart.html">Quick start</a>
     <a href="charter-yaml.html">charter.yaml</a>
@@ -330,5 +488,45 @@ datacharter serve    <span class="c"># explore in your browser</span></pre>
     <a href="https://github.com/datacharter/datacharter">GitHub</a>
   </div>
 </footer>
+
+<script>
+(function () {
+  var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!reduced) { document.documentElement.classList.add("js-anim"); }
+  var gov = document.getElementById("gov");
+  var sw = document.getElementById("switch");
+  var status = document.getElementById("govstatus");
+
+  function setAgent(on) {
+    gov.classList.toggle("agent", on);
+    sw.setAttribute("aria-checked", on ? "true" : "false");
+    status.innerHTML = on
+      ? "<b>agent view</b>: read-only · PII masked · row filters on"
+      : "<b>your view</b> · unrestricted";
+  }
+  sw.addEventListener("click", function () { setAgent(!gov.classList.contains("agent")); });
+
+  if (reduced) {
+    setAgent(true); // rest on the differentiator, no motion
+  } else {
+    setTimeout(function () { setAgent(true); }, 2100); // one auto-flip demo
+  }
+
+  var copybtn = document.getElementById("copybtn");
+  copybtn.addEventListener("click", function () {
+    navigator.clipboard.writeText(document.getElementById("cmdtext").textContent).then(function () {
+      copybtn.textContent = "copied";
+      setTimeout(function () { copybtn.textContent = "copy"; }, 1600);
+    });
+  });
+
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+    });
+  }, { rootMargin: "0px 0px -8% 0px" });
+  document.querySelectorAll(".rv").forEach(function (el) { io.observe(el); });
+})();
+</script>
 </body>
 </html>
