@@ -380,13 +380,13 @@
 <span class="k">FROM</span> <span class="t">crm.customers</span> <span class="k">JOIN</span> <span class="t">sales.orders</span> <span class="k">USING</span> <span class="t">(customer_id)</span></div>
         <table class="grid" aria-live="polite">
           <thead>
-            <tr><th>name</th><th>email<span class="tag">PII</span></th><th>region</th><th style="text-align:right">amount</th></tr>
+            <tr><th>name<span class="tag">PII</span></th><th>email<span class="tag">PII</span></th><th>region</th><th style="text-align:right">amount</th></tr>
           </thead>
           <tbody>
-            <tr><td>Ada Moreno</td><td class="pii"><span class="real">ada@volt.dev</span><span class="dots">•••</span></td><td>EU</td><td class="num">1,204.50</td></tr>
-            <tr><td>Grace Okafor</td><td class="pii"><span class="real">grace@arc.io</span><span class="dots">•••</span></td><td>US</td><td class="num">986.00</td></tr>
-            <tr><td>Kat Jensen</td><td class="pii"><span class="real">kat@lumen.co</span><span class="dots">•••</span></td><td>US</td><td class="num">2,410.75</td></tr>
-            <tr><td>Lin Chen</td><td class="pii"><span class="real">lin@delta.sh</span><span class="dots">•••</span></td><td>APAC</td><td class="num">1,877.25</td></tr>
+            <tr><td class="pii"><span class="real">Ada Moreno</span><span class="dots">•••</span></td><td class="pii"><span class="real">ada@volt.dev</span><span class="dots">•••</span></td><td>EU</td><td class="num">1,204.50</td></tr>
+            <tr><td class="pii"><span class="real">Grace Okafor</span><span class="dots">•••</span></td><td class="pii"><span class="real">grace@arc.io</span><span class="dots">•••</span></td><td>US</td><td class="num">986.00</td></tr>
+            <tr><td class="pii"><span class="real">Kat Jensen</span><span class="dots">•••</span></td><td class="pii"><span class="real">kat@lumen.co</span><span class="dots">•••</span></td><td>US</td><td class="num">2,410.75</td></tr>
+            <tr><td class="pii"><span class="real">Lin Chen</span><span class="dots">•••</span></td><td class="pii"><span class="real">lin@delta.sh</span><span class="dots">•••</span></td><td>APAC</td><td class="num">1,877.25</td></tr>
           </tbody>
         </table>
         <div class="gov-foot">
