@@ -5,6 +5,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-07-29
+
+### Added
+- **Workspace guides — agent context in the contract.** Free-form markdown in
+  `guides/*.md` (plus per-table `context:` mappings in `charter.yaml`) is served
+  to the agent surface: the built-in chat agent's system prompt, the Claude Code
+  driver, and every MCP client via the spec's `initialize` `instructions` field.
+  `describe_table` gains a `context` key for tables with declared context. The
+  human SQL editor is unaffected. `datacharter init` scaffolds a starter
+  `guides/overview.md` (HTML comments in guides never reach the model).
+- An end-to-end example workspace (`examples/ecommerce`) exercising PII masking,
+  agent access, row filters, guides, tests, and a metric — copy it as a template.
+
 ## [0.10.4] - 2026-07-28
 
 ### Added
