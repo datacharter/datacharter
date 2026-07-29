@@ -86,7 +86,33 @@ class AgentAccessForm(BaseModel):
     value: bool
 
 
+class GuideWrite(BaseModel):
+    name: str | None = None
+    content: str | None = None
+    source: str | None = None
+    table: str | None = None
+    context: str | None = None
+
+
+class EvalRunRequest(BaseModel):
+    suite: str | None = None
+    compare_guides: bool = False
+    samples: int = 1
+
+
 _QUERY_NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_\-]{0,62}$")
+_SAFE_STEM = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def _set_table_context(workspace: Path, source: str, table: str, text: str) -> None:
+    """Merge one table's context into charter.yaml, preserving the rest of the file."""
+    import yaml
+
+    path = workspace / "charter.yaml"
+    raw = yaml.safe_load(path.read_text()) or {}
+    src = (raw.setdefault("sources", {})).setdefault(source, {})
+    src.setdefault("context", {})[table] = text
+    path.write_text(yaml.safe_dump(raw, sort_keys=False))
 
 
 def _error(status: int, kind: str, message: str) -> JSONResponse:
@@ -202,6 +228,93 @@ def create_app(
             auto_pii=app.state.auto_pii, local_access=app.state.charter.local_access,
             guides=app.state.charter.guides,
         )
+
+    def _require_local():
+        if host not in security.LOOPBACK_HOSTS:
+            return _error(403, "not_local", "Editing is only allowed on a loopback server.")
+        return None
+
+    @app.get("/api/guides")
+    async def list_guides() -> dict:
+        gdir = workspace / "guides"
+        guides = []
+        if gdir.is_dir():
+            for f in sorted(gdir.glob("*.md")):
+                guides.append({"name": f.stem, "content": f.read_text()})
+        contexts = [
+            {"source": s.name, "table": t, "context": v}
+            for s in app.state.charter.sources
+            for t, v in s.table_context.items()
+        ]
+        return {"guides": guides, "contexts": contexts}
+
+    @app.put("/api/guides")
+    async def write_guide(body: GuideWrite):
+        blocked = _require_local()
+        if blocked is not None:
+            return blocked
+        if body.name is not None and body.content is not None:
+            if not _SAFE_STEM.fullmatch(body.name):
+                return _error(400, "bad_name", "Invalid guide name.")
+            gdir = workspace / "guides"
+            gdir.mkdir(exist_ok=True)
+            (gdir / f"{body.name}.md").write_text(body.content)
+        elif body.source and body.table and body.context is not None:
+            _set_table_context(workspace, body.source, body.table, body.context)
+        else:
+            return _error(400, "bad_request", "Provide name+content or source+table+context.")
+        _refresh_charter()
+        return {"saved": True}
+
+    @app.get("/api/evals")
+    async def list_evals() -> dict:
+        from datacharter.contracts.evals import load_suites
+
+        return {
+            "suites": [
+                {"name": s.name, "cases": [c.model_dump() for c in s.cases]}
+                for s in load_suites(workspace)
+            ]
+        }
+
+    @app.get("/api/evals/history")
+    async def evals_history() -> dict:
+        from datacharter.agent.eval_store import load_history
+
+        return {"runs": load_history(workspace)}
+
+    @app.post("/api/evals/run")
+    async def run_evals(body: EvalRunRequest):
+        if app.state.llm is None:
+            return _error(400, "no_llm", "Connect an LLM to run evals.")
+        import dataclasses
+
+        from datacharter.agent.eval_runner import run_suite
+        from datacharter.agent.eval_store import save_run
+        from datacharter.contracts.evals import load_suites
+
+        suites = [s for s in load_suites(workspace) if not body.suite or s.name == body.suite]
+        box = app.state.toolbox
+        box_off = (
+            ToolBox(
+                app.state.engine, app.state.charter.sources,
+                auto_pii=app.state.auto_pii, local_access=app.state.charter.local_access, guides="",
+            )
+            if body.compare_guides
+            else None
+        )
+
+        async def events() -> AsyncIterator[str]:
+            for suite in suites:
+                yield _sse("progress", {"suite": suite.name})
+                record = await run_suite(
+                    suite, box, llm=app.state.llm, toolbox_off=box_off, samples=body.samples
+                )
+                save_run(workspace, record)
+                yield _sse("result", dataclasses.asdict(record))
+            yield _sse("done", {})
+
+        return StreamingResponse(events(), media_type="text/event-stream")
 
     def _sources_payload() -> dict:
         # Credentials intentionally omitted — this payload reaches the browser.
