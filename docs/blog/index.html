@@ -1,0 +1,104 @@
+---
+title: Blog
+---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blog — DataCharter</title>
+<meta name="description" content="Writing on local-first data, governed AI-agent access, data contracts, and DuckDB federation, from the maker of DataCharter.">
+<link rel="canonical" href="https://datacharter.dev/blog/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="DataCharter blog">
+<meta property="og:description" content="Local-first data, governed AI-agent access, data contracts, and DuckDB federation.">
+<meta property="og:url" content="https://datacharter.dev/blog/">
+<meta property="og:image" content="https://raw.githubusercontent.com/datacharter/datacharter/main/brand/hero.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20128%20128'%3E%3Ccircle%20cx='64'%20cy='64'%20r='56'%20fill='none'%20stroke='%233B82C4'%20stroke-width='7'/%3E%3Cpath%20d='M30%2084%20L52%2060%20L66%2072%20L92%2042'%20fill='none'%20stroke='%233B82C4'%20stroke-width='11'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3Cpath%20d='M78%2038%20L96%2038%20L96%2056'%20fill='none'%20stroke='%233B82C4'%20stroke-width='11'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F3F6F9; --ink: #15202B; --muted: #5A6B7C; --line: #D8E0E8; --charter: #3B82C4;
+    --serif: "Newsreader", Georgia, serif;
+    --sans: "Public Sans", -apple-system, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --paper: #0D141D; --ink: #DCE6EF; --muted: #8FA1B3; --line: #223040; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 17px; line-height: 1.65; -webkit-font-smoothing: antialiased; }
+  a { color: var(--charter); text-decoration: none; }
+  a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  :focus-visible { outline: 2px solid var(--charter); outline-offset: 3px; border-radius: 4px; }
+  .nav-outer { position: sticky; top: 0; background: color-mix(in srgb, var(--paper) 86%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+  .nav { max-width: 1104px; margin: 0 auto; padding: 0 28px; display: flex; align-items: center; gap: 22px; height: 62px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.06rem; color: var(--ink); }
+  .brand:hover { text-decoration: none; }
+  .brand svg { width: 26px; height: 26px; }
+  .nav-spacer { flex: 1; }
+  .nav a.nl { color: var(--muted); font-size: 0.93rem; font-weight: 500; }
+  .nav a.nl:hover { color: var(--ink); text-decoration: none; }
+  main { max-width: 46rem; margin: 0 auto; padding: 64px 28px 80px; }
+  .kicker { font-family: var(--mono); font-size: 0.76rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--charter); margin: 0 0 14px; }
+  h1 { font-family: var(--serif); font-size: clamp(2rem, 4.5vw, 2.7rem); font-weight: 500; letter-spacing: -0.012em; margin: 0 0 10px; }
+  .sub { color: var(--muted); margin: 0 0 48px; }
+  .post { padding: 26px 0; border-top: 1px solid var(--line); }
+  .post-date { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); margin: 0 0 6px; }
+  .post h2 { font-family: var(--serif); font-size: 1.5rem; font-weight: 500; letter-spacing: -0.01em; margin: 0 0 8px; line-height: 1.25; }
+  .post h2 a { color: var(--ink); }
+  .post h2 a:hover { color: var(--charter); text-decoration: none; }
+  .post p { margin: 0; color: var(--muted); }
+  .post .more { display: inline-block; margin-top: 10px; font-size: 0.92rem; }
+  footer { border-top: 1px solid var(--line); padding: 30px 0 38px; color: var(--muted); font-size: 0.88rem; }
+  .foot { max-width: 1104px; margin: 0 auto; padding: 0 28px; display: flex; flex-wrap: wrap; gap: 8px 18px; }
+  .foot .spacer { flex: 1; }
+  .foot a { color: var(--muted); }
+  .foot a:hover { color: var(--ink); }
+</style>
+</head>
+<body>
+<div class="nav-outer">
+  <div class="nav">
+    <a class="brand" href="/">
+      <svg viewBox="0 0 128 128" role="img" aria-label="DataCharter mark">
+        <circle cx="64" cy="64" r="56" fill="none" stroke="currentColor" stroke-width="7"/>
+        <path d="M30 84 L52 60 L66 72 L92 42" fill="none" stroke="#3B82C4" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M78 38 L96 38 L96 56" fill="none" stroke="#3B82C4" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      DataCharter
+    </a>
+    <span class="nav-spacer"></span>
+    <a class="nl" href="/quickstart">Docs</a>
+    <a class="nl" href="https://github.com/datacharter/datacharter">GitHub</a>
+  </div>
+</div>
+
+<main>
+  <p class="kicker">Blog</p>
+  <h1>Notes from the charter</h1>
+  <p class="sub">Local-first data, governed agent access, data contracts, and DuckDB federation, from the maker of DataCharter.</p>
+
+  {% for post in site.posts %}
+  <div class="post">
+    <p class="post-date">{{ post.date | date: "%B %-d, %Y" }}</p>
+    <h2><a href="{{ post.url }}">{{ post.title }}</a></h2>
+    <p>{{ post.description }}</p>
+    <a class="more" href="{{ post.url }}">Read it →</a>
+  </div>
+  {% endfor %}
+</main>
+
+<footer>
+  <div class="foot">
+    <span>© DataCharter · <a href="https://github.com/datacharter/datacharter/blob/main/LICENSE">Apache-2.0</a> · <a href="/privacy">Privacy</a></span>
+    <span class="spacer"></span>
+    <a href="/">Home</a>
+    <a href="/quickstart">Quick start</a>
+    <a href="https://github.com/datacharter/datacharter">GitHub</a>
+  </div>
+</footer>
+</body>
+</html>

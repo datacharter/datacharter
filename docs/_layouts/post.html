@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ page.title }} — DataCharter blog</title>
+<meta name="description" content="{{ page.description }}">
+<link rel="canonical" href="https://datacharter.dev{{ page.url }}">
+<meta property="og:type" content="article">
+<meta property="og:title" content="{{ page.title }}">
+<meta property="og:description" content="{{ page.description }}">
+<meta property="og:url" content="https://datacharter.dev{{ page.url }}">
+<meta property="og:image" content="https://raw.githubusercontent.com/datacharter/datacharter/main/brand/hero.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20128%20128'%3E%3Ccircle%20cx='64'%20cy='64'%20r='56'%20fill='none'%20stroke='%233B82C4'%20stroke-width='7'/%3E%3Cpath%20d='M30%2084%20L52%2060%20L66%2072%20L92%2042'%20fill='none'%20stroke='%233B82C4'%20stroke-width='11'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3Cpath%20d='M78%2038%20L96%2038%20L96%2056'%20fill='none'%20stroke='%233B82C4'%20stroke-width='11'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F3F6F9; --paper-2: #EAEFF4; --ink: #15202B; --muted: #5A6B7C;
+    --line: #D8E0E8; --charter: #3B82C4;
+    --panel: #0F1722; --panel-2: #151F2C; --panel-line: #24303F;
+    --panel-ink: #D8E2EC; --panel-muted: #7E90A3;
+    --serif: "Newsreader", Georgia, serif;
+    --sans: "Public Sans", -apple-system, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0D141D; --paper-2: #111A25; --ink: #DCE6EF; --muted: #8FA1B3;
+      --line: #223040; --panel: #0A1119; --panel-2: #101A26; --panel-line: #22303F;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 17px; line-height: 1.7; -webkit-font-smoothing: antialiased; }
+  a { color: var(--charter); text-decoration: none; }
+  a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  img { max-width: 100%; height: auto; }
+  :focus-visible { outline: 2px solid var(--charter); outline-offset: 3px; border-radius: 4px; }
+  .nav-outer { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--paper) 86%, transparent); backdrop-filter: blur(10px) saturate(140%); border-bottom: 1px solid var(--line); }
+  .nav { max-width: 1104px; margin: 0 auto; padding: 0 28px; display: flex; align-items: center; gap: 22px; height: 62px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.06rem; color: var(--ink); }
+  .brand:hover { text-decoration: none; }
+  .brand svg { width: 26px; height: 26px; }
+  .nav-spacer { flex: 1; }
+  .nav a.nl { color: var(--muted); font-size: 0.93rem; font-weight: 500; }
+  .nav a.nl:hover { color: var(--ink); text-decoration: none; }
+  article { max-width: 46rem; margin: 0 auto; padding: 64px 28px 40px; }
+  .post-kicker { font-family: var(--mono); font-size: 0.76rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--charter); margin: 0 0 16px; }
+  h1 { font-family: var(--serif); font-optical-sizing: auto; font-size: clamp(2rem, 4.6vw, 2.9rem); font-weight: 500; line-height: 1.12; letter-spacing: -0.012em; margin: 0 0 14px; }
+  .post-meta { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); margin: 0 0 40px; }
+  .post-body h2 { font-family: var(--serif); font-size: 1.65rem; font-weight: 500; letter-spacing: -0.01em; margin: 44px 0 12px; line-height: 1.2; }
+  .post-body h3 { font-size: 1.12rem; font-weight: 600; margin: 32px 0 8px; }
+  .post-body p, .post-body li { color: color-mix(in srgb, var(--ink) 82%, var(--muted)); }
+  .post-body strong { color: var(--ink); }
+  .post-body code { font-family: var(--mono); font-size: 0.85em; background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .post-body pre { background: var(--panel); border: 1px solid var(--panel-line); border-radius: 12px; padding: 18px 20px; overflow-x: auto; line-height: 1.7; }
+  .post-body pre code { background: transparent; padding: 0; color: var(--panel-ink); font-size: 0.85rem; }
+  .post-body blockquote { margin: 24px 0; padding: 4px 22px; border-left: 3px solid var(--charter); color: var(--muted); font-family: var(--serif); font-size: 1.08rem; font-style: italic; }
+  .post-body table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+  .post-body th, .post-body td { border: 1px solid var(--line); padding: 8px 12px; text-align: left; }
+  .post-body hr { border: none; height: 1px; background: var(--line); margin: 40px 0; }
+  .post-cta { max-width: 46rem; margin: 24px auto 0; padding: 0 28px 72px; }
+  .post-cta-box { border: 1px solid var(--line); border-radius: 12px; background: var(--paper-2); padding: 24px 26px; }
+  .post-cta-box p { margin: 0 0 12px; color: var(--muted); }
+  .post-cta-box p b { color: var(--ink); }
+  .post-cta-box code { font-family: var(--mono); font-size: 0.88rem; background: var(--panel); color: var(--panel-ink); border: 1px solid var(--panel-line); padding: 8px 14px; border-radius: 8px; display: inline-block; }
+  footer { border-top: 1px solid var(--line); padding: 30px 0 38px; color: var(--muted); font-size: 0.88rem; }
+  .foot { max-width: 1104px; margin: 0 auto; padding: 0 28px; display: flex; flex-wrap: wrap; gap: 8px 18px; }
+  .foot .spacer { flex: 1; }
+  .foot a { color: var(--muted); }
+  .foot a:hover { color: var(--ink); }
+</style>
+</head>
+<body>
+<div class="nav-outer">
+  <div class="nav">
+    <a class="brand" href="/">
+      <svg viewBox="0 0 128 128" role="img" aria-label="DataCharter mark">
+        <circle cx="64" cy="64" r="56" fill="none" stroke="currentColor" stroke-width="7"/>
+        <path d="M30 84 L52 60 L66 72 L92 42" fill="none" stroke="#3B82C4" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M78 38 L96 38 L96 56" fill="none" stroke="#3B82C4" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      DataCharter
+    </a>
+    <span class="nav-spacer"></span>
+    <a class="nl" href="/blog/">Blog</a>
+    <a class="nl" href="/quickstart">Docs</a>
+    <a class="nl" href="https://github.com/datacharter/datacharter">GitHub</a>
+  </div>
+</div>
+
+<article>
+  <p class="post-kicker">DataCharter blog</p>
+  <h1>{{ page.title }}</h1>
+  <p class="post-meta">{{ page.date | date: "%B %-d, %Y" }} · {{ page.author | default: "Rishi Mashelkar" }}</p>
+  <div class="post-body">
+    {{ content }}
+  </div>
+</article>
+
+<div class="post-cta">
+  <div class="post-cta-box">
+    <p><b>Try DataCharter in 60 seconds.</b> One local process, no config, no account. Your data stays on your machine.</p>
+    <p><code>$ uvx datacharter serve</code></p>
+    <p style="margin:14px 0 0"><a href="https://github.com/datacharter/datacharter">Star it on GitHub</a> · <a href="/">datacharter.dev</a></p>
+  </div>
+</div>
+
+<footer>
+  <div class="foot">
+    <span>© DataCharter · <a href="https://github.com/datacharter/datacharter/blob/main/LICENSE">Apache-2.0</a> · <a href="/privacy">Privacy</a></span>
+    <span class="spacer"></span>
+    <a href="/blog/">Blog</a>
+    <a href="/quickstart">Quick start</a>
+    <a href="/mcp">MCP</a>
+    <a href="https://github.com/datacharter/datacharter">GitHub</a>
+  </div>
+</footer>
+</body>
+</html>

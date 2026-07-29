@@ -7,6 +7,9 @@ description: Contract-governed local data exploration, powered by DuckDB.
 theme: jekyll-theme-cayman
 show_downloads: false
 
+# Blog posts live under _posts/ and publish at /blog/<title>/.
+permalink: /blog/:title/
+
 # Dev-internal docs live in this folder but must never be published.
 exclude:
   - DESIGN.md
