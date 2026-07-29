@@ -9,7 +9,7 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue)](LICENSE)
 [![DataCharter MCP server on Glama](https://glama.ai/mcp/servers/datacharter/datacharter/badges/score.svg)](https://glama.ai/mcp/servers/datacharter/datacharter)
 
-**[datacharter.dev](https://datacharter.dev)** · [Docs](https://datacharter.dev/quickstart.html) · [Blog](https://datacharter.dev/blog/)
+**[datacharter.dev](https://datacharter.dev)** · [Docs](https://datacharter.dev/quickstart.html) · [Blog](https://datacharter.dev/blog/) · [CI Action](https://github.com/marketplace/actions/datacharter-data-checks)
 
 *The big-words version: a local, federated data explorer with governed, regulated
 agentic data access, powered by **[DuckDB](https://duckdb.org)**.* Here's what that
@@ -42,7 +42,7 @@ Beyond local federation and governed agent access, you also get:
 - **Point *other* AI tools at your data, too.** A governed MCP server exposes the same read-only, PII-masked query tools to Cursor, Cline, or your own agent.
 - **Every agent answer is reproducible.** The chat shows the exact SQL the agent ran, with one click to open it in the editor — and each result shows which source columns it read, so you always know where a number came from.
 - **Save, reuse, export.** Snapshot a result as a reusable local table; export to CSV, Parquet, JSON, or XLSX.
-- **Governance you can automate.** From the command line: assert data quality (`datacharter test`), catch schema/PII drift in CI, diff data across sources, trace cross-source lineage, and define certified metrics.
+- **Governance you can automate.** From the command line: assert data quality (`datacharter test`), catch schema/PII drift in CI, diff data across sources, trace cross-source lineage, and define certified metrics. Or drop the [GitHub Action](https://github.com/marketplace/actions/datacharter-data-checks) into your workflow and let a broken contract block the PR.
 
 ![DataCharter — live SQL preview, auto-charts, per-query provenance, and PII masking](https://raw.githubusercontent.com/datacharter/datacharter/main/brand/demo.gif)
 
