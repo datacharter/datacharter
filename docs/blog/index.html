@@ -51,7 +51,14 @@ title: Blog
   .dd-menu a { padding: 8px 12px; border-radius: 7px; color: var(--muted); font-size: 0.9rem; font-weight: 500; }
   .dd-menu a:hover { background: var(--paper-2); color: var(--ink); text-decoration: none; }
   .dd-menu .dd-note { font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 6px 12px 3px; }
-  @media (max-width: 560px) { .nav a.nl, .nav .dd { display: none; } }
+  .mnav { display: none; }
+  .mnav summary::after { content: none; }
+  .mnav summary { font-size: 1.25rem; line-height: 1; padding: 4px 2px; }
+  .mnav .dd-menu { max-height: 72vh; overflow-y: auto; min-width: 210px; }
+  @media (max-width: 560px) {
+    .mnav { display: block; }
+  }
+  @media (max-width: 560px) { .nav a.nl, .nav .dd:not(.mnav) { display: none; } }
   main { max-width: 46rem; margin: 0 auto; padding: 64px 28px 80px; }
   .kicker { font-family: var(--mono); font-size: 0.76rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--charter); margin: 0 0 14px; }
   h1 { font-family: var(--serif); font-size: clamp(2rem, 4.5vw, 2.7rem); font-weight: 500; letter-spacing: -0.012em; margin: 0 0 10px; }
@@ -101,6 +108,25 @@ title: Blog
       </div>
     </details>
     <a class="nl" href="/#about">About</a>
+    <details class="dd mnav">
+      <summary aria-label="Menu">☰</summary>
+      <div class="dd-menu">
+        <a href="/#federate">Federate</a>
+        <a href="/#govern">Govern</a>
+        <a href="/#agents">Agents</a>
+        <a href="/#install">Install</a>
+        <a href="/blog/">Blog</a>
+        <a href="/quickstart.html">Docs</a>
+        <a href="/#about">About</a>
+        <span class="dd-note">Listed in</span>
+        <a href="https://github.com/davidgasquez/awesome-duckdb">awesome-duckdb</a>
+        <a href="https://github.com/punkpeye/awesome-mcp-servers">awesome-mcp-servers</a>
+        <a href="https://pypi.org/project/datacharter/">PyPI</a>
+        <a href="https://github.com/datacharter/homebrew-tap">Homebrew</a>
+        <a href="https://registry.modelcontextprotocol.io">Official MCP Registry</a>
+        <a href="https://glama.ai/mcp/servers/datacharter/datacharter">Glama</a>
+      </div>
+    </details>
     <a class="gh" href="https://github.com/datacharter/datacharter">GitHub</a>
   </div>
 </div>
@@ -130,11 +156,13 @@ title: Blog
   </div>
 </footer>
 <script>
-var dd = document.querySelector(".dd");
-if (dd) {
-  document.addEventListener("click", function (e) { if (dd.open && !dd.contains(e.target)) dd.open = false; });
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape") dd.open = false; });
-}
+var dds = document.querySelectorAll(".dd");
+document.addEventListener("click", function (e) {
+  dds.forEach(function (dd) { if (dd.open && !dd.contains(e.target)) dd.open = false; });
+});
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Escape") dds.forEach(function (dd) { dd.open = false; });
+});
 document.querySelectorAll(".copy-mail").forEach(function (el) {
   el.addEventListener("click", function (e) {
     e.preventDefault();
