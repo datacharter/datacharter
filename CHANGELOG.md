@@ -11,7 +11,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - MCP tools now carry annotations — a human-readable `title` plus `readOnlyHint`,
   `idempotentHint`, and `openWorldHint` — so MCP clients (and the Claude Connectors
   Directory) can display and reason about them. All four tools are read-only.
-- Privacy Policy ([docs/privacy](https://datacharter.github.io/datacharter/privacy)):
+- Privacy Policy ([docs/privacy](https://datacharter.dev/privacy)):
   DataCharter collects no data, sends no telemetry, and runs entirely locally.
 
 ## [0.10.3] - 2026-07-28

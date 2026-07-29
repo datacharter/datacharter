@@ -9,8 +9,8 @@
     "name": "Rishi Mashelkar",
     "url": "https://github.com/datacharter/datacharter"
   },
-  "homepage": "https://datacharter.github.io/datacharter/",
-  "documentation": "https://datacharter.github.io/datacharter/mcp",
+  "homepage": "https://datacharter.dev/",
+  "documentation": "https://datacharter.dev/mcp",
   "support": "https://github.com/datacharter/datacharter/issues",
   "icon": "icon.png",
   "license": "Apache-2.0",
@@ -19,7 +19,7 @@
     "type": "git",
     "url": "https://github.com/datacharter/datacharter.git"
   },
-  "privacy_policies": ["https://datacharter.github.io/datacharter/privacy"],
+  "privacy_policies": ["https://datacharter.dev/privacy"],
   "server": {
     "type": "uv",
     "entry_point": "server/main.py",

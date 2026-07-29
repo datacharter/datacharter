@@ -29,4 +29,4 @@ the extension's user config.
 DataCharter runs entirely on your machine. It collects **no** data, sends **no**
 telemetry, and operates **no** servers — your data, queries, and credentials never
 leave your control except to the sources you configure or a model provider you
-explicitly enable. Full policy: <https://datacharter.github.io/datacharter/privacy>.
+explicitly enable. Full policy: <https://datacharter.dev/privacy>.

@@ -47,4 +47,4 @@ Four **read-only, PII-masked** tools over stdio MCP:
 
 On launch the server prints `datacharter MCP server on stdio (<workspace>)` to
 **stderr** (stdout carries the protocol). Every tool is read-only, so it is safe
-to point at real databases. Full docs: <https://datacharter.github.io/datacharter/mcp>.
+to point at real databases. Full docs: <https://datacharter.dev/mcp>.
