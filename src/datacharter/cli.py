@@ -300,15 +300,42 @@ def _cmd_scan(args: argparse.Namespace) -> int:
         engine.close()
     if not suggestions:
         print("No likely-PII columns detected. Review your columns manually.")
+    elif args.write:
+        rc = _write_pii(ws, charter, suggestions)
+        if rc:
+            return rc
+    else:
+        print("# Suggested PII columns (heuristic — review before adding to charter.yaml):")
+        for relation, cols in sorted(suggestions.items()):
+            print(f"{relation}:")
+            for col in cols:
+                print(f"  - {col}")
+    return _report_guide_pii(ws, charter, args.strict)
+
+
+def _report_guide_pii(workspace: Path, charter, strict: bool) -> int:
+    """Flag literal PII in guides/*.md and per-table context (agents read those)."""
+    from datacharter.contracts.guides import find_pii_in_text, scan_guides_for_pii
+
+    guide_hits = scan_guides_for_pii(workspace)
+    context_hits: dict[str, list[str]] = {}
+    for s in charter.sources:
+        for tbl, txt in s.table_context.items():
+            found = find_pii_in_text(txt)
+            if found:
+                context_hits[f"{s.name}.{tbl} (context)"] = found
+    if not guide_hits and not context_hits:
         return 0
-    if args.write:
-        return _write_pii(ws, charter, suggestions)
-    print("# Suggested PII columns (heuristic — review before adding to charter.yaml):")
-    for relation, cols in sorted(suggestions.items()):
-        print(f"{relation}:")
-        for col in cols:
-            print(f"  - {col}")
-    return 0
+    print("\n⚠ Literal PII in guide/context text (agents see this — remove or redact):")
+    for name, hits in sorted(guide_hits.items()):
+        print(f"  guides/{name}.md:")
+        for h in hits:
+            print(f"    - {h}")
+    for name, hits in sorted(context_hits.items()):
+        print(f"  {name}:")
+        for h in hits:
+            print(f"    - {h}")
+    return 1 if strict else 0
 
 
 def _write_pii(workspace: Path, charter, suggestions: dict) -> int:
@@ -861,6 +888,10 @@ def main(argv: list[str] | None = None) -> int:
     p_scan.add_argument("directory", nargs="?", default=".")
     p_scan.add_argument(
         "--write", action="store_true", help="Merge suggested PII into charter.yaml"
+    )
+    p_scan.add_argument(
+        "--strict", action="store_true",
+        help="Exit non-zero if literal PII is found in guides/context (for CI)",
     )
     p_scan.set_defaults(func=_cmd_scan)
 
