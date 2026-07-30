@@ -103,3 +103,84 @@ async def test_run_suite_guide_lift(demo):
     assert record.overall["without_guides"] == 0.0
     assert record.overall["lift"] == 1.0
     assert record.cases[0].without_guides is not None
+
+
+class DirectAnswerLLM:
+    """Agent answers directly (1 round, no tools), then serves scripted judge verdicts."""
+
+    def __init__(self, answer, judge_verdicts):
+        self.answer = answer
+        self.judge_verdicts = list(judge_verdicts)
+        self.calls = 0
+
+    async def stream(self, messages, tools):
+        self.calls += 1
+        # A judge call has no tools and a grading system prompt; agent calls pass TOOL_SPECS.
+        is_judge = not tools
+        if is_judge:
+            yield Delta(text=self.judge_verdicts.pop(0))
+        else:
+            yield Delta(text=self.answer)
+
+
+async def test_judge_pass_makes_case_pass(demo):
+    eng, sources = demo
+    box = ToolBox(eng, sources)
+    suite = EvalSuite(
+        name="s",
+        cases=[
+            EvalCase(
+                question="how many orders?",
+                expect=[EvalAssertion(type="answer_contains", value="90")],
+                expected_answer="There are 90 orders.",
+            )
+        ],
+    )
+    rec = await run_suite(
+        suite, box, llm=DirectAnswerLLM("There are 90 orders.", ["PASS"]), samples=1, judge=True
+    )
+    out = rec.cases[0].with_guides
+    assert out.passed is True
+    assert any(a.type == "judge" and a.passed for a in out.assertions)
+
+
+async def test_judge_fail_fails_case_even_if_assertions_pass(demo):
+    eng, sources = demo
+    box = ToolBox(eng, sources)
+    suite = EvalSuite(
+        name="s",
+        cases=[
+            EvalCase(
+                question="how many orders?",
+                expect=[EvalAssertion(type="answer_contains", value="90")],
+                expected_answer="Exactly 90 orders, none refunded.",
+            )
+        ],
+    )
+    rec = await run_suite(
+        suite, box, llm=DirectAnswerLLM("There are 90 orders.", ["FAIL"]), samples=1, judge=True
+    )
+    out = rec.cases[0].with_guides
+    assert out.passed is False
+    assert any(a.type == "judge" and not a.passed for a in out.assertions)
+
+
+async def test_judge_skipped_without_expected_answer(demo):
+    eng, sources = demo
+    box = ToolBox(eng, sources)
+    suite = EvalSuite(
+        name="s",
+        cases=[
+            EvalCase(
+                question="how many orders?",
+                expect=[EvalAssertion(type="answer_contains", value="90")],
+            )
+        ],
+    )
+    # No judge verdicts scripted; if the judge were called it'd IndexError.
+    rec = await run_suite(
+        suite, box, llm=DirectAnswerLLM("There are 90 orders.", []), samples=1, judge=True
+    )
+    out = rec.cases[0].with_guides
+    assert out.passed is True
+    assert not any(a.type == "judge" for a in out.assertions)

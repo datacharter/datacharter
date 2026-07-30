@@ -83,7 +83,35 @@ def score_case(case: EvalCase, answer: str, sqls: list[str], scalar: Any) -> Cas
     )
 
 
-async def _run_and_score(case: EvalCase, toolbox: ToolBox, llm, samples: int) -> CaseOutcome:
+_JUDGE_SYSTEM = (
+    "You grade whether an ANSWER is consistent with the EXPECTED answer for a "
+    "QUESTION about a dataset. Reply with exactly one word: PASS or FAIL."
+)
+
+
+async def judge_answer(llm, question: str, expected: str, answer: str) -> bool:
+    """One LLM call (no tools) grading the agent's answer against the reference."""
+    messages = [
+        {"role": "system", "content": _JUDGE_SYSTEM},
+        {
+            "role": "user",
+            "content": (
+                f"QUESTION: {question}\nEXPECTED: {expected}\nANSWER: {answer}\n\n"
+                "Is the ANSWER consistent with EXPECTED? Reply PASS or FAIL."
+            ),
+        },
+    ]
+    text = ""
+    async for delta in llm.stream(messages, []):
+        if delta.text:
+            text += delta.text
+    verdict = text.strip().upper()
+    return "PASS" in verdict and "FAIL" not in verdict
+
+
+async def _run_and_score(
+    case: EvalCase, toolbox: ToolBox, llm, samples: int, judge: bool = False
+) -> CaseOutcome:
     """Run one case `samples` times; passed = majority. Returns the last run's detail."""
     passes = 0
     last: CaseOutcome | None = None
@@ -91,6 +119,10 @@ async def _run_and_score(case: EvalCase, toolbox: ToolBox, llm, samples: int) ->
         agent = Agent(toolbox, AgentConfig(llm=llm))
         answer, sqls, scalar = await run_case(agent, case.question)
         last = score_case(case, answer, sqls, scalar)
+        if judge and case.expected_answer:
+            verdict = await judge_answer(llm, case.question, case.expected_answer, answer)
+            last.assertions.append(AssertionOutcome(type="judge", passed=verdict))
+            last.passed = last.passed and verdict
         passes += 1 if last.passed else 0
     assert last is not None
     last.passed = passes * 2 >= max(1, samples)  # majority
@@ -104,12 +136,13 @@ async def run_suite(
     llm,
     toolbox_off: ToolBox | None = None,
     samples: int = 1,
+    judge: bool = False,
 ) -> RunRecord:
     compare = toolbox_off is not None
     results: list[CaseResult] = []
     for case in suite.cases:
-        on = await _run_and_score(case, toolbox, llm, samples)
-        off = await _run_and_score(case, toolbox_off, llm, samples) if compare else None
+        on = await _run_and_score(case, toolbox, llm, samples, judge)
+        off = await _run_and_score(case, toolbox_off, llm, samples, judge) if compare else None
         results.append(CaseResult(question=case.question, with_guides=on, without_guides=off))
     n = len(results) or 1
     on_rate = sum(1 for r in results if r.with_guides.passed) / n

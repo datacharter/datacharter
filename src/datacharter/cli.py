@@ -706,7 +706,10 @@ def _cmd_eval(args: argparse.Namespace) -> int:
     try:
         for suite in suites:
             record = asyncio.run(
-                run_suite(suite, box, llm=llm, toolbox_off=box_off, samples=args.samples)
+                run_suite(
+                    suite, box, llm=llm, toolbox_off=box_off,
+                    samples=args.samples, judge=args.judge,
+                )
             )
             _print_scorecard(record)
             from datacharter.agent.eval_store import save_run

@@ -98,6 +98,7 @@ class EvalRunRequest(BaseModel):
     suite: str | None = None
     compare_guides: bool = False
     samples: int = 1
+    judge: bool = False
 
 
 _QUERY_NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_\-]{0,62}$")
@@ -308,7 +309,8 @@ def create_app(
             for suite in suites:
                 yield _sse("progress", {"suite": suite.name})
                 record = await run_suite(
-                    suite, box, llm=app.state.llm, toolbox_off=box_off, samples=body.samples
+                    suite, box, llm=app.state.llm, toolbox_off=box_off,
+                    samples=body.samples, judge=body.judge,
                 )
                 save_run(workspace, record)
                 yield _sse("result", dataclasses.asdict(record))
