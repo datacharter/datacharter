@@ -37,7 +37,9 @@ guide*.
 | `result_scalar` | `equals`, `tolerance?` | the last query returned one cell within tolerance |
 
 A case passes when every assertion passes; the suite score is the fraction of
-cases passed.
+cases passed. With `--judge`, any case that sets `expected_answer` is *also*
+graded by an LLM (does the agent's answer match the reference?), folded into the
+case result alongside the deterministic assertions.
 
 ## Run it
 
@@ -48,6 +50,7 @@ datacharter eval --compare-guides      # ← the headline: guides on vs. off + l
 datacharter eval --threshold 0.8       # exit non-zero below 80% (for CI)
 datacharter eval --history             # pass-rate trend + what regressed
 datacharter eval --samples 3           # run each case 3×; pass = majority
+datacharter eval --judge               # also LLM-grade freeform answers vs expected_answer
 ```
 
 `--compare-guides` runs the whole suite twice — once with your guides in the

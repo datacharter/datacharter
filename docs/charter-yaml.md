@@ -207,7 +207,7 @@ root. Every file is loaded (alphabetically, capped at 8,000 characters) into the
 agent's system context; MCP clients receive it through the protocol's
 `initialize` `instructions` field. HTML comments in guides are stripped and
 never reach the model. Guides are trusted contract content: version them,
-review them in PRs, and they travel with the workspace. See [Agent evals](evals.html) to measure the lift your guides provide.
+review them in PRs, and they travel with the workspace. See [Agent evals](evals.html) to measure the lift your guides provide. Run `datacharter scan` (or `--strict` in CI) to catch literal PII accidentally pasted into a guide — agents read that text, so it never passes through column masking.
 
 ## Metrics
 

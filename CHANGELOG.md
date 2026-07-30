@@ -5,6 +5,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-07-29
+
+### Added
+- **Eval LLM-judge.** `datacharter eval --judge` now scores freeform answers: for
+  a case with an `expected_answer`, an LLM grades whether the agent's answer is
+  consistent, folded into the case result alongside the deterministic assertions.
+  Also available via the server eval-run endpoint.
+- **`datacharter scan` flags literal PII in guides.** Since `guides/*.md` and
+  per-table `context:` are served to agents, `scan` now reports literal emails,
+  SSNs, cards, phones, and IPs found in that text (comment-stripped). `--strict`
+  exits non-zero for CI.
+
 ## [0.12.0] - 2026-07-29
 
 ### Added
