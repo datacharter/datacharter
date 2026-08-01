@@ -168,9 +168,13 @@ def create_app(
             app.state.auto_pii = {c.lower() for cols in detected.values() for c in cols}
         except Exception:  # detection must never break serving
             app.state.auto_pii = set()
+        from datacharter.audit import FlightRecorder
+
+        app.state.recorder = FlightRecorder(workspace, enabled=loaded.audit_enabled)
         app.state.toolbox = ToolBox(
             engine, loaded.sources, auto_pii=app.state.auto_pii,
             local_access=loaded.local_access, guides=loaded.guides,
+            recorder=app.state.recorder,
         )
         try:
             yield
@@ -227,7 +231,7 @@ def create_app(
         app.state.toolbox = ToolBox(
             app.state.engine, app.state.charter.sources,
             auto_pii=app.state.auto_pii, local_access=app.state.charter.local_access,
-            guides=app.state.charter.guides,
+            guides=app.state.charter.guides, recorder=app.state.recorder,
         )
 
     def _require_local():
@@ -677,6 +681,8 @@ def create_app(
 
                     return StreamingResponse(refuse(), media_type="text/event-stream")
 
+            app.state.recorder.start_session("claude-code", question=body.question)
+
             async def cc_events() -> AsyncIterator[str]:
                 got_text = False
                 sid = app.state.cc_session.get("id")
@@ -706,6 +712,9 @@ def create_app(
             contract_fingerprint(app.state.charter.sources),
         )
         agent = Agent(app.state.toolbox, AgentConfig(llm=app.state.llm, cache=cache))
+        app.state.recorder.start_session(
+            "chat", model=getattr(app.state.llm, "model", None), question=body.question
+        )
 
         async def events() -> AsyncIterator[str]:
             async for ev in agent.run(body.question):

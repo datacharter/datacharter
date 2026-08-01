@@ -148,3 +148,29 @@ async def test_initialize_instructions_carry_guides(tmp_path):
 async def test_initialize_omits_instructions_without_guides(toolbox):
     resp = await handle_message(_req(1, "initialize", {"protocolVersion": "2025-11-25"}), toolbox)
     assert "instructions" not in resp["result"]
+
+
+async def test_initialize_records_client_attribution(tmp_path):
+    from datacharter.audit import FlightRecorder
+    from datacharter.audit.evidence import read_entries
+
+    cli_main(["init", str(tmp_path), "--demo"])
+    charter = load_charter(tmp_path)
+    eng = Engine(tmp_path, charter.sources).start()
+    try:
+        tb = ToolBox(eng, charter.sources, recorder=FlightRecorder(tmp_path))
+        await handle_message(
+            _req(1, "initialize", {
+                "protocolVersion": "2025-11-25",
+                "clientInfo": {"name": "cursor", "version": "1.4"},
+            }),
+            tb,
+        )
+        await handle_message(_call(2, "query", sql="SELECT count(*) FROM store.orders"), tb)
+    finally:
+        eng.close()
+    entries = read_entries(tmp_path)
+    assert entries[0]["type"] == "session"
+    assert entries[0]["surface"] == "mcp"
+    assert entries[0]["client"] == {"name": "cursor", "version": "1.4"}
+    assert entries[1]["type"] == "access" and entries[1]["tool"] == "query"

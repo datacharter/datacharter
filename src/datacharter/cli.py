@@ -235,9 +235,14 @@ def _cmd_mcp(args: argparse.Namespace) -> int:
     if not (ws / "charter.yaml").exists():
         print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
         return 1
+    from datacharter.audit import FlightRecorder
+
     charter = load_charter(ws)
     engine = _open_engine(ws, charter.sources)
-    toolbox = ToolBox(engine, charter.sources, guides=charter.guides)
+    toolbox = ToolBox(
+        engine, charter.sources, guides=charter.guides,
+        recorder=FlightRecorder(ws, enabled=charter.audit_enabled),
+    )
     # stdout is the MCP protocol channel; diagnostics go to stderr.
     print(f"datacharter MCP server on stdio ({ws})", file=sys.stderr)
     try:

@@ -68,8 +68,12 @@ async def handle_message(message: dict, toolbox: ToolBox) -> dict | None:
     method = message.get("method")
 
     if method == "initialize":
-        requested = (message.get("params") or {}).get("protocolVersion")
+        params = message.get("params") or {}
+        requested = params.get("protocolVersion")
         version = requested if requested in _SUPPORTED_VERSIONS else PROTOCOL_VERSION
+        recorder = getattr(toolbox, "recorder", None)
+        if recorder is not None:
+            recorder.start_session("mcp", client=params.get("clientInfo"))
         result = {
             "protocolVersion": version,
             "capabilities": {"tools": {}},

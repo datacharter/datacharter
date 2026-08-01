@@ -39,6 +39,8 @@ class Charter(BaseModel):
     local_access: dict = Field(default_factory=dict)
     #: Concatenated workspace guides (guides/*.md) — agent-surface context.
     guides: str = ""
+    #: Flight-recorder audit of agent access; on by default (`audit: off` disables).
+    audit_enabled: bool = True
 
 
 def load_charter(workspace: Path | str, filename: str = CHARTER_FILE) -> Charter:
@@ -85,9 +87,18 @@ def load_charter(workspace: Path | str, filename: str = CHARTER_FILE) -> Charter
     if not isinstance(local_access, dict):
         raise CharterError(f"{filename}: 'local_access' must be a mapping.")
 
+    audit_raw = raw.get("audit", True)
+    if audit_raw in (False, "off"):
+        audit_enabled = False
+    elif audit_raw in (True, "on"):
+        audit_enabled = True
+    else:
+        raise CharterError(f"{filename}: 'audit' must be on/off (got {audit_raw!r}).")
+
     return Charter(
         version=version, sources=sources, warnings=warnings, metrics=metrics,
         tests=tests, local_access=local_access, guides=load_guides(workspace),
+        audit_enabled=audit_enabled,
     )
 
 
