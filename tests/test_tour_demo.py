@@ -25,7 +25,7 @@ def test_tour_demo_has_every_surface_populated(tmp_path):
     entries = read_entries(tmp_path)
     accesses = [e for e in entries if e["type"] == "access"]
     assert len(accesses) == 2
-    assert any(a.get("error", "").startswith("Error: policy") for a in accesses)
+    assert any((a.get("error") or "").startswith("Error: policy") for a in accesses)
     ok, n, _ = verify_chain(tmp_path)
     assert ok and n == 3
     # history seeded so `suggest` has a habit to mine
