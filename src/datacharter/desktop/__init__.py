@@ -16,6 +16,14 @@ from datacharter.desktop.core import ServerHandle, load_config, remember
 __all__ = ["main"]
 
 
+def _say(msg: str) -> None:
+    """Print to stderr; windowed (console=False) builds may have no stdio at all."""
+    try:
+        print(msg, file=sys.stderr)
+    except Exception:
+        pass
+
+
 def _resolve_initial(args) -> Path | None:
     """Workspace to boot with, or None to ask via the picker at GUI start."""
     if args.workspace:
@@ -59,23 +67,20 @@ def main(argv: list[str] | None = None) -> int:
         handle.start(ws)
         ok = handle.wait_ready()
         handle.stop()
-        print("smoke OK" if ok else "smoke FAILED", file=sys.stderr)
+        _say("smoke OK" if ok else "smoke FAILED")
         return 0 if ok else 1
 
     try:
         import webview
     except ImportError:
-        print(
-            "pywebview is not installed. Run: pip install 'datacharter[desktop]'",
-            file=sys.stderr,
-        )
+        _say("pywebview is not installed. Run: pip install 'datacharter[desktop]'")
         return 1
 
     initial = _resolve_initial(args)
     booted = initial or _demo_workspace()
     handle.start(booted)
     if not handle.wait_ready():
-        print("DataCharter server failed to start.", file=sys.stderr)
+        _say("DataCharter server failed to start.")
         return 1
     if initial is not None:
         remember(booted)
