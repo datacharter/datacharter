@@ -41,6 +41,22 @@ jobs:
 
       - uses: astral-sh/setup-uv@v7
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      # The built UI is gitignored, so a fresh checkout has none — without this
+      # the frozen app serves {"detail":"Not Found"} instead of the explorer.
+      - name: Build UI into the package
+        shell: bash
+        run: ./scripts/build_ui.sh
+
+      - name: Verify UI is present
+        shell: bash
+        run: test -f src/datacharter/server/static/index.html
+
       - name: Install
         shell: bash
         run: |
@@ -88,6 +104,9 @@ jobs:
           $bmp.Save("$env:GITHUB_WORKSPACE\windows-app-screenshot.png")
           Stop-Process -Name DataCharter -Force -ErrorAction SilentlyContinue
           if (-not $title) { Write-Error "No app window ever appeared"; exit 1 }
+          # The window must serve the real UI, not a 404 shell.
+          $ui = Select-String -Path "src\datacharter\server\static\index.html" -Pattern 'id="root"' -Quiet
+          if (-not $ui) { Write-Error "UI bundle missing from the build"; exit 1 }
 
       - name: Upload window screenshot
         if: always() && matrix.kind == 'zip'
