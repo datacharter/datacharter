@@ -246,6 +246,7 @@ def _cmd_mcp(args: argparse.Namespace) -> int:
         engine, charter.sources, guides=charter.guides,
         recorder=FlightRecorder(ws, enabled=charter.audit_enabled),
         canary=ensure_canaries(ws, engine, charter.canary_mode),
+        policies=charter.policies,
     )
     # stdout is the MCP protocol channel; diagnostics go to stderr.
     print(f"datacharter MCP server on stdio ({ws})", file=sys.stderr)
@@ -872,8 +873,11 @@ def _cmd_eval(args: argparse.Namespace) -> int:
 
     llm = _local_llm(args.model) if args.local else LLMClient()
     engine = _open_engine(ws, charter.sources)
-    box = ToolBox(engine, charter.sources, guides=charter.guides)
-    box_off = ToolBox(engine, charter.sources, guides="") if args.compare_guides else None
+    box = ToolBox(engine, charter.sources, guides=charter.guides, policies=charter.policies)
+    box_off = (
+        ToolBox(engine, charter.sources, guides="", policies=charter.policies)
+        if args.compare_guides else None
+    )
 
     worst = 1.0
     try:

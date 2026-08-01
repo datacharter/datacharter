@@ -24,8 +24,7 @@ SUPPORTED_VERSION = 1
 _CREDENTIAL_KEY = re.compile(r"(password|passwd|secret|token|passphrase|api_key)$|(^|_)key$")
 
 
-class CharterError(Exception):
-    """charter.yaml problem, phrased so the user knows exactly what to fix."""
+from datacharter.contracts.loader_errors import CharterError  # noqa: E402 (re-export)
 
 
 class Charter(BaseModel):
@@ -43,6 +42,8 @@ class Charter(BaseModel):
     audit_enabled: bool = True
     #: Canary tripwires: None = off (default), "block" or "log" when enabled.
     canary_mode: str | None = None
+    #: Plain-english policies per relation (aggregate_only / k-anonymity / joins).
+    policies: dict = Field(default_factory=dict)
 
 
 def load_charter(workspace: Path | str, filename: str = CHARTER_FILE) -> Charter:
@@ -109,10 +110,14 @@ def load_charter(workspace: Path | str, filename: str = CHARTER_FILE) -> Charter
             f"{filename}: 'canary' must be on/off or {{mode: block|log}} (got {canary_raw!r})."
         )
 
+    from datacharter.contracts.policies import parse_policies
+
+    policies = parse_policies(raw.get("policies") or {})
+
     return Charter(
         version=version, sources=sources, warnings=warnings, metrics=metrics,
         tests=tests, local_access=local_access, guides=load_guides(workspace),
-        audit_enabled=audit_enabled, canary_mode=canary_mode,
+        audit_enabled=audit_enabled, canary_mode=canary_mode, policies=policies,
     )
 
 

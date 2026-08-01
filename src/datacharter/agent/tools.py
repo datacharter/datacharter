@@ -78,6 +78,7 @@ class ToolBox:
         guides: str = "",
         recorder=None,
         canary=None,
+        policies: dict | None = None,
         timeout_s: float = _DEFAULT_TIMEOUT_S,
     ) -> None:
         self._engine = engine
@@ -87,6 +88,8 @@ class ToolBox:
         self.recorder = recorder
         #: Canary tripwire guard — agent-bound results are scanned when set.
         self.canary = canary
+        #: Plain-english policies (relation -> Policy) enforced on query().
+        self._policies = policies or {}
         # Column names flagged PII in any source's contract, matched case-insensitively.
         self._pii: set[str] = set()
         for src in sources:
@@ -188,17 +191,42 @@ class ToolBox:
         context = self._table_context.get(key) or self._table_context.get(table.lower())
         if context:
             payload["context"] = context
+        if self._policies:
+            from datacharter.contracts.policies import render_sentences
+            from datacharter.engine.policy_guard import _matches
+
+            rel = f"{source}.{table}" if source else table
+            for pkey, pol in self._policies.items():
+                if _matches(pkey, rel):
+                    payload["policies"] = render_sentences(pol)
+                    break
         return json.dumps(payload, default=str)
 
     async def _query(self, args: dict) -> str:
         sql = str(args.get("sql", ""))
+        k = None
+        if self._policies:
+            from datacharter.engine.policy_guard import PolicyRefusal, check_policies
+
+            try:
+                k = check_policies(sql, self._policies)
+            except PolicyRefusal as refusal:
+                return str(refusal)
         check_query_access(sql, is_masked=self._masked, masked_names=self._masked_names)
         run_sql = apply_row_filters(sql, self._row_filters) if self._row_filters else sql
+        if k is not None:
+            from datacharter.engine.policy_guard import apply_min_group
+
+            run_sql = apply_min_group(run_sql, k)
         result = await self._engine.query(
             run_sql, row_limit=_MAX_TOOL_ROWS, timeout_s=self._timeout_s
         )
+        if k is not None:
+            result.warnings.append(
+                f"k-anonymity: groups smaller than {k} were suppressed (workspace policy)."
+            )
         if run_sql != sql:
-            # Mask + report the ORIGINAL query, not the injected filter subquery.
+            # Mask + report the ORIGINAL query, not the injected rewrite.
             result.provenance = extract_provenance(sql)
         return self._render(result, self._mask_indices(result))
 

@@ -177,6 +177,7 @@ def create_app(
             engine, loaded.sources, auto_pii=app.state.auto_pii,
             local_access=loaded.local_access, guides=loaded.guides,
             recorder=app.state.recorder, canary=app.state.canary,
+            policies=loaded.policies,
         )
         try:
             yield
@@ -239,7 +240,7 @@ def create_app(
             app.state.engine, app.state.charter.sources,
             auto_pii=app.state.auto_pii, local_access=app.state.charter.local_access,
             guides=app.state.charter.guides, recorder=app.state.recorder,
-            canary=app.state.canary,
+            canary=app.state.canary, policies=app.state.charter.policies,
         )
 
     def _require_local():
