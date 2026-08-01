@@ -111,9 +111,12 @@ def seed_governance(workspace: Path) -> None:
         from datacharter.audit import FlightRecorder
         from datacharter.contracts import load_charter
         from datacharter.engine.session import Engine
+        from datacharter.engine.statekey import resolve_state_key
 
         charter = load_charter(workspace)
-        engine = Engine(workspace, charter.sources).start()
+        # Same key `serve` uses — otherwise the local state DB we create here
+        # cannot be reopened later and the workspace fails to start.
+        engine = Engine(workspace, charter.sources, local_key=resolve_state_key()).start()
         try:
             recorder = FlightRecorder(workspace)
             recorder.start_session("demo", model="demo-tour", question="What do the tiers look like?")
