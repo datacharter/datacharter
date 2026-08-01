@@ -1123,3 +1123,26 @@ table.grid td.rownum, table.grid th.rownum {
 .guides-contexts h3 { font-size: 14px; margin: 0 0 6px; }
 .guides-contexts ul { margin: 0; padding-left: 18px; font-size: 13px; }
 .guides-contexts li { margin-bottom: 4px; }
+
+/* Audit view */
+.audit-view { padding: 16px 20px; overflow: auto; flex: 1; min-height: 0; }
+.audit-header { display: flex; align-items: baseline; gap: 14px; }
+.audit-header h2 { margin: 0; }
+.audit-badge { font-size: 12px; padding: 3px 10px; border-radius: 999px; }
+.audit-badge.ok { background: var(--accent-soft); color: var(--accent); }
+.audit-badge.broken { background: #f8d7da; color: #a71d2a; }
+.audit-sub, .audit-empty { color: var(--text-dim); font-size: 13px; }
+.audit-session {
+  margin-top: 14px; padding: 10px 14px; background: var(--bg-panel);
+  border: 1px solid var(--border); border-radius: 8px;
+}
+.audit-session-head { display: flex; gap: 10px; align-items: baseline; }
+.audit-meta { color: var(--text-dim); font-size: 12px; }
+.audit-question { font-style: italic; margin: 4px 0; font-size: 13px; }
+.audit-accesses { list-style: none; margin: 6px 0 0; padding: 0; font-size: 13px; }
+.audit-accesses li { margin-bottom: 6px; }
+.audit-tool { background: var(--bg-raised); border-radius: 4px; padding: 1px 6px; font-size: 12px; }
+.audit-sql {
+  margin: 4px 0; padding: 6px 8px; background: var(--bg-raised);
+  border-radius: 5px; font-size: 12px; overflow-x: auto;
+}

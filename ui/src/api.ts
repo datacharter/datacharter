@@ -142,6 +142,8 @@ export const api = {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ backend }),
     }),
+  auditLog: () => request<AuditPayload>("/api/audit"),
+  auditVerify: () => request<AuditVerify>("/api/audit/verify"),
   listEvals: () => request<{ suites: EvalSuite[] }>("/api/evals"),
   evalHistory: () => request<{ runs: EvalRun[] }>("/api/evals/history"),
   listGuides: () => request<GuidesPayload>("/api/guides"),
@@ -158,6 +160,36 @@ export const api = {
       body: JSON.stringify(body),
     }),
 };
+
+export interface AuditEntry {
+  seq: number;
+  ts: string;
+  type: "session" | "access";
+  session: string;
+  surface?: string;
+  user?: string;
+  client?: { name?: string; version?: string } | null;
+  model?: string | null;
+  question?: string | null;
+  tool?: string;
+  sql?: string | null;
+  relation?: string | null;
+  row_count?: number | null;
+  masked_columns?: string[];
+  relations?: string[];
+  error?: string | null;
+}
+
+export interface AuditPayload {
+  sessions: AuditEntry[];
+  entries: AuditEntry[];
+}
+
+export interface AuditVerify {
+  ok: boolean;
+  entries: number;
+  detail: string;
+}
 
 export interface EvalSuite {
   name: string;
