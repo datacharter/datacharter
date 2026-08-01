@@ -271,6 +271,21 @@ def create_app(
         _refresh_charter()
         return {"saved": True}
 
+    @app.get("/api/audit")
+    async def audit_log() -> dict:
+        from datacharter.audit.evidence import read_entries
+
+        entries = read_entries(workspace)[-500:]
+        sessions = [e for e in entries if e.get("type") == "session"]
+        return {"sessions": sessions, "entries": entries}
+
+    @app.get("/api/audit/verify")
+    async def audit_verify() -> dict:
+        from datacharter.audit.evidence import verify_chain
+
+        ok, n, detail = verify_chain(workspace)
+        return {"ok": ok, "entries": n, "detail": detail}
+
     @app.get("/api/evals")
     async def list_evals() -> dict:
         from datacharter.contracts.evals import load_suites

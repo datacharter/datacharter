@@ -58,3 +58,20 @@ def test_audit_toggle_bad_value_rejected(tmp_path):
     (tmp_path / "charter.yaml").write_text(charter + "\naudit: maybe\n")
     with pytest.raises(CharterError, match="audit"):
         load_charter(tmp_path)
+
+
+def test_audit_endpoints_shape(tmp_path):
+    with TestClient(_app(tmp_path, llm=FakeLLM()), base_url="http://127.0.0.1") as c:
+        c.post("/api/agent/ask", json={"question": "how many orders?"})
+        log = c.get("/api/audit").json()
+        assert len(log["sessions"]) == 1
+        assert log["sessions"][0]["surface"] == "chat"
+        assert any(e["type"] == "access" or e["type"] == "session" for e in log["entries"])
+        v = c.get("/api/audit/verify").json()
+        assert v["ok"] is True and v["entries"] >= 1 and "verified" in v["detail"]
+
+
+def test_audit_endpoints_empty_workspace(tmp_path):
+    with TestClient(_app(tmp_path), base_url="http://127.0.0.1") as c:
+        assert c.get("/api/audit").json() == {"sessions": [], "entries": []}
+        assert c.get("/api/audit/verify").json()["ok"] is True
