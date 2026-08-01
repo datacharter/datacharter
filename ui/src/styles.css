@@ -1146,3 +1146,12 @@ table.grid td.rownum, table.grid th.rownum {
   margin: 4px 0; padding: 6px 8px; background: var(--bg-raised);
   border-radius: 5px; font-size: 12px; overflow-x: auto;
 }
+
+/* Canary */
+.audit-badge.muted { background: var(--bg-raised); color: var(--text-dim); }
+.audit-alarm {
+  margin-top: 12px; padding: 10px 14px; border-radius: 8px; font-size: 13px;
+  background: #f8d7da; color: #7a1220; border: 1px solid #e6a3ab;
+}
+:root[data-theme="dark"] .audit-alarm { background: #3a1418; color: #f1a7ae; border-color: #6b2a31; }
+.audit-alarm ul { list-style: none; margin: 8px 0 0; padding: 0; }

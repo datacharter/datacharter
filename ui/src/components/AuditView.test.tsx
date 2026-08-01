@@ -21,6 +21,8 @@ beforeEach(() => {
           ],
         }),
       );
+    if (url.endsWith("/api/canary"))
+      return new Response(JSON.stringify({ armed: true, mode: "block" }));
     return new Response(JSON.stringify({ ok: true, entries: 2, detail: "2 entries verified" }));
   }) as unknown as typeof fetch;
 });
@@ -32,5 +34,6 @@ describe("AuditView", () => {
     expect(screen.getByText("cursor")).toBeInTheDocument();
     expect(screen.getByText(/SELECT email FROM crm/)).toBeInTheDocument();
     expect(screen.getByText(/masked: email/)).toBeInTheDocument();
+    expect(screen.getByText(/canary armed \(block\)/)).toBeInTheDocument();
   });
 });

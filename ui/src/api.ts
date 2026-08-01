@@ -144,6 +144,7 @@ export const api = {
     }),
   auditLog: () => request<AuditPayload>("/api/audit"),
   auditVerify: () => request<AuditVerify>("/api/audit/verify"),
+  canaryStatus: () => request<{ armed: boolean; mode: string | null }>("/api/canary"),
   listEvals: () => request<{ suites: EvalSuite[] }>("/api/evals"),
   evalHistory: () => request<{ runs: EvalRun[] }>("/api/evals/history"),
   listGuides: () => request<GuidesPayload>("/api/guides"),

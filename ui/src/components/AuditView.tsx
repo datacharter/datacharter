@@ -5,14 +5,22 @@ import { api, type AuditEntry, type AuditVerify } from "../api";
 export default function AuditView() {
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [verify, setVerify] = useState<AuditVerify | null>(null);
+  const [canary, setCanary] = useState<{ armed: boolean; mode: string | null } | null>(null);
 
   useEffect(() => {
     void (async () => {
-      const [log, v] = await Promise.all([api.auditLog(), api.auditVerify()]);
+      const [log, v, c] = await Promise.all([
+        api.auditLog(),
+        api.auditVerify(),
+        api.canaryStatus(),
+      ]);
       setEntries(log.entries);
       setVerify(v);
+      setCanary(c);
     })();
   }, []);
+
+  const alarms = entries.filter((e) => e.type === ("alarm" as AuditEntry["type"]));
 
   const sessions = entries.filter((e) => e.type === "session");
   const accessesFor = (sid: string) =>
@@ -28,7 +36,34 @@ export default function AuditView() {
             {verify.ok ? `✓ chain verified · ${verify.entries} entries` : `⚠ ${verify.detail}`}
           </span>
         )}
+        {canary && (
+          <span
+            className={canary.armed ? "audit-badge ok" : "audit-badge muted"}
+            title={
+              canary.armed
+                ? `Canary tripwires armed (${canary.mode} mode): synthetic honeytokens are planted in local.canaries; if one ever appears in agent output, masking failed and an alarm lands here.`
+                : "Canary tripwires plant synthetic honeytokens in a masked local table. If a token ever appears in agent output, masking provably failed. Enable with `canary: on` in charter.yaml."
+            }
+          >
+            {canary.armed ? `🪤 canary armed (${canary.mode})` : "🪤 canary off"}
+          </span>
+        )}
       </header>
+
+      {alarms.length > 0 && (
+        <div className="audit-alarm">
+          <strong>🚨 {alarms.length} canary alarm{alarms.length > 1 ? "s" : ""}</strong> — a
+          masked value escaped to agent output. Investigate the entries below.
+          <ul>
+            {alarms.map((a) => (
+              <li key={a.seq}>
+                seq {a.seq} · {a.ts?.slice(0, 16)} · <code>{a.tool}</code>
+                {a.sql && <pre className="audit-sql">{a.sql}</pre>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <p className="audit-sub">
         Every agent data access, hash-chained and tamper-evident. Export evidence with{" "}
         <code>datacharter audit export</code>.
