@@ -17,6 +17,8 @@ CHARTER_TEMPLATE = """\
 # .env, or the OS keyring (`datacharter secrets set NAME`).
 version: 1
 
+# canary: on   # plant masked honeytokens that alarm if masking ever fails
+
 sources: {}
 """
 

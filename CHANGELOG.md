@@ -5,6 +5,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-08-01
+
+### Added
+- **Canary tripwires (opt-in).** `canary: on` plants `local.canaries` — synthetic
+  PII embedding unique per-workspace tokens — masked by the same machinery that
+  protects real data. A token appearing in any agent-bound result therefore proves
+  the masking/guard layer failed: the hit is recorded as a tamper-evident `alarm`
+  entry in the audit chain, and in block mode (default) the response is withheld;
+  `canary: {mode: log}` alarms without blocking.
+- `datacharter canary` (status + how to enable) and `datacharter canary drill`
+  (pushes a synthetic hit through the real detection/alarm path).
+- `GET /api/canary`; Audit panel gains a canary status chip (with explanatory
+  tooltip) and a red alarm banner listing tripwire hits.
+
 ## [0.14.0] - 2026-08-01
 
 ### Added

@@ -91,6 +91,13 @@ deletions are detectable, and exportable as an evidence pack. `datacharter
 audit verify` walks the chain; the Audit panel shows the timeline. Metadata and
 hashes only — the log never stores raw rows.
 
+## How would I know if masking ever failed?
+
+Enable [canary tripwires](audit.html): `canary: on` plants synthetic honeytokens
+in a masked local table. If a token ever appears in agent output, masking
+provably failed — the alarm lands in the tamper-evident audit chain, and block
+mode withholds the response. `datacharter canary drill` proves the alarm path.
+
 ## How does it compare to other tools?
 
 At a high level, and without disparaging any of them (they are good tools):

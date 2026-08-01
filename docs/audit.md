@@ -58,6 +58,29 @@ saw about your data, provable.*
 what they asked, every query with its masking) under a live **chain verified ✓**
 badge.
 
+## Canary tripwires
+
+Auditing tells you what happened; canaries tell you the moment protection
+*fails*. Enable with one line:
+
+```yaml
+canary: on              # block mode — withhold any response carrying a canary
+canary: { mode: log }   # or: let it through, alarm loudly
+```
+
+DataCharter plants `local.canaries` — synthetic PII whose values embed unique
+tokens — and masks it with the same machinery that protects your real data. An
+agent that queries it sees `•••`, like everything else. Which means **a canary
+token can only ever appear in agent output if masking or the query guard
+actually failed** — there is no legitimate path, so alarms are near-zero
+false-positive by construction. Alarms land in the hash chain (tamper-evident),
+light up the Audit panel, and in block mode the response is withheld.
+
+```sh
+datacharter canary            # armed / disabled + how to enable
+datacharter canary drill      # deliberately trip the alarm path, end to end
+```
+
 ## Notes
 
 - Recording is failure-safe: an audit write error never breaks a query.
