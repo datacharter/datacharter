@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "The guide that writes itself"
-description: "You already wrote the tribal knowledge — one WHERE clause at a time. DataCharter 0.17.0 mines your query history for the habits you repeat and turns them into agent guides, with evidence, fully offline."
+description: "You already wrote the tribal knowledge — one WHERE clause at a time. DataCharter now mines your query history for the habits you repeat and turns them into agent guides, with evidence, fully offline."
 author: Rishi Mashelkar
 ---
 
@@ -18,7 +18,7 @@ guide line. You just wrote it in SQL, forty times, instead of English, once.
 
 ## Mining the habits
 
-DataCharter 0.17.0 adds:
+DataCharter 0.16.0 adds:
 
 ```sh
 $ datacharter suggest

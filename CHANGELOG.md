@@ -5,9 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-## [0.17.0] - 2026-08-03
+### Fixed
+- **Windows: the audit module crashed the server on import** (POSIX-only `fcntl`
+  locking, shipped in 0.14.0/0.15.0) — file locking is now portable (`msvcrt` on
+  Windows). Caught by the new desktop CI smoke matrix.
 
-### Added
+### Also added in 0.16.0
 - **Self-writing guides.** `datacharter suggest` mines the workspace query
   history for repeated habits — recurring WHERE predicates per relation and
   tables that are always queried together — and turns them into guide
@@ -18,7 +21,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   guides you have already written.
 - `GET /api/guides/suggestions`.
 
-## [0.16.0] - 2026-08-02
+## [0.16.0] - 2026-08-01
 
 ### Added
 - **Desktop app (beta).** `datacharter-desktop` (new `[desktop]` extra) opens the

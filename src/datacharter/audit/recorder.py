@@ -9,13 +9,35 @@ so the audit trail cannot become a second PII store.
 
 from __future__ import annotations
 
-import fcntl
 import getpass
 import hashlib
 import json
+import os
 import uuid
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+
+if os.name == "nt":  # Windows has no fcntl; msvcrt is the portable equivalent
+    import msvcrt
+
+    @contextmanager
+    def _locked(lockfile: Path):
+        with open(lockfile, "a") as lf:
+            msvcrt.locking(lf.fileno(), msvcrt.LK_LOCK, 1)
+            try:
+                yield
+            finally:
+                lf.seek(0)
+                msvcrt.locking(lf.fileno(), msvcrt.LK_UNLCK, 1)
+else:
+    import fcntl
+
+    @contextmanager
+    def _locked(lockfile: Path):
+        with open(lockfile, "w") as lf:
+            fcntl.flock(lf, fcntl.LOCK_EX)
+            yield
 
 __all__ = ["FlightRecorder", "canonical_hash", "GENESIS", "FLIGHT_DIR"]
 
@@ -98,8 +120,7 @@ class FlightRecorder:
     def _append(self, body: dict) -> None:
         try:
             self._dir.mkdir(parents=True, exist_ok=True)
-            with open(self._dir / ".lock", "w") as lf:
-                fcntl.flock(lf, fcntl.LOCK_EX)
+            with _locked(self._dir / ".lock"):
                 seg, prev, seq = self._tail()
                 entry = {
                     "seq": seq + 1,
