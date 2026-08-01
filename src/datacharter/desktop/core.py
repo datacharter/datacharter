@@ -63,6 +63,8 @@ class ServerHandle:
         self._thread: threading.Thread | None = None
         self.port: int | None = None
         self.workspace: Path | None = None
+        #: Exception message if the server thread died (surfaced by --smoke).
+        self.error: str | None = None
 
     @property
     def url(self) -> str:
@@ -76,16 +78,30 @@ class ServerHandle:
         self.workspace = Path(workspace)
         self.port = find_free_port()
         app = create_app(self.workspace, host="127.0.0.1", port=self.port)
-        config = uvicorn.Config(app, host="127.0.0.1", port=self.port, log_level="warning")
+        # log_config=None: uvicorn's default logging probes stdio (isatty), which
+        # windowed/frozen builds don't have — the thread would die silently.
+        config = uvicorn.Config(
+            app, host="127.0.0.1", port=self.port,
+            log_level="warning", log_config=None, access_log=False,
+        )
         self._server = uvicorn.Server(config)
         self._server.install_signal_handlers = lambda: None  # GUI owns signals
-        self._thread = threading.Thread(target=self._server.run, daemon=True)
+
+        def _run() -> None:
+            try:
+                self._server.run()
+            except Exception as exc:  # surfaced by wait_ready/--smoke
+                self.error = f"{type(exc).__name__}: {exc}"
+
+        self._thread = threading.Thread(target=_run, daemon=True)
         self._thread.start()
         return self.port
 
     def wait_ready(self, timeout_s: float = 30.0) -> bool:
         deadline = time.monotonic() + timeout_s
         while time.monotonic() < deadline:
+            if self.error is not None:
+                return False
             try:
                 r = httpx.get(f"{self.url}/api/health", timeout=2.0)
                 if r.status_code == 200:

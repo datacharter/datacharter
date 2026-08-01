@@ -67,7 +67,8 @@ def main(argv: list[str] | None = None) -> int:
         handle.start(ws)
         ok = handle.wait_ready()
         handle.stop()
-        _say("smoke OK" if ok else "smoke FAILED")
+        detail = f" ({handle.error})" if handle.error else ""
+        _say(("smoke OK" if ok else "smoke FAILED") + detail)
         return 0 if ok else 1
 
     try:
