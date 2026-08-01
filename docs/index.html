@@ -66,7 +66,7 @@
 
   /* nav */
   .nav-outer { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--paper) 86%, transparent); backdrop-filter: blur(10px) saturate(140%); border-bottom: 1px solid var(--line); }
-  .nav { display: flex; align-items: center; gap: 22px; height: 62px; }
+  .nav { display: flex; align-items: center; gap: 18px; height: 62px; }
   .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.06rem; letter-spacing: -0.01em; color: var(--ink); }
   .brand:hover { text-decoration: none; }
   .brand svg { width: 26px; height: 26px; }
@@ -75,7 +75,7 @@
   .nav a.nl:hover { color: var(--ink); text-decoration: none; }
   .nav a.gh { color: var(--ink); font-weight: 600; font-size: 0.93rem; }
   .dd { position: relative; }
-  .dd summary { list-style: none; cursor: pointer; color: var(--muted); font-size: 0.93rem; font-weight: 500; }
+  .dd summary { list-style: none; cursor: pointer; color: var(--muted); font-size: 0.93rem; font-weight: 500; white-space: nowrap; }
   .dd summary::-webkit-details-marker { display: none; }
   .dd summary::after { content: " \25BE"; font-size: 0.7em; }
   .dd summary:hover, .dd[open] summary { color: var(--ink); }
@@ -97,6 +97,18 @@
   h1 em { font-style: italic; color: var(--charter); font-weight: 500; }
   .lede { font-size: 1.11rem; color: var(--muted); max-width: 46ch; margin: 0 0 30px; }
   .lede b { color: var(--ink); font-weight: 600; }
+  .nav a.nl-dl {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px;
+    color: var(--ink); font-size: 0.88rem; font-weight: 600; white-space: nowrap;
+  }
+  .nav a.nl-dl:hover { border-color: var(--charter); color: var(--charter); text-decoration: none; }
+  .nav a.nl-dl svg { width: 15px; height: 15px; }
+  .dl-beta {
+    font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 0 5px;
+  }
+  .nav a.nl-dl:hover .dl-beta { color: var(--charter); border-color: currentColor; }
   .inst a.dl { color: var(--accent, #3B82C4); font-weight: 600; font-size: 0.92rem; }
   .inst .lab em { font-style: normal; font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.75; border: 1px solid currentColor; border-radius: 999px; padding: 1px 6px; margin-left: 6px; }
   .gov-body, .gov-scroll { overflow-x: auto; }
@@ -292,6 +304,7 @@
     .nav { flex-wrap: wrap; height: auto; gap: 9px 14px; padding-top: 10px; padding-bottom: 12px; }
     .nav-spacer { flex-basis: 100%; height: 0; }
     .nav a.nl, .nav .dd summary, .nav a.gh { font-size: 0.86rem; }
+    .nav a.nl-dl { font-size: 0.82rem; padding: 5px 10px; }
     .dd-menu { min-width: 190px; max-height: 70vh; overflow-y: auto; }
     .gov-sql { font-size: 0.72rem; }
     .grid th, .grid td { padding: 8px 10px; }
@@ -315,9 +328,9 @@
     <a class="nl" href="#govern">Govern</a>
     <a class="nl" href="#agents">Agents</a>
     <a class="nl" href="#install">Install</a>
-    <a class="nl" href="desktop.html">Desktop</a>
     <a class="nl" href="blog/">Blog</a>
     <a class="nl" href="quickstart.html">Docs</a>
+    <a class="nl" href="desktop.html">Desktop</a>
     <details class="dd">
       <summary aria-label="Featured in">Featured in</summary>
       <div class="dd-menu">
@@ -332,6 +345,10 @@
       </div>
     </details>
     <a class="nl" href="#about">About</a>
+    <a class="nl-dl" href="https://github.com/datacharter/datacharter/releases/latest" title="Desktop app for macOS and Windows (beta)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Download<span class="dl-beta">beta</span>
+    </a>
     <a class="gh" href="https://github.com/datacharter/datacharter">GitHub</a>
   </div>
 </div>
