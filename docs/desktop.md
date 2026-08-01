@@ -12,6 +12,9 @@ the explorer, guides, evals, audit, the governed agent surface.
 
 ![The DataCharter desktop app](assets/desktop-app.png)
 
+![DataCharter running on Windows 11](assets/desktop-app-windows.png)
+*The Windows build, captured automatically on every release by CI.*
+
 ## Download (beta)
 
 Grab the artifact for your platform from the
