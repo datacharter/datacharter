@@ -53,6 +53,39 @@ metrics:
     dimensions: [customer_id]
 """
 
+TOUR_CHARTER = """\
+# DataCharter demo workspace. Run: datacharter serve
+version: 1
+
+# One contract, many tables: the `store` database groups customers and orders,
+# so the sidebar reads store -> table -> columns.
+sources:
+  store:
+    type: sqlite
+    path: demo/store.db
+    pii:
+      customers: [email]
+    context:
+      customers: "One row per customer. tier is their plan; email is PII."
+
+# Plain-english policy: agents may only aggregate customers, and any group
+# smaller than 2 is suppressed. Your own SQL in the editor is unaffected.
+policies:
+  store.customers:
+    - aggregates only
+    - groups of at least 2
+
+# Tripwires: synthetic honeytokens that alarm if masking ever fails.
+canary: on
+
+# A governed metric. Try: datacharter metric revenue
+metrics:
+  revenue:
+    relation: store.orders
+    expression: round(sum(total), 2)
+    dimensions: [customer_id]
+"""
+
 ENV_EXAMPLE = """\
 # Copy to .env and fill in real values. .env is gitignored.
 # EXAMPLE_DB_PASSWORD=change-me
@@ -81,7 +114,8 @@ def _cmd_init(args: argparse.Namespace) -> int:
         print(f"charter.yaml already exists in {ws} (use --force to overwrite).")
         return 1
 
-    charter.write_text(DEMO_CHARTER if args.demo else CHARTER_TEMPLATE)
+    tour = args.demo and getattr(args, "tour", False)
+    charter.write_text((TOUR_CHARTER if tour else DEMO_CHARTER) if args.demo else CHARTER_TEMPLATE)
     (ws / ".env.example").write_text(ENV_EXAMPLE)
     (ws / "queries").mkdir(exist_ok=True)
     (ws / "guides").mkdir(exist_ok=True)
@@ -90,7 +124,7 @@ def _cmd_init(args: argparse.Namespace) -> int:
         guide.write_text(GUIDE_TEMPLATE)
     _ensure_gitignore(ws)
     if args.demo:
-        write_demo_data(ws)
+        write_demo_data(ws, seed_tour=tour)
     print(f"Workspace initialized in {ws}.")
     if args.demo:
         print("Demo data in demo/ — try: datacharter serve")
@@ -113,8 +147,8 @@ def _resolve_serve_workspace(directory: str) -> Path:
     import tempfile
 
     demo_ws = Path(tempfile.mkdtemp(prefix="datacharter-demo-"))
-    (demo_ws / "charter.yaml").write_text(DEMO_CHARTER)
-    write_demo_data(demo_ws)
+    (demo_ws / "charter.yaml").write_text(TOUR_CHARTER)
+    write_demo_data(demo_ws, seed_tour=True)
     print(f"No charter.yaml in {ws} — serving an ephemeral demo workspace ({demo_ws}).")
     print("Run `datacharter init` here to start a real workspace.")
     return demo_ws
@@ -985,6 +1019,10 @@ def main(argv: list[str] | None = None) -> int:
     p_init.add_argument("directory", nargs="?", default=".")
     p_init.add_argument("--demo", action="store_true", help="Include a generated demo dataset")
     p_init.add_argument("--force", action="store_true", help="Overwrite an existing charter.yaml")
+    p_init.add_argument(
+        "--tour", action="store_true",
+        help="With --demo: include guides, evals, a policy, and a seeded audit chain",
+    )
     p_init.set_defaults(func=_cmd_init)
 
     p_serve = sub.add_parser("serve", help="Start the local server")
