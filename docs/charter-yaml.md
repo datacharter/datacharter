@@ -3,7 +3,7 @@ title: charter.yaml reference
 description: Every field of a source contract, plus how credentials resolve.
 ---
 
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
+[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
 `charter.yaml` is the heart of a workspace. It describes your sources the way a
 data contract does: connection shape, which tables to expose, and which columns
@@ -208,6 +208,21 @@ agent's system context; MCP clients receive it through the protocol's
 `initialize` `instructions` field. HTML comments in guides are stripped and
 never reach the model. Guides are trusted contract content: version them,
 review them in PRs, and they travel with the workspace. See [Agent evals](evals.html) to measure the lift your guides provide. Run `datacharter scan` (or `--strict` in CI) to catch literal PII accidentally pasted into a guide — agents read that text, so it never passes through column masking.
+
+## `policies` (plain English, enforced)
+
+Per-relation rules for the agent surface — sentences or structured keys:
+
+```yaml
+policies:
+  crm.customers:
+    - aggregates only          # no raw rows, DISTINCT, CTEs, or set ops
+    - groups of at least 10    # k-anonymity: smaller groups are suppressed
+    - no joins to payments     # may not be queried together with payments
+```
+
+See [Policies](policies.html) for exact semantics. Unrecognized sentences are a
+load error; enforcement fails closed.
 
 ## Metrics
 

@@ -3,7 +3,7 @@ title: FAQ
 description: Telemetry, offline use, model choice, and how DataCharter compares.
 ---
 
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
+[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
 ## Does DataCharter collect any telemetry?
 
@@ -110,6 +110,14 @@ Not from scratch. `datacharter suggest` mines your recent query history for
 repeated habits (filters you always apply, tables you always join) and turns
 them into guide suggestions with evidence — accept them in the CLI (`--apply`)
 or one-click in the Guides editor. Deterministic and offline; no model needed.
+
+## Can I stop an agent from ever seeing individual rows?
+
+Yes — [policies](policies.html): `aggregates only` restricts a relation to
+aggregate queries, `groups of at least k` suppresses any group smaller than k
+(the clean-room control), and `no joins to …` blocks re-identification via
+joins. Written in plain English in the charter, compiled deterministically,
+enforced fail-closed at the agent surface.
 
 ## How does it compare to other tools?
 

@@ -34,6 +34,7 @@ actually means 👇
 - **Measure the lift.** `datacharter eval --compare-guides` scores the agent on questions you write and shows how much your guides moved accuracy — locally, and as a CI gate. See [Agent evals](https://datacharter.dev/evals.html).
 - **Prove it happened.** A tamper-evident [flight recorder](https://datacharter.dev/audit.html) logs every agent access — dual attribution, masked columns, hash-chained — with `datacharter audit verify` and one-command evidence packs.
 - **Know the moment it fails.** Opt-in [canary tripwires](https://datacharter.dev/audit.html) plant masked honeytokens; if one ever escapes to agent output, you get a tamper-evident alarm — and block mode withholds the response.
+- **Clean-room math, one YAML line.** [Policies](https://datacharter.dev/policies.html) like `aggregates only` and `groups of at least 10` are enforced by query analysis — k-anonymity suppression and join limits, written in plain English.
 - Don't take our word for it: flip on **Agent view** and see, column by column, exactly what your agent gets back when it runs a query. *(Spoiler: the PII comes back `•••`.)*
 
 ## Wait, there's more!

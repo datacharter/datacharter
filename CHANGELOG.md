@@ -5,6 +5,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-08-01
+
+### Added
+- **Plain-English policies, enforced.** A `policies:` block per relation —
+  sentences (`aggregates only` · `groups of at least 10` · `no joins` ·
+  `no joins to a, b`) or equivalent structured keys, compiled deterministically
+  (unrecognized sentences are a load error). Enforced on the agent surface by
+  DuckDB-parser analysis, fail-closed: aggregate-only certification (raw rows,
+  DISTINCT, CTEs, set ops refused), k-anonymity group suppression (rewritten
+  with a count guard computed after row-level security; suppressed groups noted
+  in a result warning; strictest k wins), and queried-together join limits.
+  `describe_table` surfaces a relation's policies so agents comply first try.
+  The example workspace's `crm` table now ships policied.
+
 ### Fixed
 - **Windows: the audit module crashed the server on import** (POSIX-only `fcntl`
   locking, shipped in 0.14.0/0.15.0) — file locking is now portable (`msvcrt` on

@@ -24,6 +24,11 @@ sources:
     row_filters:
       sales: "refunded = false"       # agents only see un-refunded orders
 
+policies:
+  crm:
+    - aggregates only
+    - groups of at least 2
+
 tests:
   order_id_unique:  { type: unique, relation: sales, columns: [order_id] }
   amount_nonneg:    { type: expression, relation: sales, expression: "amount >= 0" }
