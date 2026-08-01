@@ -65,6 +65,38 @@ jobs:
           "$BIN" --smoke --demo
           echo "smoke passed on ${{ matrix.label }}"
 
+      - name: Window proof (launch the real GUI, assert the window, screenshot)
+        if: matrix.kind == 'zip'
+        shell: powershell
+        run: |
+          Start-Process -FilePath "desktop\dist\DataCharter.exe" -ArgumentList "--demo"
+          $deadline = (Get-Date).AddSeconds(120)
+          $title = ""
+          while ((Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 3
+            $p = Get-Process DataCharter -ErrorAction SilentlyContinue
+            if ($p -and $p.MainWindowTitle) { $title = $p.MainWindowTitle; break }
+          }
+          Write-Host "MainWindowTitle: '$title'"
+          Start-Sleep -Seconds 8   # let WebView2 finish painting the UI
+          Add-Type -AssemblyName System.Windows.Forms
+          Add-Type -AssemblyName System.Drawing
+          $vs = [System.Windows.Forms.SystemInformation]::VirtualScreen
+          $bmp = New-Object System.Drawing.Bitmap $vs.Width, $vs.Height
+          $g = [System.Drawing.Graphics]::FromImage($bmp)
+          $g.CopyFromScreen($vs.Location, [System.Drawing.Point]::Empty, $vs.Size)
+          $bmp.Save("$env:GITHUB_WORKSPACE\windows-app-screenshot.png")
+          Stop-Process -Name DataCharter -Force -ErrorAction SilentlyContinue
+          if (-not $title) { Write-Error "No app window ever appeared"; exit 1 }
+
+      - name: Upload window screenshot
+        if: always() && matrix.kind == 'zip'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-app-screenshot
+          path: windows-app-screenshot.png
+          if-no-files-found: ignore
+
       - name: Package
         shell: bash
         run: |
