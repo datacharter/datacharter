@@ -104,6 +104,13 @@ Yes — the [desktop app (beta)](desktop.html): a native macOS/Windows applicati
 wrapping the same local server. Pick a workspace folder and go; every governance
 layer applies identically. Downloads are on the latest GitHub release.
 
+## Do I have to write the guides myself?
+
+Not from scratch. `datacharter suggest` mines your recent query history for
+repeated habits (filters you always apply, tables you always join) and turns
+them into guide suggestions with evidence — accept them in the CLI (`--apply`)
+or one-click in the Guides editor. Deterministic and offline; no model needed.
+
 ## How does it compare to other tools?
 
 At a high level, and without disparaging any of them (they are good tools):

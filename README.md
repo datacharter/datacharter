@@ -30,6 +30,7 @@ actually means 👇
 - Grant or deny access in the UI *or* right in your data contracts, at every level: whole **sources** → individual **tables** → individual **columns**
 - **PII is auto-detected and defaulted to *no agent access*** — override per field if you really mean to
 - **Teach it your data's quirks.** Markdown guides in `guides/*.md` ("revenue is net of refunds", "exclude QA accounts") reach every agent — chat, Claude Code, and MCP clients alike. Start from the [end-to-end example](examples/ecommerce).
+- **Or let the guide write itself.** `datacharter suggest` mines your query history for the habits you repeat and turns them into guide lines — with evidence, offline, no model required.
 - **Measure the lift.** `datacharter eval --compare-guides` scores the agent on questions you write and shows how much your guides moved accuracy — locally, and as a CI gate. See [Agent evals](https://datacharter.dev/evals.html).
 - **Prove it happened.** A tamper-evident [flight recorder](https://datacharter.dev/audit.html) logs every agent access — dual attribution, masked columns, hash-chained — with `datacharter audit verify` and one-command evidence packs.
 - **Know the moment it fails.** Opt-in [canary tripwires](https://datacharter.dev/audit.html) plant masked honeytokens; if one ever escapes to agent output, you get a tamper-evident alarm — and block mode withholds the response.

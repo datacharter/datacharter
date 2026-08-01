@@ -81,6 +81,11 @@ writing a query. See the end-to-end
 [example workspace](https://github.com/datacharter/datacharter/tree/main/examples/ecommerce)
 for a working guide.
 
+And you don't have to write guides from scratch: `datacharter suggest` mines
+your query history for the habits you repeat ("14 of 20 queries on `sales`
+filter `refunded = false`") and turns them into one-click guide lines — also
+surfaced in the Guides editor in the browser.
+
 ## How the agent works
 
 The agent runs a short tool loop over a small set of **read-only** tools:

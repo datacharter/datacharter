@@ -5,6 +5,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-08-03
+
+### Added
+- **Self-writing guides.** `datacharter suggest` mines the workspace query
+  history for repeated habits — recurring WHERE predicates per relation and
+  tables that are always queried together — and turns them into guide
+  suggestions with evidence counts. `--apply` appends them to
+  `guides/suggested.md`; the Guides editor shows the same suggestions with
+  one-click Add. Parsing is done by DuckDB itself (`json_serialize_sql`), so
+  the whole loop is deterministic and offline. Suggestions dedupe against
+  guides you have already written.
+- `GET /api/guides/suggestions`.
+
 ## [0.16.0] - 2026-08-02
 
 ### Added
