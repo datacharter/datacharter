@@ -5,6 +5,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-08-01
+
+### Added
+- **Flight recorder: tamper-evident audit of agent data access.** Every tool call
+  from every agent surface (chat, MCP clients, Claude Code) is recorded to an
+  append-only, SHA-256 hash-chained log under `.datacharter/flight/` — dual
+  attribution (OS user + MCP `clientInfo`/model), SQL, relations, masked columns,
+  row counts, and a hash of the exact masked result. Metadata and hashes only;
+  never raw rows. On by default; `audit: off` in `charter.yaml` disables.
+- `datacharter audit` (recent sessions), `audit verify` (walks the chain; names
+  the exact broken entry; nonzero exit), and `audit export` (evidence-pack zip:
+  entries + verification statement + charter-in-force + summary).
+- Server endpoints `GET /api/audit` and `GET /api/audit/verify`, and an **Audit**
+  panel in the UI — session timeline with a live chain-verified badge.
+
 ## [0.13.0] - 2026-07-29
 
 ### Added

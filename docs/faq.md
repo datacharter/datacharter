@@ -3,7 +3,7 @@ title: FAQ
 description: Telemetry, offline use, model choice, and how DataCharter compares.
 ---
 
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Evals](evals.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
+[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
 ## Does DataCharter collect any telemetry?
 
@@ -82,6 +82,14 @@ from the [example workspace](https://github.com/datacharter/datacharter/tree/mai
 ## How do I know the agent is getting my data right?
 
 Write an [eval suite](evals.html). `evals/*.yaml` holds the questions you ask plus assertions on what a correct answer must contain; `datacharter eval` scores the agent against them, `--compare-guides` shows how much your guides help, and `--threshold` turns it into a CI gate. Runs persist locally so you can watch the trend and catch regressions.
+
+## How do I prove what an agent actually saw?
+
+The [flight recorder](audit.html). Every agent data access is logged with dual
+attribution (OS user + the MCP client or model), hash-chained so edits and
+deletions are detectable, and exportable as an evidence pack. `datacharter
+audit verify` walks the chain; the Audit panel shows the timeline. Metadata and
+hashes only — the log never stores raw rows.
 
 ## How does it compare to other tools?
 
