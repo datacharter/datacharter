@@ -36,10 +36,12 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "ruff>=0.6"]
+desktop = ["pywebview>=5.0"]
 snowflake = ["snowflake-connector-python>=3.12"]
 
 [project.scripts]
 datacharter = "datacharter.cli:main"
+datacharter-desktop = "datacharter.desktop:main"
 
 [project.urls]
 Homepage = "https://github.com/datacharter/datacharter"
