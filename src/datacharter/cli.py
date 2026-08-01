@@ -236,12 +236,14 @@ def _cmd_mcp(args: argparse.Namespace) -> int:
         print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
         return 1
     from datacharter.audit import FlightRecorder
+    from datacharter.audit.canary import ensure_canaries
 
     charter = load_charter(ws)
     engine = _open_engine(ws, charter.sources)
     toolbox = ToolBox(
         engine, charter.sources, guides=charter.guides,
         recorder=FlightRecorder(ws, enabled=charter.audit_enabled),
+        canary=ensure_canaries(ws, engine, charter.canary_mode),
     )
     # stdout is the MCP protocol channel; diagnostics go to stderr.
     print(f"datacharter MCP server on stdio ({ws})", file=sys.stderr)
@@ -762,6 +764,66 @@ def _cmd_audit(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_canary(args: argparse.Namespace) -> int:
+    from datacharter.audit import FlightRecorder
+    from datacharter.audit.canary import ensure_canaries
+    from datacharter.contracts import load_charter
+
+    action = None
+    directory = "."
+    for tok in args.tokens:
+        if tok in ("drill", "status") and action is None:
+            action = None if tok == "status" else tok
+        else:
+            directory = tok
+    ws = Path(directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+    charter = load_charter(ws)
+
+    if charter.canary_mode is None:
+        print(
+            "Canary tripwires: DISABLED.\n"
+            "  Canaries plant synthetic honeytokens in a masked local table\n"
+            "  (local.canaries). If a token ever appears in agent output, masking\n"
+            "  provably failed — an alarm lands in the audit chain.\n"
+            "  Enable with `canary: on` (block mode) or `canary: {mode: log}`\n"
+            "  in charter.yaml."
+        )
+        return 1 if action == "drill" else 0
+
+    engine = _open_engine(ws, charter.sources)
+    try:
+        guard = ensure_canaries(ws, engine, charter.canary_mode)
+    finally:
+        engine.close()
+    if guard is None:
+        print("Canary planting failed — check the workspace state.", file=sys.stderr)
+        return 1
+
+    if action == "drill":
+        recorder = FlightRecorder(ws, enabled=charter.audit_enabled)
+        recorder.start_session("drill", question="canary drill (deliberate tripwire test)")
+        fake_result = (
+            '{"columns": ["email"], "rows": [["' + guard.tokens[0]
+            + '@tripwire.invalid"]], "row_count": 1, "truncated": false}'
+        )
+        hit = guard.scan(fake_result)
+        if hit is None:
+            print("Drill FAILED: guard did not detect its own token.", file=sys.stderr)
+            return 1
+        recorder.record_alarm("query", '{"sql": "-- canary drill"}', hit)
+        blocked = " (block mode would withhold the response)" if guard.mode == "block" else ""
+        print(f"Drill OK: token detected and alarm recorded in the audit chain{blocked}.")
+        print("See it with: datacharter audit " + (directory if directory != "." else ""))
+        return 0
+
+    print(f"Canary tripwires: ARMED ({guard.mode} mode), {len(guard.tokens)} tokens "
+          f"planted in local.canaries.")
+    return 0
+
+
 def _cmd_eval(args: argparse.Namespace) -> int:
     import asyncio
 
@@ -1026,6 +1088,17 @@ def main(argv: list[str] | None = None) -> int:
     p_audit.add_argument("--until", help="ISO timestamp upper bound (export)")
     p_audit.add_argument("--out", help="Output zip path (export)")
     p_audit.set_defaults(func=_cmd_audit)
+
+    p_canary = sub.add_parser(
+        "canary",
+        help="Canary tripwire status, or `drill` to test the alarm path",
+        description="Usage: datacharter canary [WORKSPACE] [status|drill]",
+    )
+    p_canary.add_argument(
+        "tokens", nargs="*",
+        help="Optional workspace path and/or action (status, drill) in either order",
+    )
+    p_canary.set_defaults(func=_cmd_canary)
 
     p_eval = sub.add_parser(
         "eval", help="Run agent eval suites (evals/*.yaml) and score answers"

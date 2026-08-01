@@ -169,12 +169,14 @@ def create_app(
         except Exception:  # detection must never break serving
             app.state.auto_pii = set()
         from datacharter.audit import FlightRecorder
+        from datacharter.audit.canary import ensure_canaries
 
         app.state.recorder = FlightRecorder(workspace, enabled=loaded.audit_enabled)
+        app.state.canary = ensure_canaries(workspace, engine, loaded.canary_mode)
         app.state.toolbox = ToolBox(
             engine, loaded.sources, auto_pii=app.state.auto_pii,
             local_access=loaded.local_access, guides=loaded.guides,
-            recorder=app.state.recorder,
+            recorder=app.state.recorder, canary=app.state.canary,
         )
         try:
             yield
@@ -228,10 +230,16 @@ def create_app(
     def _refresh_charter() -> None:
         # Re-read the contract so the catalog/PII map + agent-access reflect an edit.
         app.state.charter = load_charter(workspace)
+        from datacharter.audit.canary import ensure_canaries
+
+        app.state.canary = ensure_canaries(
+            workspace, app.state.engine, app.state.charter.canary_mode
+        )
         app.state.toolbox = ToolBox(
             app.state.engine, app.state.charter.sources,
             auto_pii=app.state.auto_pii, local_access=app.state.charter.local_access,
             guides=app.state.charter.guides, recorder=app.state.recorder,
+            canary=app.state.canary,
         )
 
     def _require_local():
@@ -278,6 +286,11 @@ def create_app(
         entries = read_entries(workspace)[-500:]
         sessions = [e for e in entries if e.get("type") == "session"]
         return {"sessions": sessions, "entries": entries}
+
+    @app.get("/api/canary")
+    async def canary_status() -> dict:
+        guard = getattr(app.state, "canary", None)
+        return {"armed": guard is not None, "mode": getattr(guard, "mode", None)}
 
     @app.get("/api/audit/verify")
     async def audit_verify() -> dict:
