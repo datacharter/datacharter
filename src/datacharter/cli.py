@@ -701,6 +701,67 @@ def _cmd_test(args: argparse.Namespace) -> int:
     return 1 if failures else 0
 
 
+def _cmd_audit(args: argparse.Namespace) -> int:
+    from datacharter.audit.evidence import export_pack, read_entries, verify_chain
+
+    action = None
+    directory = "."
+    for tok in args.tokens:
+        if tok in ("verify", "export", "show") and action is None:
+            action = None if tok == "show" else tok
+        else:
+            directory = tok
+    ws = Path(directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+    if action == "verify":
+        ok, n, detail = verify_chain(ws)
+        if ok:
+            print(f"{detail} ✓")
+            return 0
+        print(detail, file=sys.stderr)
+        return 1
+
+    if action == "export":
+        from datetime import UTC, datetime
+
+        out = Path(args.out) if args.out else ws / (
+            f"audit-evidence-{datetime.now(UTC).strftime('%Y%m%dT%H%M%S')}.zip"
+        )
+        path = export_pack(ws, out, since=args.since, until=args.until)
+        print(f"Evidence pack written: {path}")
+        return 0
+
+    # default: show recent sessions with access summaries
+    entries = read_entries(ws)
+    if not entries:
+        print("No audit entries yet. Agent access is recorded automatically.")
+        return 0
+    sessions: dict[str, dict] = {}
+    order: list[str] = []
+    for e in entries:
+        if e["type"] == "session":
+            sessions[e["session"]] = {"meta": e, "accesses": 0, "errors": 0, "last": e["ts"]}
+            order.append(e["session"])
+        elif e["type"] == "access" and e.get("session") in sessions:
+            s = sessions[e["session"]]
+            s["accesses"] += 1
+            s["errors"] += 1 if e.get("error") else 0
+            s["last"] = e["ts"]
+    ok, n, detail = verify_chain(ws)
+    print(f"Audit log: {detail}" + (" ✓" if ok else "  ⚠ BROKEN"))
+    for sid in reversed(order[-20:]):
+        s = sessions[sid]
+        m = s["meta"]
+        who = (m.get("client") or {}).get("name") or m.get("model") or m["surface"]
+        q = f'  "{m["question"]}"' if m.get("question") else ""
+        err = f"  ({s['errors']} errors)" if s["errors"] else ""
+        print(f"  {m['ts'][:16]}  [{m['surface']}] {who} · {m['user']} · "
+              f"{s['accesses']} accesses{err}{q}")
+    return 0
+
+
 def _cmd_eval(args: argparse.Namespace) -> int:
     import asyncio
 
@@ -951,6 +1012,20 @@ def main(argv: list[str] | None = None) -> int:
     p_test.add_argument("directory", nargs="?", default=".")
     p_test.add_argument("--select", help="Run only the named test")
     p_test.set_defaults(func=_cmd_test)
+
+    p_audit = sub.add_parser(
+        "audit",
+        help="Show, verify, or export the agent data-access audit log",
+        description="Usage: datacharter audit [WORKSPACE] [verify|export]",
+    )
+    p_audit.add_argument(
+        "tokens", nargs="*",
+        help="Optional workspace path and/or action (verify, export) in either order",
+    )
+    p_audit.add_argument("--since", help="ISO timestamp lower bound (export)")
+    p_audit.add_argument("--until", help="ISO timestamp upper bound (export)")
+    p_audit.add_argument("--out", help="Output zip path (export)")
+    p_audit.set_defaults(func=_cmd_audit)
 
     p_eval = sub.add_parser(
         "eval", help="Run agent eval suites (evals/*.yaml) and score answers"
