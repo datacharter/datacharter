@@ -20,8 +20,10 @@ Grab the artifact for your platform from the
 | Platform | File |
 |---|---|
 | macOS (Apple Silicon) | `DataCharter-<version>-macos-arm64.dmg` |
-| macOS (Intel) | `DataCharter-<version>-macos-intel.dmg` |
 | Windows 10/11 | `DataCharter-<version>-windows-x64.zip` |
+
+Intel Macs: use `brew install datacharter/tap/datacharter` or `uvx datacharter` —
+GitHub retired free Intel macOS runners, so we don't ship an Intel build.
 
 The app remembers your last workspace and keeps a **Workspace ▸ Recents** menu.
 `brew install datacharter/tap/datacharter` and `uvx datacharter` remain the

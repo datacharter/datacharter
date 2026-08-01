@@ -65,7 +65,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.smoke:
         ws = _resolve_initial(args) or _demo_workspace()
         handle.start(ws)
-        ok = handle.wait_ready()
+        ok = handle.wait_ready(timeout_s=120)  # cold CI runners: exe extract + duckdb ext fetch
         handle.stop()
         detail = f" ({handle.error})" if handle.error else ""
         _say(("smoke OK" if ok else "smoke FAILED") + detail)
