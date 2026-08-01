@@ -104,6 +104,8 @@
   h1 em { font-style: italic; color: var(--charter); font-weight: 500; }
   .lede { font-size: 1.11rem; color: var(--muted); max-width: 46ch; margin: 0 0 30px; }
   .lede b { color: var(--ink); font-weight: 600; }
+  .inst a.dl { color: var(--accent, #3B82C4); font-weight: 600; font-size: 0.92rem; }
+  .inst .lab em { font-style: normal; font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.75; border: 1px solid currentColor; border-radius: 999px; padding: 1px 6px; margin-left: 6px; }
   .cta-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; margin-bottom: 18px; }
   .cmd {
     display: inline-flex; align-items: center; gap: 14px;
@@ -314,6 +316,7 @@
     <a class="nl" href="#govern">Govern</a>
     <a class="nl" href="#agents">Agents</a>
     <a class="nl" href="#install">Install</a>
+    <a class="nl" href="desktop.html">Desktop</a>
     <a class="nl" href="blog/">Blog</a>
     <a class="nl" href="quickstart.html">Docs</a>
     <details class="dd">
@@ -337,6 +340,7 @@
         <a href="#govern">Govern</a>
         <a href="#agents">Agents</a>
         <a href="#install">Install</a>
+        <a href="/desktop.html">Desktop app</a>
         <a href="/blog/">Blog</a>
         <a href="/quickstart.html">Docs</a>
         <a href="#about">About</a>
@@ -532,6 +536,7 @@
       <div class="inst"><span class="lab">Try it · no install</span><code>uvx datacharter serve</code></div>
       <div class="inst"><span class="lab">macOS · Homebrew</span><code>brew install datacharter/tap/datacharter</code></div>
       <div class="inst"><span class="lab">Everywhere · pip</span><code>pip install datacharter</code></div>
+      <div class="inst"><span class="lab">No terminal · desktop app <em>beta</em></span><a class="dl" href="https://github.com/datacharter/datacharter/releases/latest">Download for macOS or Windows →</a></div>
     </div>
     <p class="fine">Then <code class="i">datacharter init</code> scaffolds <code class="i">charter.yaml</code> + <code class="i">queries/</code>. Commit it, clone it, <code class="i">serve</code> it. The whole environment travels as a repo; secrets never do. <a href="quickstart.html">Read the quick start →</a></p>
   </div>

@@ -56,6 +56,9 @@ Beyond local federation and governed agent access, you also get:
 
 ## Quick start
 
+> **No terminal? [Download the desktop app](https://github.com/datacharter/datacharter/releases/latest)** (beta) for macOS or Windows — the same governed explorer in a native window. [Desktop docs](https://datacharter.dev/desktop.html).
+
+
 ```sh
 # Try it instantly on generated demo data — no install, no config:
 uvx datacharter serve          # needs `uv` → https://astral.sh/uv
