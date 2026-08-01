@@ -1,0 +1,92 @@
+# Desktop app matrix: macOS .dmg (arm64 + intel) and Windows .exe (zipped),
+# attached to the triggering release. Independent of release.yml — a desktop
+# build failure must never block the PyPI release.
+#
+# Unsigned beta. Code-signing/notarization steps are intentionally dormant:
+# when APPLE_CERT_P12 / notary secrets exist, add the signing steps here —
+# enrollment is a config change, not a build change.
+name: desktop
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to attach artifacts to (e.g. v0.15.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            label: macos-arm64
+            kind: dmg
+          - os: macos-13
+            label: macos-intel
+            kind: dmg
+          - os: windows-latest
+            label: windows-x64
+            kind: zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Release event: build the tagged code. Dispatch: build the current
+          # branch (lets us attach beta artifacts to an older tag).
+          ref: ${{ github.event.release.tag_name || github.ref }}
+
+      - uses: astral-sh/setup-uv@v7
+
+      - name: Install
+        shell: bash
+        run: |
+          uv venv .buildenv --python 3.12
+          uv pip install --python .buildenv/bin/python ".[desktop]" pyinstaller 2>/dev/null \
+            || uv pip install --python .buildenv/Scripts/python.exe ".[desktop]" pyinstaller
+
+      - name: Build
+        shell: bash
+        run: |
+          PYI=.buildenv/bin/pyinstaller; [ -f "$PYI" ] || PYI=.buildenv/Scripts/pyinstaller.exe
+          "$PYI" desktop/datacharter.spec --workpath desktop/build --distpath desktop/dist -y
+
+      - name: Smoke (headless server + health check)
+        shell: bash
+        run: |
+          if [ "${{ matrix.kind }}" = "dmg" ]; then
+            BIN="desktop/dist/DataCharter.app/Contents/MacOS/DataCharter"
+          else
+            BIN="desktop/dist/DataCharter.exe"
+          fi
+          "$BIN" --smoke --demo
+          echo "smoke passed on ${{ matrix.label }}"
+
+      - name: Package
+        shell: bash
+        run: |
+          TAG="${{ github.event.release.tag_name || github.event.inputs.tag }}"
+          VER="${TAG#v}"
+          mkdir -p out
+          if [ "${{ matrix.kind }}" = "dmg" ]; then
+            hdiutil create -volname "DataCharter" \
+              -srcfolder desktop/dist/DataCharter.app \
+              -ov -format UDZO "out/DataCharter-${VER}-${{ matrix.label }}.dmg"
+          else
+            7z a "out/DataCharter-${VER}-${{ matrix.label }}.zip" ./desktop/dist/DataCharter.exe
+          fi
+          ls -la out/
+
+      - name: Attach to release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ github.event.release.tag_name || github.event.inputs.tag }}"
+          gh release upload "$TAG" out/* --clobber
