@@ -76,11 +76,14 @@ class ToolBox:
         auto_pii: set[str] | None = None,
         local_access: dict | None = None,
         guides: str = "",
+        recorder=None,
         timeout_s: float = _DEFAULT_TIMEOUT_S,
     ) -> None:
         self._engine = engine
         #: Workspace guides (guides/*.md) — read by the agent loop and the MCP server.
         self.guides = guides
+        #: Flight recorder (audit) — every run() call is recorded when set.
+        self.recorder = recorder
         # Column names flagged PII in any source's contract, matched case-insensitively.
         self._pii: set[str] = set()
         for src in sources:
@@ -112,6 +115,12 @@ class ToolBox:
         self._timeout_s = timeout_s
 
     async def run(self, name: str, arguments: str) -> str:
+        out = await self._dispatch(name, arguments)
+        if self.recorder is not None:
+            self.recorder.record_access(name, arguments, out)
+        return out
+
+    async def _dispatch(self, name: str, arguments: str) -> str:
         try:
             args = json.loads(arguments or "{}")
         except json.JSONDecodeError:
