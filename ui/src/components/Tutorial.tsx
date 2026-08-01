@@ -24,6 +24,9 @@ export interface TutorialActions {
   loadAndRunExample: () => void;
   showChart: () => void;
   showProfile: () => void;
+  /** Navigate to a top-level panel so a step can show the thing it describes. */
+  showView: (view: "explorer" | "sources" | "evals" | "guides" | "audit") => void;
+  toggleAgentView: () => void;
 }
 
 interface Step {
@@ -92,6 +95,75 @@ export default function Tutorial({ actions, onClose }: Props) {
           agent is read-only and never sees raw PII.
         </>
       ),
+    },
+    {
+      title: "The contract is the product",
+      body: (
+        <>
+          Everything you just did is governed by <code>charter.yaml</code> — the file
+          that says what your sources are, which columns are PII, and what an agent
+          may touch. It lives in your repo: commit it, review it in a PR, clone it
+          somewhere else and the whole governed workspace comes with it.
+        </>
+      ),
+    },
+    {
+      title: "See what an agent sees",
+      body: (
+        <>
+          Flip <b>Agent view</b> above the results. PII comes back as <code>•••</code>
+          — that is literally the surface an AI agent gets, not a UI trick. Your own
+          SQL is never restricted; the leash is only on agents.
+        </>
+      ),
+      action: { label: "Toggle Agent view", run: actions.toggleAgentView },
+    },
+    {
+      title: "Teach it your quirks",
+      body: (
+        <>
+          Open <b>Guides</b>. Plain-language notes ("revenue is net of refunds",
+          "exclude test accounts") are served to every agent — the built-in chat,
+          Claude Desktop, Cursor. This demo ships one. Guides can even write
+          themselves from your query history: <code>datacharter suggest</code>.
+        </>
+      ),
+      action: { label: "Open Guides", run: () => actions.showView("guides") },
+    },
+    {
+      title: "Rules in plain English",
+      body: (
+        <>
+          This demo's charter says <code>aggregates only</code> and{" "}
+          <code>groups of at least 2</code> for customers. So an agent asking for a
+          list of emails is <b>refused</b>, and a GROUP BY only returns groups of 2 or
+          more — the small ones are suppressed. Clean-room math, one YAML line.
+        </>
+      ),
+    },
+    {
+      title: "Prove it happened",
+      body: (
+        <>
+          Open <b>Audit</b>. Every agent query is recorded in a hash-chained log —
+          who asked, what SQL ran, which columns were masked. This demo ships a real
+          chain (including that policy refusal). Edit one entry and{" "}
+          <code>datacharter audit verify</code> names the exact line that broke.
+        </>
+      ),
+      action: { label: "Open Audit", run: () => actions.showView("audit") },
+    },
+    {
+      title: "Measure it, don't trust it",
+      body: (
+        <>
+          Open <b>Evals</b>. Write the questions you actually ask, and DataCharter
+          scores how well the agent answers them — <code>--compare-guides</code> even
+          tells you how much your written context improved accuracy. Governance you
+          can prove, on your own data.
+        </>
+      ),
+      action: { label: "Open Evals", run: () => actions.showView("evals") },
     },
   ];
 

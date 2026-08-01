@@ -342,6 +342,8 @@ export default function App() {
             loadAndRunExample,
             showChart: () => setTab("chart"),
             showProfile: profile,
+            showView: setView,
+            toggleAgentView: () => setAgentView((v) => !v),
           }}
           onClose={() => setShowTutorial(false)}
         />
