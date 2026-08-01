@@ -9,7 +9,7 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue)](LICENSE)
 [![DataCharter MCP server on Glama](https://glama.ai/mcp/servers/datacharter/datacharter/badges/score.svg)](https://glama.ai/mcp/servers/datacharter/datacharter)
 
-**[datacharter.dev](https://datacharter.dev)** · [Docs](https://datacharter.dev/quickstart.html) · [Blog](https://datacharter.dev/blog/) · [CI Action](https://github.com/marketplace/actions/datacharter-data-checks)
+**[datacharter.dev](https://datacharter.dev)** · [Desktop app (beta)](https://datacharter.dev/desktop.html) · [Docs](https://datacharter.dev/quickstart.html) · [Blog](https://datacharter.dev/blog/) · [CI Action](https://github.com/marketplace/actions/datacharter-data-checks)
 
 *The big-words version: a local, federated data explorer with governed, regulated
 agentic data access, powered by **[DuckDB](https://duckdb.org)**.* Here's what that

@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-08-02
+
+### Added
+- **Desktop app (beta).** `datacharter-desktop` (new `[desktop]` extra) opens the
+  governed explorer in a native window — workspace picker, remembered recents, and
+  a `--smoke` flag for headless CI verification. Release artifacts: macOS `.dmg`
+  (Apple Silicon + Intel) and Windows `.exe`, built by a CI matrix and attached to
+  each release. Builds are unsigned for now (see the desktop docs for the macOS
+  Sequoia "Open Anyway" walkthrough); Windows is CI-smoke-verified beta.
+
 ## [0.15.0] - 2026-08-01
 
 ### Added

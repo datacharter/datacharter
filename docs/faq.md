@@ -3,7 +3,7 @@ title: FAQ
 description: Telemetry, offline use, model choice, and how DataCharter compares.
 ---
 
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
+[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
 ## Does DataCharter collect any telemetry?
 
@@ -97,6 +97,12 @@ Enable [canary tripwires](audit.html): `canary: on` plants synthetic honeytokens
 in a masked local table. If a token ever appears in agent output, masking
 provably failed — the alarm lands in the tamper-evident audit chain, and block
 mode withholds the response. `datacharter canary drill` proves the alarm path.
+
+## Is there a version that doesn't need a terminal?
+
+Yes — the [desktop app (beta)](desktop.html): a native macOS/Windows application
+wrapping the same local server. Pick a workspace folder and go; every governance
+layer applies identically. Downloads are on the latest GitHub release.
 
 ## How does it compare to other tools?
 
