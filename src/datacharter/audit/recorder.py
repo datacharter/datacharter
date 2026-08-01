@@ -56,6 +56,19 @@ class FlightRecorder:
         })
         return self._session
 
+    def record_alarm(self, tool: str, arguments: str, token: str) -> None:
+        """A canary token surfaced in agent-bound output — record the tripwire hit."""
+        if not self._enabled:
+            return
+        try:
+            args = json.loads(arguments or "{}")
+        except ValueError:
+            args = {}
+        self._append({
+            "type": "alarm", "kind": "canary", "session": self._session,
+            "tool": tool, "sql": args.get("sql"), "token": token,
+        })
+
     def record_access(self, tool: str, arguments: str, result: str) -> None:
         if not self._enabled:
             return

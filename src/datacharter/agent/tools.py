@@ -77,6 +77,7 @@ class ToolBox:
         local_access: dict | None = None,
         guides: str = "",
         recorder=None,
+        canary=None,
         timeout_s: float = _DEFAULT_TIMEOUT_S,
     ) -> None:
         self._engine = engine
@@ -84,6 +85,8 @@ class ToolBox:
         self.guides = guides
         #: Flight recorder (audit) — every run() call is recorded when set.
         self.recorder = recorder
+        #: Canary tripwire guard — agent-bound results are scanned when set.
+        self.canary = canary
         # Column names flagged PII in any source's contract, matched case-insensitively.
         self._pii: set[str] = set()
         for src in sources:
@@ -116,6 +119,16 @@ class ToolBox:
 
     async def run(self, name: str, arguments: str) -> str:
         out = await self._dispatch(name, arguments)
+        if self.canary is not None:
+            hit = self.canary.scan(out)
+            if hit is not None:
+                if self.recorder is not None:
+                    self.recorder.record_alarm(name, arguments, hit)
+                if self.canary.mode == "block":
+                    out = (
+                        "Error: canary tripwire — response withheld "
+                        "(a masked value escaped; see `datacharter audit`)."
+                    )
         if self.recorder is not None:
             self.recorder.record_access(name, arguments, out)
         return out

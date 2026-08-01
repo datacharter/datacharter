@@ -41,6 +41,8 @@ class Charter(BaseModel):
     guides: str = ""
     #: Flight-recorder audit of agent access; on by default (`audit: off` disables).
     audit_enabled: bool = True
+    #: Canary tripwires: None = off (default), "block" or "log" when enabled.
+    canary_mode: str | None = None
 
 
 def load_charter(workspace: Path | str, filename: str = CHARTER_FILE) -> Charter:
@@ -95,10 +97,22 @@ def load_charter(workspace: Path | str, filename: str = CHARTER_FILE) -> Charter
     else:
         raise CharterError(f"{filename}: 'audit' must be on/off (got {audit_raw!r}).")
 
+    canary_raw = raw.get("canary")
+    if canary_raw in (None, False, "off"):
+        canary_mode: str | None = None
+    elif canary_raw in (True, "on"):
+        canary_mode = "block"
+    elif isinstance(canary_raw, dict) and canary_raw.get("mode") in ("block", "log"):
+        canary_mode = canary_raw["mode"]
+    else:
+        raise CharterError(
+            f"{filename}: 'canary' must be on/off or {{mode: block|log}} (got {canary_raw!r})."
+        )
+
     return Charter(
         version=version, sources=sources, warnings=warnings, metrics=metrics,
         tests=tests, local_access=local_access, guides=load_guides(workspace),
-        audit_enabled=audit_enabled,
+        audit_enabled=audit_enabled, canary_mode=canary_mode,
     )
 
 
