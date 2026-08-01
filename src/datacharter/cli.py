@@ -766,6 +766,22 @@ def _cmd_audit(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_suggest(args: argparse.Namespace) -> int:
+    from datacharter.contracts.suggest import apply_suggestions, mine_history, render_suggestions
+
+    ws = Path(args.directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+    suggestions = mine_history(ws)
+    print(render_suggestions(suggestions))
+    if args.apply and suggestions:
+        path = apply_suggestions(ws, suggestions)
+        print(f"\nAppended {len(suggestions)} suggestion(s) to {path.relative_to(ws)}.")
+        print("Edit the file to refine the wording — it's a guide like any other.")
+    return 0
+
+
 def _cmd_canary(args: argparse.Namespace) -> int:
     from datacharter.audit import FlightRecorder
     from datacharter.audit.canary import ensure_canaries
@@ -1090,6 +1106,16 @@ def main(argv: list[str] | None = None) -> int:
     p_audit.add_argument("--until", help="ISO timestamp upper bound (export)")
     p_audit.add_argument("--out", help="Output zip path (export)")
     p_audit.set_defaults(func=_cmd_audit)
+
+    p_suggest = sub.add_parser(
+        "suggest",
+        help="Mine query history for guide suggestions (self-writing guides)",
+    )
+    p_suggest.add_argument("directory", nargs="?", default=".")
+    p_suggest.add_argument(
+        "--apply", action="store_true", help="Append suggestions to guides/suggested.md"
+    )
+    p_suggest.set_defaults(func=_cmd_suggest)
 
     p_canary = sub.add_parser(
         "canary",

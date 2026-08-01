@@ -148,6 +148,10 @@ export const api = {
   listEvals: () => request<{ suites: EvalSuite[] }>("/api/evals"),
   evalHistory: () => request<{ runs: EvalRun[] }>("/api/evals/history"),
   listGuides: () => request<GuidesPayload>("/api/guides"),
+  guideSuggestions: () =>
+    request<{ suggestions: { kind: string; relation: string; text: string; count: number; total: number }[] }>(
+      "/api/guides/suggestions",
+    ),
   saveGuide: (body: {
     name?: string;
     content?: string;

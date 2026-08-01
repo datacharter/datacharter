@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { api, type GuidesPayload } from "../api";
 
+type SuggestionItem = { kind: string; relation: string; text: string; count: number; total: number };
+
 /** Author workspace guides (guides/*.md) and per-table context in the browser. */
 export default function GuidesEditor() {
   const [payload, setPayload] = useState<GuidesPayload>({ guides: [], contexts: [] });
@@ -8,6 +10,7 @@ export default function GuidesEditor() {
   const [content, setContent] = useState("");
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
 
   const load = async () => {
     const p = await api.listGuides();
@@ -20,7 +23,17 @@ export default function GuidesEditor() {
   };
   useEffect(() => {
     void load();
+    void api
+      .guideSuggestions()
+      .then((r) => setSuggestions(r.suggestions))
+      .catch(() => undefined);
   }, []);
+
+  const addSuggestion = (s: SuggestionItem) => {
+    setContent((c) => (c.endsWith("\n") || c === "" ? c : c + "\n") + `- ${s.text}\n`);
+    setSuggestions((list) => list.filter((x) => x !== s));
+    setSaved(false);
+  };
 
   const pick = (n: string) => {
     const g = payload.guides.find((x) => x.name === n);
@@ -86,6 +99,25 @@ export default function GuidesEditor() {
         {saved && <span className="guides-saved">Saved ✓</span>}
         {error && <span className="guides-error">{error}</span>}
       </div>
+
+      {suggestions.length > 0 && (
+        <section className="guides-suggestions">
+          <h3>Suggestions from your query history</h3>
+          <p className="guides-sub">
+            Habits mined from recent queries — add the ones that are true, then refine the wording.
+          </p>
+          <ul>
+            {suggestions.map((s, i) => (
+              <li key={i}>
+                <span>{s.text}</span>
+                <button className="guides-tab" onClick={() => addSuggestion(s)}>
+                  Add
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {payload.contexts.length > 0 && (
         <section className="guides-contexts">

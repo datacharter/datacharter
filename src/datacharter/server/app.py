@@ -299,6 +299,14 @@ def create_app(
         ok, n, detail = verify_chain(workspace)
         return {"ok": ok, "entries": n, "detail": detail}
 
+    @app.get("/api/guides/suggestions")
+    async def guide_suggestions() -> dict:
+        from dataclasses import asdict
+
+        from datacharter.contracts.suggest import mine_history
+
+        return {"suggestions": [asdict(s) for s in mine_history(workspace)]}
+
     @app.get("/api/evals")
     async def list_evals() -> dict:
         from datacharter.contracts.evals import load_suites

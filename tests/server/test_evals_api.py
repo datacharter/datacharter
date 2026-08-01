@@ -42,3 +42,14 @@ def test_set_table_context_persists(tmp_path):
             json={"name": "describe_table", "arguments": '{"relation": "store.orders"}'},
         )
         assert "one row per order" in out.text
+
+
+def test_guide_suggestions_endpoint(tmp_path):
+    from datacharter.engine.history import record
+
+    with _client(tmp_path) as c:
+        for _ in range(4):
+            record(tmp_path, "SELECT 1 FROM sales WHERE refunded = false", 1,
+                   {"relations": ["sales"], "columns": [], "lineage": {}})
+        body = c.get("/api/guides/suggestions").json()
+        assert any("refunded = false" in s["text"] for s in body["suggestions"])

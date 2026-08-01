@@ -1155,3 +1155,13 @@ table.grid td.rownum, table.grid th.rownum {
 }
 :root[data-theme="dark"] .audit-alarm { background: #3a1418; color: #f1a7ae; border-color: #6b2a31; }
 .audit-alarm ul { list-style: none; margin: 8px 0 0; padding: 0; }
+
+/* Guide suggestions */
+.guides-suggestions { margin-top: 20px; }
+.guides-suggestions h3 { font-size: 14px; margin: 0 0 2px; }
+.guides-suggestions ul { list-style: none; margin: 8px 0 0; padding: 0; font-size: 13px; }
+.guides-suggestions li {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg-panel); margin-bottom: 6px;
+}
