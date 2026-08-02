@@ -8,6 +8,7 @@ health — the CI verification path for platforms we can't drive a GUI on.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import sys
 from pathlib import Path
 
@@ -18,10 +19,8 @@ __all__ = ["main"]
 
 def _say(msg: str) -> None:
     """Print to stderr; windowed (console=False) builds may have no stdio at all."""
-    try:
+    with contextlib.suppress(Exception):
         print(msg, file=sys.stderr)
-    except Exception:
-        pass
 
 
 def _resolve_initial(args) -> Path | None:

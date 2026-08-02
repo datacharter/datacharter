@@ -62,7 +62,7 @@ _KEYS = {"aggregate_only", "min_group_size", "no_joins", "no_joins_to"}
 
 
 def _apply_structured(policy: Policy, body: dict, ctx: str) -> None:
-    for key, value in body.items():
+    for key in body:
         if key not in _KEYS:
             raise CharterError(f"{ctx}: unknown policy key {key!r} (known: {sorted(_KEYS)}).")
     if "aggregate_only" in body:

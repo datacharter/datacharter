@@ -30,7 +30,8 @@ def test_english_variants_and_case():
 
 
 def test_structured_form():
-    p = parse_policies({"billing": {"aggregate_only": True, "min_group_size": 25, "no_joins": True}})["billing"]
+    body = {"aggregate_only": True, "min_group_size": 25, "no_joins": True}
+    p = parse_policies({"billing": body})["billing"]
     assert p.aggregate_only and p.min_group_size == 25 and p.no_joins
 
 

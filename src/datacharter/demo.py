@@ -97,8 +97,9 @@ def seed_governance(workspace: Path) -> None:
             "SELECT tier, count(*) AS n FROM store.customers "
             "WHERE tier <> 'internal' GROUP BY tier"
         )
+        provenance = {"relations": ["store.customers"], "columns": [], "lineage": {}}
         for _ in range(4):
-            record(workspace, habit, 2, {"relations": ["store.customers"], "columns": [], "lineage": {}})
+            record(workspace, habit, 2, provenance)
     except Exception:
         pass
 
@@ -119,7 +120,9 @@ def seed_governance(workspace: Path) -> None:
         engine = Engine(workspace, charter.sources, local_key=resolve_state_key()).start()
         try:
             recorder = FlightRecorder(workspace)
-            recorder.start_session("demo", model="demo-tour", question="What do the tiers look like?")
+            recorder.start_session(
+                "demo", model="demo-tour", question="What do the tiers look like?"
+            )
             box = ToolBox(
                 engine, charter.sources, guides=charter.guides,
                 recorder=recorder, policies=charter.policies,
