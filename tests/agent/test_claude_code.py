@@ -115,3 +115,31 @@ async def test_run_turn_aborts_on_stall(monkeypatch):
     errs = [e for e in events if e["kind"] == "error"]
     assert errs and "no output" in errs[0]["detail"]
     assert "boom" in errs[0]["detail"]
+
+
+def test_claude_found_when_path_is_minimal(tmp_path, monkeypatch):
+    """A GUI-launched app has a minimal PATH; detection must still find the CLI."""
+    import os as _os
+
+    from datacharter.agent import claude_code as cc
+
+    fake_home = tmp_path / "home"
+    (fake_home / ".local" / "bin").mkdir(parents=True)
+    binary = fake_home / ".local" / "bin" / "claude"
+    binary.write_text("#!/bin/sh\n")
+    binary.chmod(0o755)
+
+    monkeypatch.setattr(cc.shutil, "which", lambda _n: None)  # not on PATH at all
+    monkeypatch.setenv("HOME", str(fake_home))
+    monkeypatch.setattr(_os.path, "expanduser", lambda p: p.replace("~", str(fake_home)))
+
+    assert cc.find_claude() == str(binary)
+    assert cc.claude_available() is True
+
+
+def test_claude_absent_reports_unavailable(monkeypatch):
+    from datacharter.agent import claude_code as cc
+
+    monkeypatch.setattr(cc.shutil, "which", lambda _n: None)
+    monkeypatch.setattr(cc, "_EXTRA_BIN_DIRS", ())
+    assert cc.find_claude() is None and cc.claude_available() is False

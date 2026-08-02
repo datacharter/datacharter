@@ -5,6 +5,25 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-08-01
+
+### Added
+- **Guided tour.** The in-app walkthrough grew from 5 steps to 11, adding the
+  governance arc — the contract, seeing what an agent sees, guides, policies,
+  the audit chain, and evals — with steps that open the panel they describe.
+- **Tour workspace.** `datacharter serve` with no charter (and
+  `datacharter init --demo --tour`) now scaffolds a workspace where every surface
+  has real content: a guide, an eval suite, a policy (`aggregates only` ·
+  `groups of at least 2`), canary tripwires, seeded query history for
+  `datacharter suggest`, and a genuine hash-verifiable audit chain containing a
+  real policy refusal. The plain `--demo` workspace stays minimal.
+
+### Fixed
+- **Claude Code was invisible in the desktop app.** A GUI-launched app inherits a
+  minimal PATH, so the `claude` binary in `~/.local/bin` (or Homebrew, npm, bun,
+  volta paths) was never found and the "Connect Claude Code" option stayed hidden.
+  Detection now searches those locations and launches the resolved path.
+
 ## [0.17.0] - 2026-08-01
 
 ### Added

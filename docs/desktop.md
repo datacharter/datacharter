@@ -15,6 +15,9 @@ the explorer, guides, evals, audit, the governed agent surface.
 ![DataCharter running on Windows 11](assets/desktop-app-windows.png)
 *The Windows build, captured automatically on every release by CI.*
 
+The app opens with an 11-step guided tour covering the whole arc: query your
+data, see what an agent sees, guides, policies, the audit chain, and evals.
+
 ## Download (beta)
 
 Grab the artifact for your platform from the

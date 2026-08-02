@@ -45,8 +45,31 @@ class ClaudeGovernanceError(RuntimeError):
     """Raised when Claude Code exposes tools beyond the governed set — connection refused."""
 
 
+#: Where CLI tools actually live. A GUI-launched app (Finder/Dock, or the frozen
+#: desktop build) inherits a minimal PATH that omits all of these, so `which`
+#: alone would report "not installed" on a machine that clearly has it.
+_EXTRA_BIN_DIRS = (
+    "~/.local/bin", "~/.claude/local", "~/bin",
+    "/opt/homebrew/bin", "/usr/local/bin",
+    "~/.npm-global/bin", "~/.bun/bin", "~/.volta/bin",
+)
+
+
+def find_claude() -> str | None:
+    """Absolute path to the `claude` binary, searching beyond a GUI app's PATH."""
+    found = shutil.which("claude")
+    if found:
+        return found
+    name = "claude.exe" if os.name == "nt" else "claude"
+    for d in _EXTRA_BIN_DIRS:
+        candidate = Path(d).expanduser() / name
+        if candidate.exists() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    return None
+
+
 def claude_available() -> bool:
-    return shutil.which("claude") is not None
+    return find_claude() is not None
 
 
 def _deny_path(workspace: Path) -> Path:
@@ -181,7 +204,7 @@ async def probe_tools(
     with tempfile.TemporaryDirectory(prefix="dc-claude-") as td:
         settings, mcp = build_configs(serve_url, dc_bin, Path(td), deny)
         proc = await asyncio.create_subprocess_exec(
-            "claude", "-p", "ok", "--output-format", "stream-json", "--verbose",
+            find_claude() or "claude", "-p", "ok", "--output-format", "stream-json", "--verbose",
             *_base_flags(settings, mcp),
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=_env(),
         )
@@ -239,7 +262,7 @@ async def run_turn(
     with tempfile.TemporaryDirectory(prefix="dc-claude-") as td:
         settings, mcp = build_configs(serve_url, dc_bin, Path(td), deny)
         args = [
-            "claude", "-p", question, "--output-format", "stream-json",
+            find_claude() or "claude", "-p", question, "--output-format", "stream-json",
             "--verbose", "--include-partial-messages",
             *_base_flags(settings, mcp),
         ]

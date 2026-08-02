@@ -184,3 +184,15 @@ Everything a workspace produces stays inside its directory. Real credentials go
 in `.env`; local state (snapshots, cache, temporary spill files) lives in
 `.datacharter/`. Both are gitignored. Delete `.datacharter/` any time to reset
 local state. Moving or renaming the workspace directory breaks nothing.
+
+## Take the guided tour
+
+```sh
+datacharter serve            # no charter here? you get the tour workspace
+datacharter init demo --demo --tour   # or scaffold it explicitly
+```
+
+The tour workspace ships everything wired up — a guide, an eval suite, a policy
+(`aggregates only` · `groups of at least 2`), canary tripwires, and a real,
+hash-verifiable audit chain — so the in-app walkthrough has something true to
+point at on every panel.
