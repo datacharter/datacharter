@@ -23,7 +23,7 @@ import { exportRequest } from "./lib/mask";
 import { useResize } from "./lib/useResize";
 import Tutorial, { hasSeenTutorial } from "./components/Tutorial";
 import { registerCompletions } from "./monaco";
-import { STARTER, exampleFor, shouldShowLaunchpad, shouldShowTour } from "./onboarding";
+import { STARTER, agentExampleFor, exampleFor, shouldShowLaunchpad, shouldShowTour } from "./onboarding";
 
 type Tab = "results" | "chart" | "profile" | "plan";
 
@@ -122,6 +122,17 @@ export default function App() {
     const example = exampleFor(tablesRef.current);
     loadSql(example);
     run(example);
+  }, [run, loadSql]);
+
+  // Tour's Agent-view step: run a query that actually has masked columns, then
+  // show the agent surface — toggling on a PII-free result demonstrates nothing.
+  const runAgentExample = useCallback(() => {
+    const example = agentExampleFor(tablesRef.current);
+    if (example) {
+      loadSql(example);
+      run(example);
+    }
+    setAgentView(true);
   }, [run, loadSql]);
 
   // Instant preview: a beat after you stop typing, auto-run the query (row-capped,
@@ -344,6 +355,7 @@ export default function App() {
             showProfile: profile,
             showView: setView,
             toggleAgentView: () => setAgentView((v) => !v),
+            runAgentExample,
           }}
           onClose={() => setShowTutorial(false)}
         />

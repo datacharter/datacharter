@@ -415,11 +415,17 @@ def create_app(
 
     @app.post("/api/demo")
     async def load_demo() -> dict:
-        """Populate the workspace with the demo `store` source (idempotent)."""
-        if not any(s.name == "store" for s in app.state.charter.sources):
-            from datacharter.demo import write_demo_data
+        """Populate the workspace with the demo `store` source (idempotent).
 
-            write_demo_data(workspace)
+        On a pristine workspace (the launchpad case) this seeds full tour
+        parity — policies, canaries, guides, evals, and a real audit chain —
+        so the Guides/Evals/Audit views have something to show.
+        """
+        if not any(s.name == "store" for s in app.state.charter.sources):
+            from datacharter import demo
+
+            pristine = not app.state.charter.sources
+            demo.write_demo_data(workspace)
             form = source_admin.SourceForm(
                 name="store",
                 type="sqlite",
@@ -428,7 +434,18 @@ def create_app(
                 pii={"customers": ["email"]},
             )
             await asyncio.to_thread(source_admin.create_source, app.state.engine, workspace, form)
+            if pristine:
+                demo.merge_tour_governance(workspace)
+                demo.seed_files(workspace)
             _refresh_charter()
+            if pristine:
+                # The audit chain must go through the LIVE toolbox — opening a
+                # second engine against the state DB would fail on the lock.
+                app.state.recorder.start_session(
+                    "demo", model="demo-tour", question=demo.SEED_QUESTION
+                )
+                for sql in demo.SEED_QUERIES:
+                    await app.state.toolbox.run("query", json.dumps({"sql": sql}))
         return _sources_payload()
 
     @app.put("/api/sources/{name}")

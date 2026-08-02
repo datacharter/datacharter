@@ -49,8 +49,9 @@ def test_empty_workspace_serves_with_no_sources(empty_client):
     assert c.get("/api/sources").json()["sources"] == []
 
 
-def test_api_tool_runs_governed_query(empty_client):
-    # the loopback bridge for the Claude Code agent: only the governed toolbox, PII masked.
+def test_api_tool_governed_query_hits_demo_policy(empty_client):
+    # the pristine demo now ships the tour's aggregates-only policy on customers:
+    # a raw SELECT through the agent surface is refused, not masked.
     c, _ = empty_client
     c.post("/api/demo")
     r = c.post(
@@ -58,8 +59,20 @@ def test_api_tool_runs_governed_query(empty_client):
         json={"name": "query", "arguments": '{"sql":"SELECT email FROM store.customers LIMIT 1"}'},
     )
     assert r.status_code == 200
+    assert "policy" in r.json()["result"] and "@example.com" not in r.json()["result"]
+
+
+def test_api_tool_masks_pii_on_unpolicied_table(empty_client):
+    # masking still demonstrable: the canaries snapshot has masked PII and no policy.
+    c, _ = empty_client
+    c.post("/api/demo")
+    r = c.post(
+        "/api/tool",
+        json={"name": "query", "arguments": '{"sql":"SELECT email FROM local.canaries LIMIT 1"}'},
+    )
+    assert r.status_code == 200
     data = json.loads(r.json()["result"])   # result is a JSON string from the governed toolbox
-    assert data["rows"][0][0] == "•••" and "@example.com" not in r.json()["result"]
+    assert data["rows"][0][0] == "•••"
 
 
 def test_api_tool_lists_tables(empty_client):
@@ -96,6 +109,38 @@ def test_load_demo_populates_store(empty_client):
     assert any(s["name"] == "store" for s in r.json()["sources"])
     q = c.post("/api/query", json={"sql": "SELECT count(*) AS n FROM store.orders"})
     assert q.status_code == 200 and q.json()["rows"] == [[90]]
+
+
+def test_load_demo_pristine_seeds_tour_parity(empty_client):
+    # the launchpad demo must match the ephemeral tour: guides, evals, audit
+    # chain, canaries, and the plain-english policy — not just the data.
+    c, ws = empty_client
+    assert c.post("/api/demo").status_code == 200
+    assert (ws / "guides" / "analytics.md").exists()
+    assert (ws / "evals" / "demo.yaml").exists()
+    guides = c.get("/api/guides").json()["guides"]
+    assert any("Revenue" in g["content"] for g in guides)
+    entries = c.get("/api/audit").json()["entries"]
+    assert len(entries) >= 2  # one allowed aggregate + one policy refusal
+    tables = c.get("/api/tables").json()["tables"]
+    canaries = [t for t in tables if t["table"] == "canaries"]
+    assert canaries and any(a["masked"] for a in canaries[0]["access"].values())
+
+
+def test_load_demo_on_nonpristine_workspace_stays_minimal(empty_client):
+    # a workspace that already has real sources gets only the store source —
+    # no policies, canaries, or seeded content forced into their charter.
+    c, ws = empty_client
+    con = sqlite3.connect(ws / "crm.db")
+    con.execute("CREATE TABLE accounts (id INTEGER, org TEXT)")
+    con.commit()
+    con.close()
+    src = {"name": "crm", "type": "sqlite", "path": "crm.db", "tables": ["accounts"]}
+    assert c.post("/api/sources", json=src).status_code == 200
+    assert c.post("/api/demo").status_code == 200
+    assert "policies" not in (ws / "charter.yaml").read_text()
+    assert not (ws / "guides" / "analytics.md").exists()
+    assert c.get("/api/audit").json()["entries"] == []
 
 
 def test_load_demo_is_idempotent(empty_client):

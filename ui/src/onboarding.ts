@@ -14,6 +14,22 @@ export function exampleFor(tables: TableInfo[]): string {
   return STARTER;
 }
 
+// The Agent-view tour step needs a query whose result actually contains a masked
+// column — otherwise the toggle changes nothing. Prefer the canaries snapshot: it
+// carries masked PII by design and no aggregates-only policy blocks a raw SELECT
+// (unlike the policied demo customers table).
+export function agentExampleFor(tables: TableInfo[]): string | null {
+  const masked = tables.filter((t) =>
+    Object.values(t.access ?? {}).some((a) => a.masked),
+  );
+  if (masked.length === 0) return null;
+  const pick =
+    masked.find((t) => t.table === "canaries") ??
+    masked.find((t) => t.table !== "customers") ??
+    masked[0];
+  return `SELECT ${pick.columns.join(", ")}\nFROM ${pick.source}.${pick.table}\nLIMIT 5;\n`;
+}
+
 // The guided tour auto-shows only on a populated workspace; empty workspaces get the
 // launchpad instead.
 export function shouldShowTour(seen: boolean, sourceCount: number, loaded: boolean): boolean {

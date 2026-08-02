@@ -16,7 +16,8 @@ from pathlib import Path
 import httpx
 
 __all__ = [
-    "CONFIG_PATH", "load_config", "save_config", "remember", "find_free_port", "ServerHandle",
+    "CONFIG_PATH", "load_config", "save_config", "remember", "find_free_port",
+    "preferred_port", "ServerHandle",
 ]
 
 CONFIG_PATH = Path.home() / ".datacharter-desktop.json"
@@ -55,6 +56,23 @@ def find_free_port() -> int:
         return s.getsockname()[1]
 
 
+def preferred_port(path: Path = CONFIG_PATH) -> int:
+    """A stable port across launches, so the webview origin (and its
+    localStorage — theme, tutorial-seen) survives restarts. Falls back to a
+    fresh free port if the remembered one is taken, and remembers the result."""
+    cfg = load_config(path)
+    want = cfg.get("port")
+    if isinstance(want, int) and 1024 <= want <= 65535:
+        with contextlib.suppress(OSError):
+            with socket.socket() as s:
+                s.bind(("127.0.0.1", want))
+            return want
+    port = find_free_port()
+    cfg["port"] = port
+    save_config(cfg, path)
+    return port
+
+
 class ServerHandle:
     """Runs the DataCharter server for one workspace on a background thread."""
 
@@ -76,7 +94,9 @@ class ServerHandle:
         from datacharter.server import create_app
 
         self.workspace = Path(workspace)
-        self.port = find_free_port()
+        # Keep the port (= webview origin) stable across restarts and workspace
+        # switches, else localStorage state is lost every launch.
+        self.port = self.port or preferred_port()
         app = create_app(self.workspace, host="127.0.0.1", port=self.port)
         # log_config=None: uvicorn's default logging probes stdio (isatty), which
         # windowed/frozen builds don't have — the thread would die silently.

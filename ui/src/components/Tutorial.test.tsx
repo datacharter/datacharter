@@ -8,6 +8,7 @@ const actions = () => ({
   showProfile: vi.fn(),
   showView: vi.fn(),
   toggleAgentView: vi.fn(),
+  runAgentExample: vi.fn(),
 });
 
 describe("Tutorial", () => {

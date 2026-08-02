@@ -5,6 +5,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Desktop: exporting no longer risks quitting the app.** Downloads now go
+  through the native save dialog instead of navigating the app window to the
+  file (closing that "file" closed DataCharter).
+- **Desktop: your theme and tour progress now survive relaunches** — the
+  webview uses persistent storage and a stable server port, so the tour no
+  longer reopens on every launch once dismissed.
+- **Charts: all-numeric results now offer bar, line, and area** — previously
+  only scatter was available unless a text or date column was present.
+- **The tour's Agent-view step now runs a query that actually contains PII**,
+  so flipping Agent view visibly masks a column instead of changing nothing.
+
+### Changed
+- **"Load the demo dataset" now seeds the full tour demo** on a fresh
+  workspace — guides, evals, plain-english policies, canary tripwires, and a
+  verifiable audit chain — so every panel has something real to show.
+  Workspaces that already have sources still get just the demo data.
+
 ## [0.18.1] - 2026-08-01
 
 ### Changed

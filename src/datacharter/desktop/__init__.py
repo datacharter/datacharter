@@ -85,6 +85,11 @@ def main(argv: list[str] | None = None) -> int:
     if initial is not None:
         remember(booted)
 
+    # Exports are <a download> clicks; without this the webview navigates the
+    # app window to the blob instead — and closing that "file" quits the app.
+    with contextlib.suppress(Exception):
+        webview.settings["ALLOW_DOWNLOADS"] = True
+
     window = webview.create_window(
         "DataCharter", handle.url, width=1280, height=850, min_size=(900, 600)
     )
@@ -139,9 +144,11 @@ def main(argv: list[str] | None = None) -> int:
                 + ([Menu("Recents", recents)] if recents else []),
             )
         ]
-        webview.start(on_start, menu=menu)
+        # private_mode=False: persist localStorage (theme, tutorial-seen)
+        # across launches — the default private mode wipes it every run.
+        webview.start(on_start, menu=menu, private_mode=False)
     except Exception:
-        webview.start(on_start)  # menus are best-effort; the app must still open
+        webview.start(on_start, private_mode=False)  # menus are best-effort
     finally:
         handle.stop()
     return 0

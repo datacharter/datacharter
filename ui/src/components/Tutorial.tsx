@@ -27,6 +27,8 @@ export interface TutorialActions {
   /** Navigate to a top-level panel so a step can show the thing it describes. */
   showView: (view: "explorer" | "sources" | "evals" | "guides" | "audit") => void;
   toggleAgentView: () => void;
+  /** Run a query with masked columns, then switch on Agent view. */
+  runAgentExample: () => void;
 }
 
 interface Step {
@@ -111,12 +113,13 @@ export default function Tutorial({ actions, onClose }: Props) {
       title: "See what an agent sees",
       body: (
         <>
-          Flip <b>Agent view</b> above the results. PII comes back as <code>•••</code>
-          — that is literally the surface an AI agent gets, not a UI trick. Your own
-          SQL is never restricted; the leash is only on agents.
+          This runs a query over PII columns and flips <b>Agent view</b>: the PII
+          comes back as <code>•••</code> — that is literally the surface an AI agent
+          gets, not a UI trick. Your own SQL is never restricted; the leash is only
+          on agents. (Flip Agent view off to see the real values again.)
         </>
       ),
-      action: { label: "Toggle Agent view", run: actions.toggleAgentView },
+      action: { label: "Run a PII query", run: actions.runAgentExample },
     },
     {
       title: "Teach it your quirks",

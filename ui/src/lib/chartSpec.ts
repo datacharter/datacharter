@@ -30,7 +30,9 @@ export function applicableKinds(result: QueryResult): ChartKind[] {
   const has = (cls: ColumnClass) => result.columns.some((c) => classes.get(c) === cls);
   const kinds: ChartKind[] = [];
   if (has("numeric")) {
-    if (has("categorical") || has("date")) kinds.push("bar", "line", "area");
+    // Any second column can be an x axis — all-numeric results (ids, counts)
+    // still bar/line/area fine; buildSpec types the axis per column class.
+    if (result.columns.length >= 2) kinds.push("bar", "line", "area");
     if (has("categorical")) kinds.push("pie");
   }
   const numCount = result.columns.filter((c) => classes.get(c) === "numeric").length;

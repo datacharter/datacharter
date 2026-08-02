@@ -14,6 +14,48 @@ DEMO_SOURCE = {
     "pii": {"customers": ["email"]},
 }
 
+# The full tour workspace contract: policies + canaries + context on top of the
+# demo source. Written by `init --demo --tour`, the ephemeral demo, and the
+# launchpad's "Load the demo dataset" (pristine workspaces only).
+TOUR_CHARTER = """\
+# DataCharter demo workspace. Run: datacharter serve
+version: 1
+
+# One contract, many tables: the `store` database groups customers and orders,
+# so the sidebar reads store -> table -> columns.
+sources:
+  store:
+    type: sqlite
+    path: demo/store.db
+    pii:
+      customers: [email]
+    context:
+      customers: "One row per customer. tier is their plan; email is PII."
+
+# Plain-english policy: agents may only aggregate customers, and any group
+# smaller than 2 is suppressed. Your own SQL in the editor is unaffected.
+policies:
+  store.customers:
+    - aggregates only
+    - groups of at least 2
+
+# Tripwires: synthetic honeytokens that alarm if masking ever fails.
+canary: on
+
+# A governed metric. Try: datacharter metric revenue
+metrics:
+  revenue:
+    relation: store.orders
+    expression: round(sum(total), 2)
+    dimensions: [customer_id]
+"""
+
+SEED_QUESTION = "What do the tiers look like?"
+SEED_QUERIES = (
+    "SELECT tier, count(*) AS n FROM store.customers GROUP BY tier",
+    "SELECT email FROM store.customers",  # refused: policy is aggregates-only
+)
+
 
 def write_demo_data(workspace: Path, seed_tour: bool = False) -> None:
     """Write the demo `store.db` (customers + orders) under `<workspace>/demo/`."""
@@ -74,13 +116,28 @@ cases:
 """
 
 
-def seed_governance(workspace: Path) -> None:
-    """Give the demo real guides, evals, query history, and a genuine audit chain.
+def merge_tour_governance(workspace: Path) -> None:
+    """Add the tour's policies, canaries, and table context to an existing charter.
 
-    Everything here is produced by the real machinery — the audit entries are
-    written by the flight recorder from actual tool calls, so the chain verifies.
-    Seeding must never break `init`.
+    Used by POST /api/demo after `create_source` has registered (and attached)
+    the demo source — writing TOUR_CHARTER wholesale would skip the attach.
     """
+    from ruamel.yaml import YAML
+
+    path = workspace / "charter.yaml"
+    yaml = YAML()
+    data = yaml.load(path.read_text()) or {}
+    data["policies"] = {"store.customers": ["aggregates only", "groups of at least 2"]}
+    data["canary"] = "on"
+    src = (data.get("sources") or {}).get("store")
+    if isinstance(src, dict):
+        src["context"] = {"customers": "One row per customer. tier is their plan; email is PII."}
+    with path.open("w") as f:
+        yaml.dump(data, f)
+
+
+def seed_files(workspace: Path) -> None:
+    """Write the demo guides, evals, and query history (no engine required)."""
     try:
         (workspace / "guides").mkdir(exist_ok=True)
         (workspace / "guides" / "analytics.md").write_text(DEMO_GUIDE)
@@ -103,6 +160,18 @@ def seed_governance(workspace: Path) -> None:
     except Exception:
         pass
 
+
+def seed_governance(workspace: Path) -> None:
+    """Give the demo real guides, evals, query history, and a genuine audit chain.
+
+    Everything here is produced by the real machinery — the audit entries are
+    written by the flight recorder from actual tool calls, so the chain verifies.
+    Seeding must never break `init`. Only for workspaces with NO running server
+    (opens its own engine); a live server seeds through its own toolbox instead
+    (POST /api/demo) — the state DB cannot be opened twice.
+    """
+    seed_files(workspace)
+
     # A real, hash-verifiable audit chain: one allowed aggregate, one refusal.
     try:
         import asyncio
@@ -120,17 +189,12 @@ def seed_governance(workspace: Path) -> None:
         engine = Engine(workspace, charter.sources, local_key=resolve_state_key()).start()
         try:
             recorder = FlightRecorder(workspace)
-            recorder.start_session(
-                "demo", model="demo-tour", question="What do the tiers look like?"
-            )
+            recorder.start_session("demo", model="demo-tour", question=SEED_QUESTION)
             box = ToolBox(
                 engine, charter.sources, guides=charter.guides,
                 recorder=recorder, policies=charter.policies,
             )
-            for sql in (
-                "SELECT tier, count(*) AS n FROM store.customers GROUP BY tier",
-                "SELECT email FROM store.customers",  # refused: policy is aggregates-only
-            ):
+            for sql in SEED_QUERIES:
                 asyncio.run(box.run("query", _json.dumps({"sql": sql})))
         finally:
             engine.close()

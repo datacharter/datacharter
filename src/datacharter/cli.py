@@ -8,7 +8,7 @@ from pathlib import Path
 
 from datacharter import __version__
 from datacharter.agent.llm import LLMClient
-from datacharter.demo import write_demo_data
+from datacharter.demo import TOUR_CHARTER, write_demo_data
 
 CHARTER_TEMPLATE = """\
 # DataCharter workspace — https://github.com/datacharter/datacharter
@@ -44,39 +44,6 @@ sources:
     path: demo/store.db
     pii:
       customers: [email]
-
-# A governed metric. Try: datacharter metric revenue
-metrics:
-  revenue:
-    relation: store.orders
-    expression: round(sum(total), 2)
-    dimensions: [customer_id]
-"""
-
-TOUR_CHARTER = """\
-# DataCharter demo workspace. Run: datacharter serve
-version: 1
-
-# One contract, many tables: the `store` database groups customers and orders,
-# so the sidebar reads store -> table -> columns.
-sources:
-  store:
-    type: sqlite
-    path: demo/store.db
-    pii:
-      customers: [email]
-    context:
-      customers: "One row per customer. tier is their plan; email is PII."
-
-# Plain-english policy: agents may only aggregate customers, and any group
-# smaller than 2 is suppressed. Your own SQL in the editor is unaffected.
-policies:
-  store.customers:
-    - aggregates only
-    - groups of at least 2
-
-# Tripwires: synthetic honeytokens that alarm if masking ever fails.
-canary: on
 
 # A governed metric. Try: datacharter metric revenue
 metrics:

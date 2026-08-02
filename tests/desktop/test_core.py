@@ -45,3 +45,26 @@ def test_smoke_with_workspace(tmp_path, capsys):
 def test_smoke_falls_back_to_demo(capsys):
     assert desktop_main(["--smoke", "--demo"]) == 0
     assert "smoke OK" in capsys.readouterr().err
+
+
+def test_preferred_port_is_stable_across_calls(tmp_path):
+    from datacharter.desktop.core import preferred_port
+
+    cfg = tmp_path / "cfg.json"
+    first = preferred_port(cfg)
+    assert preferred_port(cfg) == first  # same origin -> localStorage survives
+
+
+def test_preferred_port_falls_back_when_taken(tmp_path):
+    import socket
+
+    from datacharter.desktop.core import load_config, preferred_port
+
+    cfg = tmp_path / "cfg.json"
+    first = preferred_port(cfg)
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", first))
+        s.listen(1)
+        second = preferred_port(cfg)
+    assert second != first
+    assert load_config(cfg)["port"] == second  # remembers the replacement
