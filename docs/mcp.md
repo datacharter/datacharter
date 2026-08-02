@@ -1,6 +1,6 @@
 ---
-title: MCP server
-description: Expose your governed workspace to an MCP client — read-only, PII-masked.
+title: MCP server — connect Claude, Cursor, or Cline to your data, governed
+description: Expose your workspace to any MCP client — read-only, PII-masked SQL over your files and databases, with per-column access from your data contract.
 ---
 
 [Home](index.html) &middot; [Quick start](quickstart.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)

@@ -13,6 +13,7 @@ show_downloads: false
 plugins:
   - jekyll-seo-tag
   - jekyll-sitemap
+  - jekyll-feed
 
 # Blog posts live under _posts/ and publish at /blog/<title>/.
 # Scoped to posts via defaults — a global `permalink` would switch every doc

@@ -1,6 +1,6 @@
 ---
-title: Agent modes
-description: Run on your Claude Code subscription, bring your own endpoint, run fully local, or skip the agent entirely.
+title: AI agent modes — Claude Code, Ollama local models, or any OpenAI-compatible endpoint
+description: Chat with your data using your Claude Code subscription, a fully local Ollama model, or any OpenAI-compatible agent — governed and PII-masked either way.
 ---
 
 [Home](index.html) &middot; [Quick start](quickstart.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)

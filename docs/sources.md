@@ -1,6 +1,6 @@
 ---
-title: Sources matrix
-description: How each source type is registered, and how pushdown behaves.
+title: Supported sources — Postgres, MySQL, Snowflake, BigQuery, Iceberg, Delta, CSV, Parquet
+description: Every file and database source DataCharter can query and join locally — how each is registered, and how pushdown behaves.
 ---
 
 [Home](index.html) &middot; [Quick start](quickstart.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
