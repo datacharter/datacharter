@@ -4,8 +4,15 @@
 # untouched); the Markdown pages render with the theme below.
 title: DataCharter
 description: Contract-governed local data exploration, powered by DuckDB.
+url: https://datacharter.dev
 theme: jekyll-theme-cayman
 show_downloads: false
+
+# jekyll-seo-tag ships with the theme; jekyll-sitemap adds /sitemap.xml
+# (both are on the GitHub Pages plugin whitelist).
+plugins:
+  - jekyll-seo-tag
+  - jekyll-sitemap
 
 # Blog posts live under _posts/ and publish at /blog/<title>/.
 # Scoped to posts via defaults — a global `permalink` would switch every doc
@@ -16,6 +23,13 @@ defaults:
       type: posts
     values:
       permalink: /blog/:title/
+      image: /assets/hero.png
+  # Site-wide social-card image: pages without their own `image:` get the
+  # hero, which also upgrades twitter:card to summary_large_image.
+  - scope:
+      path: ""
+    values:
+      image: /assets/hero.png
 
 # Dev-internal docs live in this folder but must never be published.
 exclude:

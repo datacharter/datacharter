@@ -1,0 +1,37 @@
+# DataCharter
+
+> Contract-governed local data exploration, powered by DuckDB. One local SQL
+> workspace over your files and databases (CSV, Parquet, JSON, Excel, Postgres,
+> MySQL, SQLite, SQL Server, Snowflake, BigQuery, Iceberg, Delta), with governed,
+> read-only, PII-masked access for AI agents via chat, Claude Code, or MCP.
+> `pip install datacharter` / `uvx datacharter`. Apache-2.0.
+
+Key facts: the engine is read-only by construction; PII is auto-detected and
+masked from agents by default; access is granted per source, table, and column
+in a `charter.yaml` data contract; every agent access is logged to a
+tamper-evident, hash-chained audit trail; plain-English policies (aggregates
+only, k-anonymity thresholds, join limits) are enforced by query analysis;
+opt-in canary tripwires alarm if a masked value ever escapes to agent output.
+
+## Docs
+
+- [Quick start](https://datacharter.dev/quickstart.html): install, first workspace, first query
+- [charter.yaml](https://datacharter.dev/charter-yaml.html): the data-contract file — sources, PII, agent access
+- [Sources](https://datacharter.dev/sources.html): every supported file and database source
+- [Agent](https://datacharter.dev/agent.html): connecting Claude Code, Ollama, or any OpenAI-compatible agent
+- [MCP server](https://datacharter.dev/mcp.html): governed MCP tools for Cursor, Cline, Claude, and others
+- [Policies](https://datacharter.dev/policies.html): aggregates-only, k-anonymity, and join policies
+- [Audit](https://datacharter.dev/audit.html): the flight recorder and canary tripwires
+- [Evals](https://datacharter.dev/evals.html): scoring agent answers and measuring guide lift
+- [CLI](https://datacharter.dev/cli.html): every subcommand
+- [Workspace](https://datacharter.dev/workspace.html): workspace layout and state
+- [Desktop](https://datacharter.dev/desktop.html): the desktop app (beta)
+- [FAQ](https://datacharter.dev/faq.html): common questions
+
+## Optional
+
+- [Blog](https://datacharter.dev/blog/): release deep-dives and design notes
+- [About](https://datacharter.dev/about.html): who builds DataCharter and why
+- [Security](https://datacharter.dev/security.html): security model and reporting
+- [GitHub](https://github.com/datacharter/datacharter): source, issues, releases
+- [PyPI](https://pypi.org/project/datacharter/): the Python package
