@@ -70,14 +70,34 @@ def _reload(tmp_path):
 def test_set_agent_access_field_table_source_levels(tmp_path):
     (tmp_path / "charter.yaml").write_text(BASE)
     set_agent_access(tmp_path, "crmpg", "customers", "email", True)  # field
-    set_agent_access(tmp_path, "crmpg", "customers", None, False)  # table
-    set_agent_access(tmp_path, "crmpg", None, None, True)  # source
     aa = _reload(tmp_path)["sources"]["crmpg"]["agent_access"]
     assert aa["columns"]["customers.email"] is True
+    set_agent_access(tmp_path, "crmpg", "customers", None, False)  # table
+    aa = _reload(tmp_path)["sources"]["crmpg"]["agent_access"]
     assert aa["tables"]["customers"] is False
+    set_agent_access(tmp_path, "crmpg", None, None, True)  # source
+    aa = _reload(tmp_path)["sources"]["crmpg"]["agent_access"]
     assert aa["source"] is True
     # other fields preserved
     assert list(_reload(tmp_path)["sources"]["crmpg"]["tables"]) == ["customers"]
+
+
+def test_coarser_access_toggle_clears_finer_overrides(tmp_path):
+    # a table toggle must clear that table's field overrides (else a stale
+    # field override wins and "mask the table" leaves a PII column visible);
+    # a source toggle clears everything beneath it.
+    (tmp_path / "charter.yaml").write_text(BASE)
+    set_agent_access(tmp_path, "crmpg", "customers", "email", True)
+    set_agent_access(tmp_path, "crmpg", "customers", None, False)
+    aa = _reload(tmp_path)["sources"]["crmpg"]["agent_access"]
+    assert "customers.email" not in (aa.get("columns") or {})
+    assert aa["tables"]["customers"] is False
+
+    set_agent_access(tmp_path, "crmpg", "customers", "email", True)
+    set_agent_access(tmp_path, "crmpg", None, None, False)
+    aa = _reload(tmp_path)["sources"]["crmpg"]["agent_access"]
+    assert "columns" not in aa and "tables" not in aa
+    assert aa["source"] is False
 
 
 def test_set_agent_access_unknown_source(tmp_path):

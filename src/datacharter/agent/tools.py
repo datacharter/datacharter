@@ -97,10 +97,11 @@ class ToolBox:
                 self._pii.update(c.lower() for c in cols)
         self._auto_pii = auto_pii or set()
         # Per-source agent-access overrides (on=real, off=masked); `local.*` snapshot
-        # overrides live under the reserved "local" key (charter `local_access`).
-        self._overrides = {s.name: s.agent_access for s in sources if s.agent_access}
-        if local_access:
-            self._overrides["local"] = local_access
+        # overrides live under the reserved "local" key (charter `local_access`),
+        # file/connector sources are remapped to their `memory` registrations.
+        from datacharter.contracts.access import build_overrides
+
+        self._overrides = build_overrides(sources, local_access)
         # Names that may be masked, for the access guard's parse-failure fallback.
         self._masked_names: set[str] = set(self._pii) | set(self._auto_pii)
         # Row-level filters for the agent surface: table (and source__table alias) -> predicate.
@@ -247,6 +248,10 @@ class ToolBox:
             parts = str(r).split(".")
             if len(parts) >= 2:
                 rels.append((parts[-2], parts[-1]))  # (source, table)
+            elif parts[0]:
+                # Unqualified relation = a `memory` view (file source / upload);
+                # resolving under "memory" lets its remapped overrides apply.
+                rels.append(("memory", parts[0]))
         idx = set()
         for i, outcol in enumerate(result.columns):
             srcs = lineage.get(outcol)
@@ -264,6 +269,10 @@ class ToolBox:
         parts = qualified.split(".")
         if len(parts) >= 3:
             return self._masked(parts[-3], parts[-2], parts[-1])
+        if len(parts) == 2:
+            # table.column from a `memory` view — same default as the name
+            # check below, but agent-access overrides now reach it.
+            return self._masked("memory", parts[0], parts[1])
         name = parts[-1].lower()
         return name in self._pii or name in self._auto_pii
 

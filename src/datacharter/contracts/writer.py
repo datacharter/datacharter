@@ -87,11 +87,20 @@ def set_agent_access(
         if aa is None:
             aa = {}
             entry["agent_access"] = aa
+    # A coarser toggle clears the finer overrides beneath it — otherwise a
+    # stale field override silently wins over a later table/source click and
+    # the toggle looks broken (worse: a table masked "everything" can leave
+    # one previously-unmasked PII column visible).
     if column is not None and table is not None:
         aa.setdefault("columns", {})[f"{table}.{column}"] = value
     elif table is not None:
+        cols = aa.get("columns") or {}
+        for key in [k for k in cols if k.startswith(f"{table}.")]:
+            del cols[key]
         aa.setdefault("tables", {})[table] = value
     else:
+        aa.pop("columns", None)
+        aa.pop("tables", None)
         aa["source"] = value
     _write(path, y, data)
 

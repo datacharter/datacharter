@@ -485,9 +485,9 @@ def create_app(
         }
         declared_pii = {c.lower() for s in sources for cols in s.pii.values() for c in cols}
         auto_pii = app.state.auto_pii
-        overrides = {s.name: s.agent_access for s in sources if s.agent_access}
-        if app.state.charter.local_access:
-            overrides["local"] = app.state.charter.local_access  # snapshot overrides
+        from datacharter.contracts.access import build_overrides
+
+        overrides = build_overrides(sources, app.state.charter.local_access)
         pii_set = declared_pii | auto_pii
         listing = []
         for row in result.rows:

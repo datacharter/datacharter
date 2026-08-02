@@ -29,3 +29,48 @@ def test_overrides_win_field_over_table_over_source():
 def test_field_on_unmasks_pii():
     ov = {"store": {"columns": {"customers.email": True}}}
     assert resolve_masked("store", "customers", "email", overrides=ov, **BASE) is False
+
+
+def test_build_overrides_remaps_file_sources_to_memory():
+    # csv/parquet/json sources register as views under the engine's `memory`
+    # database — their toggles must reach those registrations (the charter-name
+    # key never matches, which silently disabled source/table toggles).
+    from datacharter.contracts.access import build_overrides
+    from datacharter.models import Source, SourceType
+
+    csv = Source(
+        name="people", type=SourceType.CSV, path="people.csv",
+        tables=["people"], agent_access={"source": False},
+    )
+    ov = build_overrides([csv])
+    assert ov["memory"]["tables"]["people"] is False
+    assert resolve_masked("memory", "people", "plan", overrides=ov, **BASE) is True
+
+
+def test_build_overrides_finer_file_entries_win():
+    from datacharter.contracts.access import build_overrides
+    from datacharter.models import Source, SourceType
+
+    csv = Source(
+        name="people", type=SourceType.CSV, path="people.csv", tables=["people"],
+        agent_access={"source": False, "tables": {"people": True},
+                      "columns": {"people.email": False}},
+    )
+    ov = build_overrides([csv])
+    assert ov["memory"]["tables"]["people"] is True  # explicit table beats source
+    assert resolve_masked("memory", "people", "email", overrides=ov, **BASE) is True
+    assert resolve_masked("memory", "people", "plan", overrides=ov, **BASE) is False
+
+
+def test_build_overrides_leaves_attach_sources_alone():
+    from datacharter.contracts.access import build_overrides
+    from datacharter.models import Source, SourceType
+
+    pg = Source(
+        name="crm", type=SourceType.POSTGRES, tables=["accounts"],
+        agent_access={"source": True},
+    )
+    ov = build_overrides([pg], local_access={"tables": {"snap": False}})
+    assert ov["crm"] == {"source": True}
+    assert "memory" not in ov
+    assert ov["local"]["tables"]["snap"] is False

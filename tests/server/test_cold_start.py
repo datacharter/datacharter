@@ -102,6 +102,34 @@ def test_add_source_then_query_it(empty_client):
     assert r.status_code == 200 and r.json()["rows"] == [[1]]
 
 
+def test_csv_source_access_toggles_reach_memory_registration(empty_client):
+    # file sources register under `memory`, not their charter name — the
+    # source/table toggles must still mask them (user-reported regression).
+    c, ws = empty_client
+    (ws / "people.csv").write_text("name,email,plan\nada,ada@x.com,pro\n")
+    src = {"name": "people", "type": "csv", "path": "people.csv",
+           "tables": ["people"], "pii": {"people": ["email"]}}
+    assert c.post("/api/sources", json=src).status_code == 200
+
+    def masked():
+        t = [t for t in c.get("/api/tables").json()["tables"] if t["table"] == "people"][0]
+        return {k: v["masked"] for k, v in t["access"].items()}
+
+    assert masked() == {"name": False, "email": True, "plan": False}
+    # source-level mask-all
+    assert c.post("/api/agent-access", json={"source": "people", "value": False}).status_code == 200
+    assert masked() == {"name": True, "email": True, "plan": True}
+    # and the agent surface itself is masked, not just the catalog
+    r = c.post("/api/tool", json={"name": "query",
+                                  "arguments": '{"sql":"SELECT name FROM people LIMIT 1"}'})
+    assert json.loads(r.json()["result"])["rows"][0][0] == "•••"
+    # table-level unmask-all wins back
+    assert c.post(
+        "/api/agent-access", json={"source": "people", "table": "people", "value": True}
+    ).status_code == 200
+    assert masked() == {"name": False, "email": False, "plan": False}
+
+
 def test_load_demo_populates_store(empty_client):
     c, _ = empty_client
     r = c.post("/api/demo")

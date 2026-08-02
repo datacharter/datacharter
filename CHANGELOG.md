@@ -6,6 +6,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- **Source- and table-level agent-access toggles now work on file sources**
+  (CSV, Parquet, JSON, …). These register under the engine's `memory` database,
+  so overrides keyed by the charter source name never reached them — the
+  toggle wrote the contract but nothing changed. Both the catalog and the
+  agent/MCP surface now honor them.
+- **A source- or table-level toggle now clears the finer overrides beneath
+  it.** Previously a stale field-level override silently won over a later
+  table/source click — masking a table could leave a previously-unmasked PII
+  column visible.
 - **Desktop: exporting no longer risks quitting the app.** Downloads now go
   through the native save dialog instead of navigating the app window to the
   file (closing that "file" closed DataCharter).
