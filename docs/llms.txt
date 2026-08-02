@@ -30,6 +30,9 @@ opt-in canary tripwires alarm if a masked value ever escapes to agent output.
 
 ## Optional
 
+- [Local DuckDB UI](https://datacharter.dev/duckdb-ui.html): DataCharter as a DuckDB editor/GUI
+- [Hex alternative](https://datacharter.dev/hex-alternative.html): local-first, open-source comparison
+- [Governed MCP data access](https://datacharter.dev/mcp-data-governance.html): safe AI access to real data
 - [Blog](https://datacharter.dev/blog/): release deep-dives and design notes
 - [About](https://datacharter.dev/about.html): who builds DataCharter and why
 - [Security](https://datacharter.dev/security.html): security model and reporting
