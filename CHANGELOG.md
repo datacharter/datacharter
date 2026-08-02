@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.18.1] - 2026-08-01
+
+### Changed
+- Package metadata now credits the maker alongside the project: authors are
+  DataCharter and Rishi Mashelkar.
+
+### Removed
+- An empty test file committed by accident in 0.18.0.
+
 ## [0.18.0] - 2026-08-01
 
 ### Added
