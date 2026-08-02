@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.18.2] - 2026-08-02
+
 ### Fixed
 - **Source- and table-level agent-access toggles now work on file sources**
   (CSV, Parquet, JSON, …). These register under the engine's `memory` database,
