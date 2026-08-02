@@ -22,7 +22,16 @@
   "description": {{ page.description | jsonify }},
   "datePublished": "{{ page.date | date_to_xmlschema }}",
   "dateModified": "{{ page.last_modified_at | default: page.date | date_to_xmlschema }}",
-  "author": { "@type": "Person", "name": {{ page.author | default: "DataCharter" | jsonify }} },
+  "author": {
+    "@type": "Person",
+    "@id": "https://datacharter.dev/#rishi-mashelkar",
+    "name": {{ page.author | default: "Rishi Mashelkar" | jsonify }},
+    "url": "https://datacharter.dev/about.html",
+    "sameAs": [
+      "https://github.com/rishi-mashelkar",
+      "https://www.linkedin.com/in/rishimashelkar/"
+    ]
+  },
   "publisher": { "@type": "Organization", "name": "DataCharter", "url": "https://datacharter.dev/" },
   "image": "https://datacharter.dev/assets/hero.png",
   "url": "https://datacharter.dev{{ page.url }}",

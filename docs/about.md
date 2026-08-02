@@ -58,6 +58,16 @@ auth system. It is a local tool for exploring the data your contracts already
 describe. Its extension surface is DuckDB's own extension ecosystem rather than a
 bespoke plugin system.
 
+## Who builds this
+
+DataCharter is built by [Rishi Mashelkar](https://github.com/rishi-mashelkar),
+a data engineer who wanted to point AI agents at real data without the
+governance nightmare. You can find him on
+[GitHub](https://github.com/rishi-mashelkar) and
+[LinkedIn](https://www.linkedin.com/in/rishimashelkar/), or say hi at
+[hello@datacharter.dev](mailto:hello@datacharter.dev) — feedback and issue
+reports genuinely shape the roadmap.
+
 ## Built on open source
 
 DataCharter stands on excellent open-source foundations: DuckDB for the engine
