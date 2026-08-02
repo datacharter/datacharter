@@ -8,6 +8,7 @@ import datetime
 import json
 import re
 import shutil
+import sys
 import threading
 import time
 from collections.abc import Sequence
@@ -91,6 +92,8 @@ class Engine:
         self.workspace = Path(workspace).resolve()
         self.sources = list(sources)
         self._local_key = local_key
+        #: False when the local state DB had to be created without encryption.
+        self.state_encrypted = local_key is not None
         self._allow_spill = allow_spill
         self._conn: duckdb.DuckDBPyConnection | None = None
         self._query_lock = asyncio.Lock()
@@ -609,7 +612,36 @@ class Engine:
                     "(env DATACHARTER_STATE_KEY), or delete that file to start fresh "
                     "(this discards saved snapshots)."
                 ) from None
+            if options and "crypto" in str(exc).lower():
+                # Some builds (notably the frozen desktop app) start without
+                # DuckDB's crypto module, so an encrypted local DB can't be
+                # created. Load it if we can; otherwise fall back to an
+                # UNENCRYPTED state DB rather than refusing to start — and say
+                # so, because it changes a security property.
+                if self._load_crypto_module():
+                    self._setup(f"ATTACH {self._quoted(str(db))} AS local{options}")
+                    return
+                self.state_encrypted = False
+                print(
+                    f"WARNING: {STATE_DIR}/state.duckdb could not be encrypted "
+                    "(DuckDB's crypto module is unavailable in this build); "
+                    "local snapshots are stored unencrypted.",
+                    file=sys.stderr,
+                )
+                self._setup(f"ATTACH {self._quoted(str(db))} AS local")
+                return
             raise exc
+
+    def _load_crypto_module(self) -> bool:
+        """Best-effort load of the extension that provides DuckDB's crypto."""
+        conn = self._require_conn()
+        for stmt in ("LOAD httpfs", "INSTALL httpfs; LOAD httpfs"):
+            try:
+                conn.execute(stmt)
+                return True
+            except duckdb.Error:
+                continue
+        return False
 
     def _setup(self, stmt: str) -> None:
         conn = self._require_conn()
