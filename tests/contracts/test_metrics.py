@@ -141,4 +141,4 @@ def test_grain_works_on_text_date_columns(tmp_path):
     from datacharter.cli import main as cli_main
 
     cli_main(["init", str(tmp_path), "--demo"])
-    assert cli_main(["metric", "revenue", "--grain", "month", str(tmp_path)]) == 0
+    assert cli_main(["metric", "revenue", str(tmp_path), "--grain", "month"]) == 0
