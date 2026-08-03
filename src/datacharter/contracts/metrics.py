@@ -74,7 +74,9 @@ def metric_sql(metric: Metric, by: list[str] | None = None, grain: str | None = 
             raise MetricError(f"metric '{metric.name}': invalid grain {grain!r}")
         if not metric.time_column or not _valid_identifier(metric.time_column):
             raise MetricError(f"metric '{metric.name}': --grain needs a valid time_column")
-        trunc = f"date_trunc('{grain}', {metric.time_column})"
+        # CAST: date columns are often TEXT in sqlite/CSV sources; date_trunc
+        # takes no VARCHAR, and TIMESTAMP accepts ISO date strings and DATEs alike.
+        trunc = f"date_trunc('{grain}', CAST({metric.time_column} AS TIMESTAMP))"
         alias = metric.time_column.split(".")[-1]
         dim_exprs.insert(0, trunc)
         select.insert(0, f"{trunc} AS {alias}")

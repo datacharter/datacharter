@@ -133,3 +133,12 @@ def test_metric_grain_cli(tmp_path, capsys):
     assert cli_main(["metric", "revenue", str(tmp_path), "--grain", "month"]) == 0
     out = capsys.readouterr().out
     assert "2024-01" in out and "15" in out  # Jan bucket total
+
+
+def test_grain_works_on_text_date_columns(tmp_path):
+    # sqlite/CSV date columns are TEXT; date_trunc must still work (the demo's
+    # placed_on is exactly this shape).
+    from datacharter.cli import main as cli_main
+
+    cli_main(["init", str(tmp_path), "--demo"])
+    assert cli_main(["metric", "revenue", "--grain", "month", str(tmp_path)]) == 0

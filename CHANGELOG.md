@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.18.3] - 2026-08-02
+
 ### Fixed
 - **Misplaced governance config is now a load error instead of silently
   ignored.** A top-level `row_filters:`/`agent_access:`/`pii:` block (they are
