@@ -70,6 +70,17 @@ def load_charter(workspace: Path | str, filename: str = CHARTER_FILE) -> Charter
     if not isinstance(sources_raw, dict):
         raise CharterError(f"{filename}: 'sources' must be a mapping of name -> source.")
 
+    # Source-level governance keys at the top level would be silently ignored —
+    # a user who copies them there believes masking/filters are on when nothing
+    # is enforced. Fail closed at the config layer instead.
+    for key in ("agent_access", "row_filters", "pii", "context", "tables"):
+        if key in raw:
+            raise CharterError(
+                f"{filename}: '{key}' is a source-level field and has no effect at "
+                f"the top level — move it under the source it applies to "
+                f"(sources.<name>.{key})."
+            )
+
     resolver = SecretResolver(workspace)
     warnings: list[str] = []
     sources: list[Source] = []
@@ -89,6 +100,7 @@ def load_charter(workspace: Path | str, filename: str = CHARTER_FILE) -> Charter
     local_access = raw.get("local_access") or {}
     if not isinstance(local_access, dict):
         raise CharterError(f"{filename}: 'local_access' must be a mapping.")
+    _validate_access_block(local_access, f"{filename}: local_access")
 
     audit_raw = raw.get("audit", True)
     if audit_raw in (False, "off"):
@@ -185,6 +197,8 @@ def _build_source(name: str, body: Any, resolver: SecretResolver, warnings: list
         path_value = resolver.interpolate(str(path_value))
         _lint_path(ctx, path_value, stype, warnings)
 
+    _validate_access_block(body.get("agent_access") or {}, f"{ctx}.agent_access")
+
     context_raw = body.get("context") or {}
     if not isinstance(context_raw, dict) or not all(
         isinstance(k, str) and isinstance(v, str) for k, v in context_raw.items()
@@ -215,6 +229,33 @@ def _build_source(name: str, body: Any, resolver: SecretResolver, warnings: list
     except ValidationError as exc:
         first = exc.errors()[0]
         raise CharterError(f"{ctx}: {first['loc'][0]}: {first['msg']}") from None
+
+
+def _validate_access_block(aa: Any, ctx: str) -> None:
+    """Agent-access overrides must be booleans — YAML strings like `deny` would
+    otherwise be truthy and silently UNMASK the column they meant to protect."""
+    if not isinstance(aa, dict):
+        raise CharterError(f"{ctx}: must be a mapping (source/tables/columns).")
+
+    def _require_bool(value: Any, where: str) -> None:
+        if not isinstance(value, bool):
+            raise CharterError(
+                f"{ctx}.{where}: must be true (agent sees real values) or false "
+                f"(masked) — got {value!r}."
+            )
+
+    for key, value in aa.items():
+        if key == "source":
+            _require_bool(value, "source")
+        elif key in ("tables", "columns"):
+            if not isinstance(value, dict):
+                raise CharterError(f"{ctx}.{key}: must be a mapping of name -> true/false.")
+            for name, v in value.items():
+                _require_bool(v, f"{key}.{name}")
+        else:
+            raise CharterError(
+                f"{ctx}: unknown key {key!r} (allowed: source, tables, columns)."
+            )
 
 
 def _resolve_credentials(ctx: str, creds: Any, resolver: SecretResolver) -> dict[str, str]:

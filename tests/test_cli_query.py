@@ -43,3 +43,13 @@ def test_snapshot_uses_snapshot_sync(tmp_path, monkeypatch):
     rc = main(["snapshot", "top", "SELECT 1 AS n", str(tmp_path)])
     assert rc == 0
     assert calls["args"] == ("SELECT 1 AS n", "top")
+
+
+def test_demo_exposes_flat_views_as_quickstart_teaches(tmp_path, capsys):
+    # The quickstart teaches `source__table` names; the demo workspace must
+    # actually have them (it didn't, when its charter omitted `tables:`).
+    from datacharter.cli import main as cli_main
+
+    cli_main(["init", str(tmp_path), "--demo"])
+    assert cli_main(["query", "SELECT count(*) AS n FROM store__customers", str(tmp_path)]) == 0
+    assert "3" in capsys.readouterr().out

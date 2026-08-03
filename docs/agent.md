@@ -3,10 +3,16 @@ title: AI agent modes — Claude Code, Ollama local models, or any OpenAI-compat
 description: Chat with your data using your Claude Code subscription, a fully local Ollama model, or any OpenAI-compatible agent — governed and PII-masked either way.
 ---
 
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
+[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [Editor](editor.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Guides](guides.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Workspace](workspace.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
 DataCharter has an optional natural-language agent that turns a plain-language
 question into SQL against your sources. It is genuinely optional.
+
+One word, four doors — "agent" on this page means the **built-in chat panel**
+(in any of the three modes below). Claude Code connects *as* that chat's
+backend (Mode 3), while external MCP clients — Claude Desktop, Cursor, Cline —
+connect through [the MCP server](mcp.html) instead. Every door leads to the
+same four governed tools; nothing reaches your data any other way.
 
 ## The product is fully usable without any LLM
 
@@ -62,14 +68,14 @@ key and no per-token billing. In the chat panel, click **Connect Claude Code**
 - Requires the `claude` CLI on your `PATH` and an active Claude subscription.
 - DataCharter drives Claude Code headlessly, one turn per question. Claude reaches
   your data **only** through the same four read-only, access-governed tools below —
-  never your raw files or connections.
-- The connection is **fail-closed**: before enabling it, DataCharter verifies that
-  the tool sandbox exposes nothing beyond those governed tools, and refuses to
-  connect otherwise.
-- This is **not** a no-egress mode. Because Claude Code runs against Anthropic's
-  models, your questions and the (PII-masked) tool results are sent to Anthropic
-  under your Claude subscription. Use `--local` (Mode 2) if no data may leave your
+  never your raw files or connections. To be equally plain about what *does*
+  leave: your questions and the (PII-masked) tool results are sent to Anthropic
+  under your Claude subscription — "local" here means local execution and local
+  governance, not zero egress. Use `--local` (Mode 2) if no data may leave your
   machine.
+- The connection is **fail-closed** (if it can't be proven safe, it's refused):
+  before enabling it, DataCharter verifies that the tool sandbox exposes nothing
+  beyond those governed tools, and refuses to connect otherwise.
 
 ## Guides: tell the agent what you'd tell a colleague
 
@@ -102,8 +108,10 @@ The agent runs a short tool loop over a small set of **read-only** tools:
   as PII when you serve. Override access at the source, table, or column level —
   from the data explorer's left panel or via the contract's
   [`agent_access`](charter-yaml.html#agent_access) block — to unmask a
-  non-sensitive column or hide one that isn't PII. Flip **Agent view** on any
-  result to see exactly what the agent receives. The same governance applies over
+  non-sensitive column or hide one that isn't PII. **Agent view** — the toggle
+  above any query result — re-renders that result exactly as an agent would
+  receive it: masked columns, row filters, and policies applied. It is the
+  fastest way to check what your contract actually grants. The same governance applies over
   [MCP](mcp.html) and to Claude Code. Masking is enforced, not cosmetic: a masked
   column may be selected (values return as `•••`) but cannot be used to filter,
   join, group, or order results, so its values can't be inferred by predicate.
@@ -126,3 +134,5 @@ The agent runs a short tool loop over a small set of **read-only** tools:
 
 See the [quick-start guide](quickstart.html) to get a workspace running first,
 then turn the agent on with either mode above.
+
+Next: [Guides — teach agents your data's quirks →](guides.html) · [The MCP server →](mcp.html)

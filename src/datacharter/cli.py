@@ -42,15 +42,17 @@ sources:
   store:
     type: sqlite
     path: demo/store.db
+    tables: [customers, orders]
     pii:
       customers: [email]
 
-# A governed metric. Try: datacharter metric revenue
+# A governed metric. Try: datacharter metric revenue --grain month
 metrics:
   revenue:
     relation: store.orders
     expression: round(sum(total), 2)
     dimensions: [customer_id]
+    time_column: placed_on
 """
 
 ENV_EXAMPLE = """\
@@ -183,7 +185,9 @@ def _cmd_serve(args: argparse.Namespace) -> int:
     )
     if args.offline:
         _print_attestation(ws, args.host, args.port)
-    print(f"DataCharter serving {ws} on http://{args.host}:{args.port}")
+    # flush: under nohup/CI redirection stdout is block-buffered and uvicorn.run
+    # never returns, so an unflushed banner leaves the log empty.
+    print(f"DataCharter serving {ws} on http://{args.host}:{args.port}", flush=True)
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
     return 0
 
@@ -872,6 +876,22 @@ def _cmd_eval(args: argparse.Namespace) -> int:
         print("No eval suites in evals/*.yaml.", file=sys.stderr)
         return 1
 
+    import os
+
+    # Evals run every question through a real agent. With no endpoint at all,
+    # every case fails 0% for a reason the scorecard can't show — refuse with
+    # the reason instead.
+    if not args.local and not os.environ.get("OPENAI_BASE_URL") and not os.environ.get(
+        "OPENAI_API_KEY"
+    ):
+        print(
+            "No agent endpoint configured — evals run each question through a real "
+            "agent.\nSet OPENAI_BASE_URL / OPENAI_API_KEY (any OpenAI-compatible "
+            "endpoint), or pass --local to use Ollama.",
+            file=sys.stderr,
+        )
+        return 2
+
     llm = _local_llm(args.model) if args.local else LLMClient()
     engine = _open_engine(ws, charter.sources)
     box = ToolBox(engine, charter.sources, guides=charter.guides, policies=charter.policies)
@@ -879,6 +899,8 @@ def _cmd_eval(args: argparse.Namespace) -> int:
         ToolBox(engine, charter.sources, guides="", policies=charter.policies)
         if args.compare_guides else None
     )
+
+    from datacharter.agent.llm import LLMError
 
     worst = 1.0
     try:
@@ -894,6 +916,13 @@ def _cmd_eval(args: argparse.Namespace) -> int:
 
             save_run(ws, record)
             worst = min(worst, record.overall["with_guides"])
+    except LLMError as exc:
+        print(f"\nAgent endpoint error: {exc}", file=sys.stderr)
+        print(
+            "Check OPENAI_BASE_URL / OPENAI_API_KEY (or your --local Ollama model).",
+            file=sys.stderr,
+        )
+        return 1
     finally:
         engine.close()
 
@@ -1188,7 +1217,18 @@ def main(argv: list[str] | None = None) -> int:
     if not hasattr(args, "func"):
         parser.print_help()
         return 1
-    return args.func(args)
+    try:
+        return args.func(args)
+    except Exception as exc:  # noqa: BLE001 — narrowed below; lazy imports keep startup fast
+        from datacharter.contracts import CharterError
+        from datacharter.engine.session import EngineError
+
+        if isinstance(exc, (CharterError, EngineError)):
+            # Anything that escapes a subcommand's own handling still prints as
+            # a clean, actionable message — never a traceback.
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
+        raise
 
 
 if __name__ == "__main__":

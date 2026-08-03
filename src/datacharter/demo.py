@@ -27,6 +27,7 @@ sources:
   store:
     type: sqlite
     path: demo/store.db
+    tables: [customers, orders]
     pii:
       customers: [email]
     context:
@@ -42,12 +43,13 @@ policies:
 # Tripwires: synthetic honeytokens that alarm if masking ever fails.
 canary: on
 
-# A governed metric. Try: datacharter metric revenue
+# A governed metric. Try: datacharter metric revenue --grain month
 metrics:
   revenue:
     relation: store.orders
     expression: round(sum(total), 2)
     dimensions: [customer_id]
+    time_column: placed_on
 """
 
 SEED_QUESTION = "What do the tiers look like?"

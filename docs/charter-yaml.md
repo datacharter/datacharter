@@ -3,7 +3,7 @@ title: charter.yaml reference
 description: Every field of a source contract, plus how credentials resolve.
 ---
 
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
+[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [Editor](editor.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Guides](guides.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Workspace](workspace.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
 `charter.yaml` is the heart of a workspace. It describes your sources the way a
 data contract does: connection shape, which tables to expose, and which columns
@@ -25,6 +25,16 @@ sources:
 | --- | --- | --- |
 | `version` | yes | Must be `1`. Any other value is a load error. |
 | `sources` | yes | A non-empty **mapping** of source name to source body. |
+| `metrics` | no | Named, governed aggregations ([below](#metrics)). |
+| `tests` | no | Data assertions for `datacharter test` ([below](#tests)). |
+| `policies` | no | Plain-English agent policies ([policies](policies.html)). |
+| `local_access` | no | Agent-access overrides for `local.*` snapshots ([below](#local_access)). |
+| `audit` / `canary` | no | Flight recorder (default on) and canary tripwires ([audit](audit.html)). |
+
+Everything else — `pii`, `tables`, `agent_access`, `row_filters`, `context` —
+is **source-level**: it lives inside a `sources.<name>:` block. Placing one at
+the top level is a load error (it would otherwise be silently ignored, which is
+worse).
 
 The file must be a YAML mapping. `sources` is keyed by name (not a list), so
 each source name is unique by construction.
@@ -102,8 +112,9 @@ POSIX-style path or a `${VAR}` reference.
 ### `tables`
 
 A list of table names to expose for a database or Snowflake source. Each is
-published as a flat `<source>__<table>` view. If omitted for a database source,
-DataCharter introspects the source and aliases all of its tables. File sources
+published as a flat `<source>__<table>` view alongside the dotted
+`source.table` name. If omitted for a database source, every table is still
+queryable by its dotted name — only the flat views need the list. File sources
 are a single relation named after the source, so they ignore `tables`.
 
 ### `pii`
@@ -130,14 +141,20 @@ table override, which beats a source-wide override, which beats the PII default
 `true` means the agent sees real values; `false` means it sees masked (`•••`)
 values. The human SQL editor is never affected either way.
 
+Like every field in this section, it lives **inside the source it governs**
+(a top-level `agent_access:` is a load error):
+
 ```yaml
-agent_access:
-  source: true                 # whole-source default for the agent
-  tables:
-    orders: true               # every column of orders
-  columns:
-    customers.tier: false      # mask one non-PII column
-    customers.email: true      # unmask one PII column
+sources:
+  crm:
+    type: postgres
+    agent_access:
+      source: true                 # whole-source default for the agent
+      tables:
+        orders: true               # every column of orders
+      columns:
+        customers.tier: false      # mask one non-PII column
+        customers.email: true      # unmask one PII column
 ```
 
 The **data explorer's left panel** writes this block for you: the 👁 / 🙈
@@ -153,9 +170,12 @@ referenced but the query can't be rewritten, it is refused rather than run
 unfiltered.
 
 ```yaml
-row_filters:
-  orders: "region = 'US'"
-  customers: "tier != 'internal'"
+sources:
+  crm:
+    type: postgres
+    row_filters:
+      orders: "region = 'US'"
+      customers: "tier != 'internal'"
 ```
 
 Predicates are static (authored in the contract); the local OSS core has no
@@ -371,3 +391,5 @@ sources:
 
 See the [sources matrix](sources.html) for how each type is registered and how
 pushdown behaves.
+
+Next: [Supported sources →](sources.html)

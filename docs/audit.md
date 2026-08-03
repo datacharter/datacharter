@@ -3,7 +3,7 @@ title: Audit — the flight recorder
 description: A tamper-evident record of every agent data access, with one-command verification and evidence export.
 ---
 
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
+[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [Editor](editor.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Guides](guides.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Workspace](workspace.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
 Governance without evidence is a promise. The flight recorder turns it into a
 record: **every agent data access is logged, hash-chained, and verifiable** —
@@ -71,9 +71,9 @@ canary: { mode: log }   # or: let it through, alarm loudly
 DataCharter plants `local.canaries` — synthetic PII whose values embed unique
 tokens — and masks it with the same machinery that protects your real data. An
 agent that queries it sees `•••`, like everything else. Which means **a canary
-token can only ever appear in agent output if masking or the query guard
-actually failed** — there is no legitimate path, so alarms are near-zero
-false-positive by construction. Alarms land in the hash chain (tamper-evident),
+token in agent output means masking or the query guard failed on that path** —
+canaries are designed so that no governed query can legitimately return one, so
+alarms are near-zero false-positive by construction. Alarms land in the hash chain (tamper-evident),
 light up the Audit panel, and in block mode the response is withheld.
 
 ```sh
@@ -88,3 +88,5 @@ datacharter canary drill      # deliberately trip the alarm path, end to end
   existing query [history](cli.html).
 - Concurrent surfaces (serve + mcp on one workspace) serialize through a lock,
   so the chain stays linear.
+
+Next: [Measure agent accuracy — evals →](evals.html)

@@ -118,3 +118,22 @@ async def test_async_timeout_interrupts(workspace):
         # Session stays usable after an interrupt.
         result = eng.query_sync("SELECT 1")
         assert result.rows == [(1,)]
+
+
+def test_second_open_reports_lock_not_key_change(tmp_path):
+    # A second process/engine on the same workspace must not be told to delete
+    # the state DB ("encryption key may have changed" steered users to discard
+    # snapshots when the real cause was a running server).
+    from datacharter.engine.session import Engine, EngineError
+
+    first = Engine(tmp_path, []).start()
+    try:
+        try:
+            Engine(tmp_path, []).start()
+            raise AssertionError("second open unexpectedly succeeded")
+        except EngineError as exc:
+            msg = str(exc)
+            assert "already using this workspace" in msg
+            assert "encryption key" not in msg
+    finally:
+        first.close()

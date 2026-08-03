@@ -481,17 +481,14 @@
         <pre><span class="k">sources</span>:
   <span class="k">crm</span>:
     <span class="k">type</span>: <span class="s">postgres</span>
-    <span class="k">tables</span>:
-      <span class="k">customers</span>:
-        <span class="k">pii</span>: [<span class="s">email</span>, <span class="s">phone</span>]   <span class="c"># masked for agents by default</span>
-
-<span class="k">agent_access</span>:
-  <span class="k">crm</span>:
-    <span class="k">customers</span>:
-      <span class="k">email</span>: <span class="s">deny</span>            <span class="c"># not one column more</span>
-
-<span class="k">row_filters</span>:
-  <span class="k">orders</span>: <span class="s">"region = 'US'"</span>    <span class="c"># the rows an agent may see</span></pre>
+    <span class="k">tables</span>: [<span class="s">customers</span>, <span class="s">orders</span>]
+    <span class="k">pii</span>:
+      <span class="k">customers</span>: [<span class="s">email</span>, <span class="s">phone</span>]  <span class="c"># masked for agents by default</span>
+    <span class="k">agent_access</span>:
+      <span class="k">columns</span>:
+        <span class="k">customers.email</span>: <span class="s">false</span>   <span class="c"># not one column more</span>
+    <span class="k">row_filters</span>:
+      <span class="k">orders</span>: <span class="s">"region = 'US'"</span>    <span class="c"># the rows an agent may see</span></pre>
       </div>
       <ul class="law">
         <li>
@@ -544,7 +541,7 @@
         <li>Agent evals: measure accuracy and your guide-lift</li>
         <li>Flight recorder: tamper-evident audit of every agent access</li>
         <li>Desktop app (beta): the same governed explorer, no terminal needed</li>
-        <li>Self-writing guides: your query habits, mined into agent context</li>
+        <li>Guides that write themselves from your query history (<code class="i">datacharter suggest</code>) — you review every line before it ships</li>
         <li>Plain-English policies: aggregates-only + k-anonymity, enforced</li>
         <li>Monaco SQL editor with catalog autocomplete</li>
         <li>Live results preview as you type</li>
@@ -615,9 +612,11 @@
     <span>© DataCharter · <a href="https://github.com/datacharter/datacharter/blob/main/LICENSE">Apache-2.0</a> · <a href="privacy.html">Privacy</a> · <a href="mailto:hello@datacharter.dev" class="copy-mail" title="Click to copy">hello@datacharter.dev</a></span>
     <span class="spacer"></span>
     <a href="quickstart.html">Quick start</a>
+    <a href="editor.html">Editor</a>
     <a href="charter-yaml.html">charter.yaml</a>
     <a href="sources.html">Sources</a>
     <a href="agent.html">Agent</a>
+    <a href="guides.html">Guides</a>
     <a href="cli.html">CLI</a>
     <a href="mcp.html">MCP</a>
     <a href="faq.html">FAQ</a>

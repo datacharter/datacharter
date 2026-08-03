@@ -3,7 +3,7 @@ title: Supported sources — Postgres, MySQL, Snowflake, BigQuery, Iceberg, Delt
 description: Every file and database source DataCharter can query and join locally — how each is registered, and how pushdown behaves.
 ---
 
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
+[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [Editor](editor.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Guides](guides.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Workspace](workspace.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
 DataCharter federates every source through one DuckDB engine. Each source type
 is registered by one of four mechanisms, and pushdown (sending filters and
@@ -93,11 +93,12 @@ raise `max_rows`, narrow your query so pushdown pulls less, or use Export
 
 ## Uniform table names
 
-Every database and Snowflake table is exposed as a flat view named
-`"<source>__<table>"`, collapsing six different qualification schemes into one
-predictable name. A Snowflake connector table reads identically to an attached
-one at the query layer. File sources are already a single flat relation named
-after the source (for example, `orders`), so they need no alias.
+Every table declared in a source's `tables:` list is exposed as a flat view
+named `"<source>__<table>"`, collapsing six different qualification schemes
+into one predictable name; dotted `source.table` names always work, listed or
+not. A Snowflake connector table reads identically to an attached one at the
+query layer. File sources are already a single flat relation named after the
+source (for example, `orders`), so they need no alias.
 
 ```sql
 -- A cross-source join reads the same regardless of where each side lives:
@@ -108,4 +109,22 @@ GROUP BY c.email
 ORDER BY spend DESC;
 ```
 
-See [charter.yaml reference](charter-yaml.html) for how to declare each source.
+Declaring one is a few lines of `charter.yaml` — for example:
+
+```yaml
+sources:
+  warehouse:
+    type: postgres
+    connection: { host: db.internal, database: analytics, user: readonly }
+    credentials: { password: ${WAREHOUSE_PASSWORD} }
+    tables: [customers, orders]
+
+  events:
+    type: parquet
+    path: s3://lake/events/*.parquet
+    credentials: { key_id: ${AWS_KEY_ID}, secret: ${AWS_SECRET} }
+```
+
+Every field, per type, is in the [charter.yaml reference](charter-yaml.html).
+
+Next: [Connect an agent →](agent.html)

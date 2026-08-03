@@ -1,16 +1,16 @@
 ---
 layout: post
 title: "The black-box flight recorder for AI data access"
-description: "71% of organizations are running AI agents they can't monitor. DataCharter 0.14.0 ships the missing piece: a tamper-evident audit trail of every agent query — dual-attributed, hash-chained, exportable as evidence."
+description: "Most teams running AI agents can't answer 'what did it touch?'. DataCharter 0.14.0 ships the missing piece: a tamper-evident audit trail of every agent query — dual-attributed, hash-chained, exportable as evidence."
 author: Rishi Mashelkar
 ---
 
-Here's a number that stopped me cold this week: surveys of enterprise MCP
-adoption keep finding that **the single biggest blocker is the missing audit
-trail** — there's no standard record of which tools an agent called, with what
-arguments, and what came back. One report put it bluntly: 71% of organizations
-are running AI agents they cannot properly monitor, and roughly nine in ten had
-an agent-related security incident last year.
+Here's the pattern that stopped me cold this week: ask a team running AI agents
+"what did your agent touch last Tuesday?" and watch the room go quiet. Surveys
+of enterprise MCP adoption keep finding the same blocker near the top —
+**the missing audit trail**. There's no standard record of which tools an agent
+called, with what arguments, and what came back; every incident review starts
+from screenshots and vibes.
 
 Airplanes solved this problem decades ago. You don't argue about what happened
 on a flight — you pull the black box.

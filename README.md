@@ -11,8 +11,8 @@
 
 **[datacharter.dev](https://datacharter.dev)** · [Desktop app (beta)](https://datacharter.dev/desktop.html) · [Docs](https://datacharter.dev/quickstart.html) · [Blog](https://datacharter.dev/blog/) · [CI Action](https://github.com/marketplace/actions/datacharter-data-checks)
 
-*The big-words version: a local, federated data explorer with governed, regulated
-agentic data access, powered by **[DuckDB](https://duckdb.org)**.* Here's what that
+*The big-words version: a local, federated data explorer with governed
+agent data access, powered by **[DuckDB](https://duckdb.org)**.* Here's what that
 actually means 👇
 
 **🔍 Query all your data, locally — no pipelines, no warehouse, no waiting**

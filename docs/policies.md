@@ -3,7 +3,7 @@ title: Policies — plain English, enforced math
 description: Aggregate-only access, k-anonymity group suppression, and join limits — written the way you'd say them, enforced by query analysis.
 ---
 
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
+[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [Editor](editor.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Guides](guides.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Workspace](workspace.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
 Masking hides sensitive *columns*. Sometimes the requirement is stronger: agents
 should never see **individuals at all** — only statistics, only over groups big
@@ -62,3 +62,13 @@ uvx datacharter serve examples/ecommerce
 
 Ask the agent for "average customer count by region" — works. Ask it to "list
 customer emails" — refused, with the policy quoted back.
+
+**No LLM handy?** Policies bind the agent surface, so your own SQL in the
+editor won't trigger them — but any MCP client will. Point one at the
+workspace (`datacharter mcp <dir>`, config on the [MCP page](mcp.html)) and
+call the `query` tool with `SELECT * FROM <policied relation>`: you get the
+refusal text back, and the refusal itself lands in the
+[flight recorder](audit.html). The tour demo (`datacharter init demo --demo
+--tour`) ships a policied table and a seeded refusal to inspect.
+
+Next: [Prove it happened — audit →](audit.html)

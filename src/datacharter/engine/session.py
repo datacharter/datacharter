@@ -602,6 +602,17 @@ class Engine:
         try:
             self._setup(f"ATTACH {self._quoted(str(db))} AS local{options}")
         except EngineError as exc:
+            # Another running process holding the DB is by far the most common
+            # cause — never steer that user toward deleting their snapshots.
+            lowered = str(exc).lower()
+            held = "lock" in lowered or "being used" in lowered or "already attached" in lowered
+            if db.exists() and held:
+                raise EngineError(
+                    f"The local state database ({STATE_DIR}/state.duckdb) is locked — "
+                    "another datacharter process (serve, mcp, or the desktop app) is "
+                    "already using this workspace. Stop it, or use a different "
+                    "workspace."
+                ) from None
             # A pre-existing state DB that won't open usually means the key
             # changed. It can hold saved snapshots, so never wipe it silently —
             # tell the user how to recover instead.

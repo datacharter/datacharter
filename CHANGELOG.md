@@ -5,6 +5,32 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Misplaced governance config is now a load error instead of silently
+  ignored.** A top-level `row_filters:`/`agent_access:`/`pii:` block (they are
+  source-level fields) previously did nothing while looking enabled — the
+  loader now refuses with a message saying exactly where to move it. Agent
+  access values must be booleans, so a YAML `deny` can no longer silently
+  unmask a column.
+- **A locked workspace now says so.** Opening a workspace another datacharter
+  process is serving reported "the encryption key may have changed" and
+  suggested deleting the state database; it now names the real cause.
+- **`datacharter eval` refuses with a hint when no agent endpoint is
+  configured** instead of reporting a misleading 0%, and endpoint errors
+  (including `--judge`) print cleanly instead of a traceback.
+- The demo workspace now exposes the `store__customers`-style flat views the
+  quickstart teaches, and its `revenue` metric declares a `time_column` so
+  `--grain` works out of the box.
+- CLI errors that escape a subcommand print as one-line messages, and the
+  `serve` banner is flushed so redirected logs aren't empty.
+
+### Docs
+- New Guides and Workbench (editor) pages; every page joined a unified nav
+  with reading-order links; the landing page's charter example now uses real,
+  loadable syntax; CLI reference gained `eval`, `audit`, `canary`, and
+  `suggest`; MCP page gained per-client setup paths; clearer table-naming,
+  drift, and offline-evals documentation throughout.
+
 ## [0.18.2] - 2026-08-02
 
 ### Fixed

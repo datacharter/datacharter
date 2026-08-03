@@ -3,11 +3,16 @@ title: Quick-start guide
 description: From zero to querying your own data in a few minutes.
 ---
 
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
+[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [Editor](editor.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Guides](guides.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Workspace](workspace.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
 DataCharter is one Python package. `pip install datacharter` (or `uvx` for a
 zero-install try) gives you the engine, the API, and the web UI in one process.
 It requires Python 3.11 or newer.
+
+One idea powers everything here: your **charter** is the data contract your
+team already writes (sources, tables, PII) — and in DataCharter it's also the
+enforcement mechanism. Describe your data once; querying, masking, and agent
+access all follow from that file.
 
 ## Try it in 60 seconds
 
@@ -40,6 +45,7 @@ datacharter serve     # explore in your browser
 ```
 charter.yaml     # your sources (safe to commit; no secrets)
 queries/         # your SQL query library (*.sql)
+guides/          # notes for agents — tribal knowledge, versioned (see Guides)
 .env.example     # credential names with placeholder values
 .gitignore       # excludes .env and .datacharter/
 ```
@@ -103,9 +109,11 @@ environment or `.env` secrets).
 
 ## Query across sources
 
-Every database table is exposed as a flat `<source>__<table>` view; a file
-source is a relation named after the source. Joins across sources read like any
-other SQL:
+Database tables are queried as `source.table` (for example `store.customers`);
+tables you list under a source's `tables:` also get a flat `<source>__<table>`
+view. A file source is a relation named after the source. Not sure what exists?
+`datacharter query "SHOW ALL TABLES"` lists every queryable relation. Joins
+across sources read like any other SQL:
 
 ```sql
 SELECT c.email, sum(o.total) AS spend
@@ -192,7 +200,10 @@ datacharter serve            # no charter here? you get the tour workspace
 datacharter init demo --demo --tour   # or scaffold it explicitly
 ```
 
-The tour workspace ships everything wired up — a guide, an eval suite, a policy
-(`aggregates only` · `groups of at least 2`), canary tripwires, and a real,
-hash-verifiable audit chain — so the in-app walkthrough has something true to
-point at on every panel.
+The tour workspace ships everything wired up: a sample guide (notes agents read
+for context), an eval suite (accuracy tests for agent answers), a plain-English
+policy (`aggregates only` · `groups of at least 2`), canary tripwires (fake PII
+that alarms if masking ever fails), and a real, hash-verifiable audit chain —
+so the in-app walkthrough has something true to point at on every panel.
+
+Next: [The workbench — editor, charts, profiling →](editor.html) · [Define your charter →](charter-yaml.html)

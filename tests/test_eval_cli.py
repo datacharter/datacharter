@@ -24,6 +24,7 @@ def test_eval_passes_and_exits_zero(tmp_path, monkeypatch):
             for d in [Delta(text="There are 90 orders.")]:
                 yield d
 
+    monkeypatch.setenv("OPENAI_BASE_URL", "http://stub.local/v1")
     monkeypatch.setattr(cli, "LLMClient", StubLLM, raising=False)
     assert cli_main(["eval", str(tmp_path), "--threshold", "1.0"]) == 0
 
@@ -44,6 +45,7 @@ def test_eval_below_threshold_exits_nonzero(tmp_path, monkeypatch):
             for d in [Delta(text="nope")]:
                 yield d
 
+    monkeypatch.setenv("OPENAI_BASE_URL", "http://stub.local/v1")
     monkeypatch.setattr(cli, "LLMClient", StubLLM, raising=False)
     assert cli_main(["eval", str(tmp_path), "--threshold", "0.5"]) == 1
 
@@ -75,6 +77,7 @@ def test_eval_compare_guides_reports_lift(tmp_path, monkeypatch, capsys):
             for d in [Delta(text=answer)]:
                 yield d
 
+    monkeypatch.setenv("OPENAI_BASE_URL", "http://stub.local/v1")
     monkeypatch.setattr(cli, "LLMClient", GuideSensitiveLLM, raising=False)
     rc = cli_main(["eval", str(tmp_path), "--compare-guides"])
     out = capsys.readouterr().out
@@ -98,9 +101,25 @@ def test_eval_history_after_run(tmp_path, monkeypatch, capsys):
             for d in [Delta(text="There are 90 orders.")]:
                 yield d
 
+    monkeypatch.setenv("OPENAI_BASE_URL", "http://stub.local/v1")
     monkeypatch.setattr(cli, "LLMClient", StubLLM, raising=False)
     cli_main(["eval", str(tmp_path)])
     capsys.readouterr()
     assert cli_main(["eval", str(tmp_path), "--history"]) == 0
     out = capsys.readouterr().out
     assert "Pass rate over time" in out and "100%" in out
+
+
+def test_eval_without_endpoint_refuses_with_hint(tmp_path, monkeypatch, capsys):
+    # A silent "0% passed" with no agent configured is indistinguishable from
+    # the agent being wrong — refuse up front and say what to set.
+    cli_main(["init", str(tmp_path), "--demo"])
+    _write_suite(
+        tmp_path,
+        "version: 1\ncases:\n  - question: q?\n"
+        "    expect:\n      - { type: answer_contains, value: 'x' }\n",
+    )
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    assert cli_main(["eval", str(tmp_path)]) == 2
+    assert "No agent endpoint configured" in capsys.readouterr().err

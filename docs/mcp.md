@@ -3,11 +3,12 @@ title: MCP server — connect Claude, Cursor, or Cline to your data, governed
 description: Expose your workspace to any MCP client — read-only, PII-masked SQL over your files and databases, with per-column access from your data contract.
 ---
 
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
+[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [Editor](editor.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Guides](guides.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Workspace](workspace.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
-`datacharter mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io)
-server that exposes your workspace's data to any MCP client (Cursor, Cline, or
-your own agent) — **safely**. The same governance the built-in agent uses is
+MCP — the [Model Context Protocol](https://modelcontextprotocol.io) — is the
+open standard AI apps like Claude, Cursor, and Cline use to call external
+tools. `datacharter mcp` runs an MCP server that exposes your workspace's data
+to any such client — **safely**. The same governance the built-in agent uses is
 applied to every tool call:
 
 - **Read-only** — writes and filesystem/remote functions are rejected by the
@@ -74,6 +75,22 @@ Use the absolute path to your workspace (the directory containing
 `charter.yaml`). If `datacharter` is installed in a virtual environment, use its
 full path (or `uvx datacharter`).
 
+Where that JSON goes, per client:
+
+- **Claude Desktop** — Settings → Developer → Edit Config, or edit
+  `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) /
+  `%APPDATA%\Claude\claude_desktop_config.json` (Windows), then restart the app.
+- **Claude Code** — `claude mcp add datacharter -- datacharter mcp /path/to/workspace`,
+  or add the block to `.mcp.json` in your project.
+- **Cursor** — Settings → MCP → Add server, or `.cursor/mcp.json` in your
+  project (`~/.cursor/mcp.json` for all projects).
+- **Cline** — the MCP Servers icon → Configure, which edits
+  `cline_mcp_settings.json`.
+
+Your workspace **guides** ride along automatically in the protocol's
+`initialize` `instructions` field — every client above gets your data notes
+with zero extra configuration ([how guides work](guides.html)).
+
 ## Run it in Docker
 
 The repository ships a `Dockerfile` that runs the MCP server over stdio with a
@@ -94,3 +111,5 @@ This is the local, single-user surface: stdio transport, no authentication —
 the same trust model as running `datacharter serve` on your own machine. A
 network-addressable server with per-caller authentication and authorization is a
 separate, enterprise-oriented capability and is not part of this command.
+
+Next: [Plain-English policies →](policies.html)

@@ -3,7 +3,7 @@ title: Agent evals
 description: Measure how well agents answer over your data — and how much your guides help.
 ---
 
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
+[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [Editor](editor.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Guides](guides.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Workspace](workspace.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
 [Guides](charter-yaml.html#context-and-guides-agent-context) claim that context
 makes agents better. **Evals prove it — on your data, locally.** Write the
@@ -63,6 +63,12 @@ agent's context, once with them stripped — and prints the delta:
 Evals run your real agent, so they cost tokens and are non-deterministic. Use
 `--samples` to average, and `--local` to run against a local model for free.
 
+**An agent endpoint is required.** Set `OPENAI_BASE_URL` / `OPENAI_API_KEY`
+(any OpenAI-compatible endpoint), or pass `--local` to use Ollama. With
+nothing configured, `datacharter eval` refuses with a hint — a suite can't
+score answers no agent produced. `--judge` uses the same endpoint to grade
+freeform answers.
+
 ## In CI
 
 Drop it into the [DataCharter Action](https://github.com/marketplace/actions/datacharter-data-checks)
@@ -75,3 +81,5 @@ accuracy blocks the PR rather than surfacing in production.
 the scorecard, the guide-lift bar, and the trend chart. The neighbouring
 **Guides** editor lets you write `guides/*.md` and per-table context without
 leaving the app. Editing is only enabled on a loopback server.
+
+Next: [The flight recorder and canaries →](audit.html)

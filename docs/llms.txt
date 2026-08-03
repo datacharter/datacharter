@@ -16,6 +16,8 @@ opt-in canary tripwires alarm if a masked value ever escapes to agent output.
 ## Docs
 
 - [Quick start](https://datacharter.dev/quickstart.html): install, first workspace, first query
+- [The workbench](https://datacharter.dev/editor.html): SQL editor, live results, charts, profiling, command palette
+- [Guides](https://datacharter.dev/guides.html): markdown agent context, datacharter suggest, measuring lift
 - [charter.yaml](https://datacharter.dev/charter-yaml.html): the data-contract file — sources, PII, agent access
 - [Sources](https://datacharter.dev/sources.html): every supported file and database source
 - [Agent](https://datacharter.dev/agent.html): connecting Claude Code, Ollama, or any OpenAI-compatible agent

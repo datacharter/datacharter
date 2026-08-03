@@ -250,3 +250,42 @@ def test_loader_parses_tests(tmp_path):
     assert t.name == "id_not_null"
     assert t.type == "not_null"
     assert t.column == "id"
+
+
+def test_top_level_governance_keys_are_rejected(tmp_path):
+    # Silently ignoring a misplaced row_filters/agent_access block means a user
+    # believes governance is on when nothing is enforced — fail closed instead.
+    for key in ("row_filters", "agent_access", "pii"):
+        ws = write_charter(
+            tmp_path, f"version: 1\nsources: {{}}\n{key}:\n  orders: something\n"
+        )
+        with pytest.raises(CharterError, match="source-level"):
+            load_charter(ws)
+
+
+def test_agent_access_values_must_be_booleans(tmp_path):
+    # YAML `deny` is a truthy string — it would silently UNMASK the column.
+    text = (
+        "version: 1\nsources:\n  crm:\n    type: csv\n    path: d.csv\n"
+        "    agent_access:\n      columns:\n        customers.email: deny\n"
+    )
+    with pytest.raises(CharterError, match="true .*or false"):
+        load_charter(write_charter(tmp_path, text))
+
+
+def test_agent_access_unknown_key_rejected(tmp_path):
+    text = (
+        "version: 1\nsources:\n  crm:\n    type: csv\n    path: d.csv\n"
+        "    agent_access:\n      customers:\n        email: false\n"
+    )
+    with pytest.raises(CharterError, match="unknown key"):
+        load_charter(write_charter(tmp_path, text))
+
+
+def test_local_access_values_validated_too(tmp_path):
+    ws = write_charter(
+        tmp_path,
+        "version: 1\nsources: {}\nlocal_access:\n  tables:\n    snap: deny\n",
+    )
+    with pytest.raises(CharterError, match="true .*or false"):
+        load_charter(ws)
