@@ -54,6 +54,26 @@ export default function GuidesEditor() {
     }
   };
 
+  const startNew = () => {
+    setName("");
+    setContent("");
+    setSaved(false);
+    setError(null);
+  };
+
+  const remove = async () => {
+    if (!window.confirm(`Delete guide "${name}"? Agents stop receiving it immediately.`)) return;
+    setError(null);
+    try {
+      await api.deleteGuide(name);
+      setName("");
+      setContent("");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Delete failed.");
+    }
+  };
+
   return (
     <div className="guides-editor">
       <header className="guides-header">
@@ -63,19 +83,20 @@ export default function GuidesEditor() {
         </p>
       </header>
 
-      {payload.guides.length > 0 && (
-        <div className="guides-tabs">
-          {payload.guides.map((g) => (
-            <button
-              key={g.name}
-              className={g.name === name ? "guides-tab active" : "guides-tab"}
-              onClick={() => pick(g.name)}
-            >
-              {g.name}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="guides-tabs">
+        {payload.guides.map((g) => (
+          <button
+            key={g.name}
+            className={g.name === name ? "guides-tab active" : "guides-tab"}
+            onClick={() => pick(g.name)}
+          >
+            {g.name}
+          </button>
+        ))}
+        <button className="guides-tab" onClick={startNew} aria-label="New guide">
+          + New
+        </button>
+      </div>
 
       <input
         className="guides-name"
@@ -96,6 +117,11 @@ export default function GuidesEditor() {
         <button className="topbar-btn" onClick={save}>
           Save
         </button>
+        {payload.guides.some((g) => g.name === name) && (
+          <button className="topbar-btn" onClick={remove} aria-label={`Delete guide ${name}`}>
+            Delete
+          </button>
+        )}
         {saved && <span className="guides-saved">Saved ✓</span>}
         {error && <span className="guides-error">{error}</span>}
       </div>

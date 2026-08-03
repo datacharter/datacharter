@@ -1165,3 +1165,11 @@ table.grid td.rownum, table.grid th.rownum {
   padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;
   background: var(--bg-panel); margin-bottom: 6px;
 }
+
+/* Snapshot recheck (source tree) */
+.tree-snapshot-row .tree-recheck { display: flex; align-items: center; gap: 6px; margin: 0 0 4px 26px; }
+.tree-recheck-note { font-size: 0.78rem; color: var(--muted, #667); }
+
+/* Evals suite editor + data tests reuse the guides editor styles */
+.evals-editor, .evals-datatests { margin-top: 18px; }
+.evals-editor .guides-content { font-family: var(--mono, monospace); font-size: 0.85rem; }

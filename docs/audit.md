@@ -56,7 +56,8 @@ saw about your data, provable.*
 
 `datacharter serve` has an **Audit** panel: a session timeline (who connected,
 what they asked, every query with its masking) under a live **chain verified ✓**
-badge.
+badge, and an **Export evidence** button that downloads the same self-contained
+pack as `datacharter audit export`.
 
 ## Canary tripwires
 

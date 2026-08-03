@@ -164,6 +164,32 @@ export const api = {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
     }),
+  deleteGuide: (name: string) =>
+    request<{ removed: string }>(`/api/guides/${name}`, { method: "DELETE" }),
+  listEvalFiles: () =>
+    request<{ files: { name: string; content: string }[] }>("/api/evals/files"),
+  saveEvalFile: (name: string, content: string) =>
+    request<{ saved: string }>(`/api/evals/files/${name}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content }),
+    }),
+  deleteEvalFile: (name: string) =>
+    request<{ removed: string }>(`/api/evals/files/${name}`, { method: "DELETE" }),
+  recheckSnapshot: (name: string) =>
+    request<{ changed: boolean; gone: number; new: number }>(
+      `/api/snapshot/${name}/recheck`,
+      { method: "POST" },
+    ),
+  listMetrics: () =>
+    request<{ metrics: { name: string; sql: string; dimensions: string[]; has_time: boolean }[] }>(
+      "/api/metrics",
+    ),
+  runDataTests: () =>
+    request<{
+      results: { name: string; passed: boolean; failing_rows?: number; error?: string }[];
+      passed: boolean;
+    }>("/api/tests/run", { method: "POST" }),
 };
 
 export interface AuditEntry {

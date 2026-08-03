@@ -15,7 +15,8 @@ from pydantic import BaseModel, Field, ValidationError
 
 __all__ = [
     "EvalAssertion", "EvalCase", "EvalSuite", "EvalError",
-    "load_suites", "validate_assertion", "check_assertion", "ASSERTION_TYPES",
+    "load_suites", "parse_suite", "validate_assertion", "check_assertion",
+    "ASSERTION_TYPES",
 ]
 
 EVALS_DIR = "evals"
@@ -59,30 +60,33 @@ def validate_assertion(a: EvalAssertion, ctx: str) -> None:
         raise EvalError(f"{ctx}: result_scalar needs 'equals'")
 
 
+def parse_suite(name: str, text: str) -> EvalSuite:
+    """Parse and validate one suite's YAML text (also the save-time validator)."""
+    ctx = f"{name}.yaml"
+    try:
+        raw: Any = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        raise EvalError(f"{ctx}: invalid YAML: {exc}") from None
+    cases_raw = (raw or {}).get("cases") or []
+    if not isinstance(cases_raw, list):
+        raise EvalError(f"{ctx}: 'cases' must be a list.")
+    cases: list[EvalCase] = []
+    for i, c in enumerate(cases_raw):
+        try:
+            case = EvalCase(**c)
+        except (ValidationError, TypeError) as exc:
+            raise EvalError(f"{ctx}: case {i}: {exc}") from None
+        for j, a in enumerate(case.expect):
+            validate_assertion(a, f"{ctx}: case {i}: expect[{j}]")
+        cases.append(case)
+    return EvalSuite(name=name, cases=cases)
+
+
 def load_suites(workspace: Path | str) -> list[EvalSuite]:
     root = Path(workspace) / EVALS_DIR
     if not root.is_dir():
         return []
-    suites: list[EvalSuite] = []
-    for f in sorted(root.glob("*.yaml")):
-        try:
-            raw: Any = yaml.safe_load(f.read_text())
-        except yaml.YAMLError as exc:
-            raise EvalError(f"{f.name}: invalid YAML: {exc}") from None
-        cases_raw = (raw or {}).get("cases") or []
-        if not isinstance(cases_raw, list):
-            raise EvalError(f"{f.name}: 'cases' must be a list.")
-        cases: list[EvalCase] = []
-        for i, c in enumerate(cases_raw):
-            try:
-                case = EvalCase(**c)
-            except (ValidationError, TypeError) as exc:
-                raise EvalError(f"{f.name}: case {i}: {exc}") from None
-            for j, a in enumerate(case.expect):
-                validate_assertion(a, f"{f.name}: case {i}: expect[{j}]")
-            cases.append(case)
-        suites.append(EvalSuite(name=f.stem, cases=cases))
-    return suites
+    return [parse_suite(f.stem, f.read_text()) for f in sorted(root.glob("*.yaml"))]
 
 
 def check_assertion(a: EvalAssertion, *, answer: str, sqls: list[str], scalar: Any) -> bool:

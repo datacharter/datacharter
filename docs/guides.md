@@ -21,7 +21,8 @@ guides/
 ```
 
 They are ordinary files: version them with the contract, review edits in PRs,
-and edit them in the app's **Guides** panel or any editor. Per-table notes can
+and manage them in the app's **Guides** panel — create (**+ New**), edit,
+Save, and Delete — or in any editor. Per-table notes can
 also live in the contract itself, as a source's
 [`context:`](charter-yaml.html#context) map — those surface in
 `describe_table`, right where an agent is looking at that table.

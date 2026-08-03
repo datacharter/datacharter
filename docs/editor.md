@@ -48,14 +48,16 @@ one; **Explain** shows the engine's plan. Both live next to the Run button.
 ## Files, snapshots, exports
 
 Drag a CSV, Parquet, JSON, or Excel file onto the window and it's queryable
-instantly. **Snapshot** saves a result as a reusable `local.<name>` table
-([recheck](cli.html) tells you later if its numbers changed). **Export**
-writes a result to CSV, Parquet, JSON, or XLSX — in Agent view, exports are
-masked too.
+instantly. **Snapshot** saves a result as a reusable `local.<name>` table —
+each snapshot in the sidebar has a **recheck** button that re-runs its query
+and tells you inline whether the numbers changed. **Export** writes a result
+to CSV, Parquet, JSON, or XLSX — in Agent view, exports are masked too.
 
 ## Command palette
 
-`Cmd/Ctrl+K` jumps anywhere: tables, saved queries, panels, actions — the
-fastest way around once you know it exists.
+`Cmd/Ctrl+K` jumps anywhere: tables, saved queries, panels, actions — and any
+contract-defined [metric](charter-yaml.html#metrics) ("Run metric: revenue"
+compiles it to SQL and runs it). The fastest way around once you know it
+exists.
 
 Next: [The workspace on disk →](workspace.html)

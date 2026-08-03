@@ -2,7 +2,18 @@ import { useEffect, useRef, useState } from "react";
 import embed from "vega-embed";
 import { api, type EvalRun, type EvalSuite } from "../api";
 
-/** Runs eval suites, shows the scorecard + guide-lift, and charts the trend. */
+const SUITE_TEMPLATE = `# Questions you actually ask, and what a correct answer must do.
+# Run from the Run button above, or: datacharter eval --compare-guides
+version: 1
+cases:
+  - question: "How many orders are there in total?"
+    expect:
+      - { type: sql_contains, value: "orders" }
+      - { type: answer_matches, pattern: "\\\\d+" }
+`;
+
+/** Runs eval suites, shows the scorecard + guide-lift, edits suite YAML, and
+ *  runs the contract's data tests. */
 export default function EvalsView() {
   const [suites, setSuites] = useState<EvalSuite[]>([]);
   const [runs, setRuns] = useState<EvalRun[]>([]);
@@ -11,10 +22,73 @@ export default function EvalsView() {
   const [compare, setCompare] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const trend = useRef<HTMLDivElement>(null);
+  const [files, setFiles] = useState<{ name: string; content: string }[]>([]);
+  const [editName, setEditName] = useState("");
+  const [editContent, setEditContent] = useState("");
+  const [editSaved, setEditSaved] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<
+    { name: string; passed: boolean; failing_rows?: number; error?: string }[] | null
+  >(null);
 
   const refresh = async () => {
     setSuites((await api.listEvals()).suites);
     setRuns((await api.evalHistory()).runs);
+    const f = (await api.listEvalFiles().catch(() => ({ files: [] }))).files ?? [];
+    setFiles(f);
+    if (f.length > 0 && !f.some((x) => x.name === editName)) {
+      setEditName(f[0].name);
+      setEditContent(f[0].content);
+    }
+  };
+
+  const pickSuite = (n: string) => {
+    const f = files.find((x) => x.name === n);
+    setEditName(n);
+    setEditContent(f?.content ?? "");
+    setEditSaved(false);
+    setEditError(null);
+  };
+
+  const newSuite = () => {
+    setEditName("");
+    setEditContent(SUITE_TEMPLATE);
+    setEditSaved(false);
+    setEditError(null);
+  };
+
+  const saveSuite = async () => {
+    setEditError(null);
+    try {
+      await api.saveEvalFile(editName, editContent);
+      setEditSaved(true);
+      setTimeout(() => setEditSaved(false), 1500);
+      await refresh();
+    } catch (e) {
+      setEditError(e instanceof Error ? e.message : "Save failed.");
+    }
+  };
+
+  const deleteSuite = async () => {
+    if (!window.confirm(`Delete eval suite "${editName}"?`)) return;
+    setEditError(null);
+    try {
+      await api.deleteEvalFile(editName);
+      setEditName("");
+      setEditContent("");
+      await refresh();
+    } catch (e) {
+      setEditError(e instanceof Error ? e.message : "Delete failed.");
+    }
+  };
+
+  const runTests = async () => {
+    setTestResults(null);
+    try {
+      setTestResults((await api.runDataTests()).results);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Data tests failed to run.");
+    }
   };
   useEffect(() => {
     void refresh();
@@ -114,6 +188,82 @@ export default function EvalsView() {
           </ul>
         </section>
       ))}
+
+      <section className="evals-editor">
+        <h3>Edit suites</h3>
+        <div className="guides-tabs">
+          {files.map((f) => (
+            <button
+              key={f.name}
+              className={f.name === editName ? "guides-tab active" : "guides-tab"}
+              onClick={() => pickSuite(f.name)}
+            >
+              {f.name}
+            </button>
+          ))}
+          <button className="guides-tab" onClick={newSuite} aria-label="New eval suite">
+            + New
+          </button>
+        </div>
+        <input
+          className="guides-name"
+          value={editName}
+          onChange={(e) => setEditName(e.target.value)}
+          aria-label="suite name"
+          placeholder="suite name (e.g. weekly-questions)"
+        />
+        <textarea
+          className="guides-content"
+          value={editContent}
+          onChange={(e) => setEditContent(e.target.value)}
+          rows={12}
+          aria-label="suite yaml"
+          placeholder="version: 1&#10;cases: …"
+        />
+        <div className="guides-actions">
+          <button className="topbar-btn" onClick={saveSuite}>
+            Save
+          </button>
+          {files.some((f) => f.name === editName) && (
+            <button className="topbar-btn" onClick={deleteSuite} aria-label={`Delete suite ${editName}`}>
+              Delete
+            </button>
+          )}
+          {editSaved && <span className="guides-saved">Saved ✓</span>}
+          {editError && <span className="guides-error">{editError}</span>}
+        </div>
+        <p className="evals-empty">
+          Saving validates the YAML with the same checks <code>datacharter eval</code> uses —
+          a suite that saves, runs.
+        </p>
+      </section>
+
+      <section className="evals-datatests">
+        <h3>
+          Data tests{" "}
+          <button className="topbar-btn" onClick={runTests} aria-label="Run data tests">
+            Run tests
+          </button>
+        </h3>
+        {testResults !== null && testResults.length === 0 && (
+          <p className="evals-empty">
+            No tests declared — add a <code>tests:</code> block to charter.yaml.
+          </p>
+        )}
+        {testResults !== null && testResults.length > 0 && (
+          <ul>
+            {testResults.map((t) => (
+              <li key={t.name}>
+                {t.passed ? "✓" : "✗"} {t.name}
+                {!t.passed && t.error && <span className="guides-error"> — {t.error}</span>}
+                {!t.passed && !t.error && (
+                  <span className="guides-error"> — {t.failing_rows} failing row(s)</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       {latest && (
         <div className="evals-scorecard">

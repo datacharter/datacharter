@@ -77,9 +77,12 @@ accuracy blocks the PR rather than surfacing in production.
 
 ## In the browser
 
-`datacharter serve` has an **Evals** panel — author cases, hit Run, and watch
-the scorecard, the guide-lift bar, and the trend chart. The neighbouring
-**Guides** editor lets you write `guides/*.md` and per-table context without
-leaving the app. Editing is only enabled on a loopback server.
+`datacharter serve` has an **Evals** panel — create, edit, and delete suites
+right there (saving validates the YAML with the same checks `datacharter eval`
+uses, so a suite that saves, runs), hit Run, and watch the scorecard, the
+guide-lift bar, and the trend chart. A **Data tests** card runs the contract's
+`tests:` assertions on demand. The neighbouring **Guides** editor creates,
+edits, and deletes `guides/*.md` without leaving the app. Editing is only
+enabled on a loopback server.
 
 Next: [The flight recorder and canaries →](audit.html)

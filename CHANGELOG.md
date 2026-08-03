@@ -5,6 +5,29 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Guides are now fully manageable in the browser** — create (+ New), edit,
+  and delete, with a new `DELETE /api/guides/{name}` endpoint. Deleting a
+  guide stops agents receiving it immediately.
+- **Eval suites are now fully manageable in the browser** — a YAML editor in
+  the Evals panel with create-from-template, save, and delete. Saving
+  validates with the same checks `datacharter eval` uses, so a suite that
+  saves, runs.
+- **Data tests in the UI** — a "Run tests" card in the Evals panel runs the
+  contract's `tests:` assertions and shows per-test verdicts.
+- **Audit evidence export in the UI** — one button downloads the same
+  self-contained pack as `datacharter audit export`.
+- **Snapshot recheck in the UI** — every snapshot in the sidebar gains a
+  recheck button that re-runs its query and reports inline whether the
+  result changed.
+- **Metrics in the command palette** — ⌘K now offers "Run metric: <name>"
+  for every contract-defined metric, compiling it to SQL in the editor.
+
+### Fixed
+- **Snapshots created in the browser now persist their SQL**, so `datacharter
+  recheck` (and the new recheck button) work on them — previously only
+  CLI-created snapshots could be rechecked.
+
 ## [0.18.3] - 2026-08-02
 
 ### Fixed

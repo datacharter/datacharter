@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import re
 import uuid
@@ -92,6 +93,10 @@ class GuideWrite(BaseModel):
     source: str | None = None
     table: str | None = None
     context: str | None = None
+
+
+class EvalFileWrite(BaseModel):
+    content: str
 
 
 class EvalRunRequest(BaseModel):
@@ -307,6 +312,131 @@ def create_app(
         from datacharter.contracts.suggest import mine_history
 
         return {"suggestions": [asdict(s) for s in mine_history(workspace)]}
+
+    @app.delete("/api/guides/{name}")
+    async def delete_guide(name: str):
+        blocked = _require_local()
+        if blocked is not None:
+            return blocked
+        if not _SAFE_STEM.fullmatch(name):
+            return _error(400, "bad_name", "Invalid guide name.")
+        path = workspace / "guides" / f"{name}.md"
+        if not path.exists():
+            return _error(404, "not_found", f"No guide '{name}'.")
+        path.unlink()
+        _refresh_charter()  # agents stop receiving the deleted guide immediately
+        return {"removed": name}
+
+    @app.get("/api/evals/files")
+    async def eval_files() -> dict:
+        root = workspace / "evals"
+        files = []
+        if root.is_dir():
+            for f in sorted(root.glob("*.yaml")):
+                files.append({"name": f.stem, "content": f.read_text()})
+        return {"files": files}
+
+    @app.put("/api/evals/files/{name}")
+    async def save_eval_file(name: str, body: EvalFileWrite):
+        blocked = _require_local()
+        if blocked is not None:
+            return blocked
+        if not _SAFE_STEM.fullmatch(name):
+            return _error(400, "bad_name", "Invalid suite name.")
+        from datacharter.contracts.evals import EvalError, parse_suite
+
+        try:
+            # Same validator `datacharter eval` uses — a suite that saves, runs.
+            parse_suite(name, body.content)
+        except EvalError as exc:
+            return _error(400, "invalid_suite", str(exc))
+        root = workspace / "evals"
+        root.mkdir(exist_ok=True)
+        (root / f"{name}.yaml").write_text(body.content)
+        return {"saved": name}
+
+    @app.delete("/api/evals/files/{name}")
+    async def delete_eval_file(name: str):
+        blocked = _require_local()
+        if blocked is not None:
+            return blocked
+        if not _SAFE_STEM.fullmatch(name):
+            return _error(400, "bad_name", "Invalid suite name.")
+        path = workspace / "evals" / f"{name}.yaml"
+        if not path.exists():
+            return _error(404, "not_found", f"No suite '{name}'.")
+        path.unlink()
+        return {"removed": name}
+
+    @app.post("/api/audit/export")
+    async def audit_export() -> FileResponse:
+        import tempfile
+
+        from datacharter.audit.evidence import export_pack
+
+        out = Path(tempfile.mkdtemp()) / "audit-evidence.zip"
+        await asyncio.to_thread(export_pack, workspace, out)
+        return FileResponse(
+            out,
+            media_type="application/zip",
+            filename="audit-evidence.zip",
+            background=BackgroundTask(lambda: out.unlink(missing_ok=True)),
+        )
+
+    @app.post("/api/snapshot/{name}/recheck")
+    async def recheck_snapshot(name: str):
+        if not re.fullmatch(r"[a-z][a-z0-9_]{0,62}", name):
+            return _error(400, "bad_name", "Invalid snapshot name.")
+        sql_file = workspace / ".datacharter" / "snapshots" / f"{name}.sql"
+        if not sql_file.exists():
+            return _error(404, "not_found", f"No snapshot 'local.{name}'.")
+        sql = sql_file.read_text()
+        tmp = f"_recheck_{name}"
+        engine = app.state.engine
+        try:
+            await asyncio.to_thread(
+                engine.query_sync, f"CREATE OR REPLACE TABLE local.{tmp} AS {sql}"
+            )
+            result = await engine.diff(f"local.{name}", f"local.{tmp}")
+        finally:
+            with contextlib.suppress(Exception):
+                await asyncio.to_thread(engine.query_sync, f"DROP TABLE IF EXISTS local.{tmp}")
+        changed = result.left_only_count > 0 or result.right_only_count > 0
+        return {
+            "changed": changed,
+            "gone": result.left_only_count,
+            "new": result.right_only_count,
+        }
+
+    @app.get("/api/metrics")
+    async def list_metrics() -> dict:
+        from datacharter.contracts.metrics import metric_sql
+
+        return {
+            "metrics": [
+                {
+                    "name": m.name,
+                    "sql": metric_sql(m),
+                    "dimensions": m.dimensions,
+                    "has_time": bool(m.time_column),
+                }
+                for m in app.state.charter.metrics
+            ]
+        }
+
+    @app.post("/api/tests/run")
+    async def run_data_tests() -> dict:
+        from datacharter.contracts.datatests import DataTestError, check_sql
+        from datacharter.engine.guard import QueryNotAllowed
+
+        results = []
+        for t in app.state.charter.tests:
+            try:
+                n = (await asyncio.to_thread(app.state.engine.query_sync, check_sql(t))).rows[0][0]
+                results.append({"name": t.name, "passed": not n, "failing_rows": int(n or 0)})
+            except (DataTestError, EngineError, QueryNotAllowed) as exc:
+                results.append({"name": t.name, "passed": False, "error": str(exc)})
+        return {"results": results, "passed": all(r["passed"] for r in results)}
 
     @app.get("/api/evals")
     async def list_evals() -> dict:
@@ -593,6 +723,10 @@ def create_app(
     @app.post("/api/snapshot")
     async def snapshot(body: SnapshotRequest) -> dict:
         await asyncio.to_thread(app.state.engine.snapshot_sync, body.sql, body.name)
+        # Persist the SQL like the CLI does — recheck needs it to re-run later.
+        snaps = workspace / ".datacharter" / "snapshots"
+        snaps.mkdir(parents=True, exist_ok=True)
+        (snaps / f"{body.name}.sql").write_text(body.sql)
         return {"snapshot": f"local.{body.name}"}
 
     @app.delete("/api/snapshot/{name}")

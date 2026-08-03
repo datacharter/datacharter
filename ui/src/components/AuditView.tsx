@@ -22,6 +22,19 @@ export default function AuditView() {
 
   const alarms = entries.filter((e) => e.type === ("alarm" as AuditEntry["type"]));
 
+  const exportEvidence = async () => {
+    // Same pack as `datacharter audit export`: entries + verification + charter + summary.
+    const resp = await fetch("/api/audit/export", { method: "POST" });
+    if (!resp.ok) return;
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "audit-evidence.zip";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const sessions = entries.filter((e) => e.type === "session");
   const accessesFor = (sid: string) =>
     entries.filter((e) => e.type === "access" && e.session === sid);
@@ -35,6 +48,15 @@ export default function AuditView() {
           <span className={verify.ok ? "audit-badge ok" : "audit-badge broken"}>
             {verify.ok ? `✓ chain verified · ${verify.entries} entries` : `⚠ ${verify.detail}`}
           </span>
+        )}
+        {entries.length > 0 && (
+          <button
+            className="topbar-btn"
+            onClick={exportEvidence}
+            title="Download a self-contained evidence pack: entries, verification result, the charter in force, and a summary."
+          >
+            Export evidence
+          </button>
         )}
         {canary && (
           <span

@@ -44,3 +44,21 @@ describe("GuidesEditor", () => {
     );
   });
 });
+
+describe("GuidesEditor CRUD affordances", () => {
+  it("shows + New and Delete for an existing guide", async () => {
+    render(<GuidesEditor />);
+    await waitFor(() => expect(screen.getByLabelText("New guide")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByLabelText(/Delete guide/)).toBeInTheDocument(),
+    );
+  });
+
+  it("+ New clears the editor for a fresh guide", async () => {
+    render(<GuidesEditor />);
+    await waitFor(() => expect(screen.getByLabelText("New guide")).toBeInTheDocument());
+    screen.getByLabelText("New guide").click();
+    await waitFor(() => expect(screen.getByLabelText("guide name")).toHaveValue(""));
+    expect(screen.getByLabelText("guide content")).toHaveValue("");
+  });
+});

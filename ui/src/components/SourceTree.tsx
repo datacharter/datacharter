@@ -22,6 +22,7 @@ interface Props {
   onPick: (relation: string) => void;
   onRemove?: (kind: "snapshot" | "upload", name: string) => void;
   onSetAccess?: (a: { source: string; table?: string; column?: string; value: boolean }) => void;
+  onRecheck?: (name: string) => Promise<{ changed: boolean; gone: number; new: number }>;
 }
 
 interface Remove {
@@ -45,7 +46,30 @@ function systemLabel(s: SourceInfo): string {
 
 /** Sidebar catalog: system → source (contract) → tables → columns. Sources expand by
  *  default; tables expand on the +/- to reveal columns. Clicking a name inserts a query. */
-export default function SourceTree({ sources, tables, onPick, onRemove, onSetAccess }: Props) {
+export default function SourceTree({
+  sources,
+  tables,
+  onPick,
+  onRemove,
+  onSetAccess,
+  onRecheck,
+}: Props) {
+  // Per-snapshot recheck verdicts ("did this number change?"), shown inline.
+  const [checks, setChecks] = useState<Record<string, string>>({});
+
+  const recheck = async (name: string) => {
+    if (!onRecheck) return;
+    setChecks((c) => ({ ...c, [name]: "…" }));
+    try {
+      const r = await onRecheck(name);
+      setChecks((c) => ({
+        ...c,
+        [name]: r.changed ? `CHANGED (−${r.gone} +${r.new})` : "unchanged ✓",
+      }));
+    } catch {
+      setChecks((c) => ({ ...c, [name]: "recheck failed" }));
+    }
+  };
   const anyReal = (ts: TableInfo[]) =>
     ts.some((t) => Object.values(t.access ?? {}).some((a) => !a.masked));
 
@@ -227,15 +251,31 @@ export default function SourceTree({ sources, tables, onPick, onRemove, onSetAcc
         </div>
         <div className="tree-group">
           {locals.length === 0 && <div className="hint tree-empty">empty</div>}
-          {locals.map((t) =>
-            tableNode(
-              t,
-              `local.${t.table}`,
-              undefined,
-              { label: `Remove local.${t.table}`, run: () => onRemove?.("snapshot", t.table) },
-              "local",
-            ),
-          )}
+          {locals.map((t) => (
+            <div key={`local.${t.table}`} className="tree-snapshot-row">
+              {tableNode(
+                t,
+                `local.${t.table}`,
+                undefined,
+                { label: `Remove local.${t.table}`, run: () => onRemove?.("snapshot", t.table) },
+                "local",
+              )}
+              {onRecheck && t.table !== "canaries" && (
+                <div className="tree-recheck">
+                  <button
+                    type="button"
+                    className="guides-tab"
+                    aria-label={`Recheck local.${t.table}`}
+                    title="Re-run this snapshot's query and diff it against the saved result"
+                    onClick={() => recheck(t.table)}
+                  >
+                    recheck
+                  </button>
+                  {checks[t.table] && <span className="tree-recheck-note">{checks[t.table]}</span>}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </div>
     </nav>

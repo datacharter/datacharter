@@ -30,6 +30,9 @@ type Tab = "results" | "chart" | "profile" | "plan";
 export default function App() {
   const [sources, setSources] = useState<SourceInfo[]>([]);
   const [tables, setTables] = useState<TableInfo[]>([]);
+  const [metrics, setMetrics] = useState<
+    { name: string; sql: string; dimensions: string[]; has_time: boolean }[]
+  >([]);
   const [sql, setSql] = useState(STARTER);
   const [result, setResult] = useState<QueryResult | null>(null);
   const [profileResult, setProfileResult] = useState<QueryResult | null>(null);
@@ -89,6 +92,7 @@ export default function App() {
     Promise.allSettled([
       api.sources().then((b) => setSources(b.sources)),
       api.tables().then((b) => setTables(b.tables)),
+      api.listMetrics().then((b) => setMetrics(b.metrics)),
     ]).finally(() => setCatalogLoaded(true));
   }, []);
 
@@ -331,8 +335,14 @@ export default function App() {
       const rel = t.source === "memory" ? t.table : `${t.source}.${t.table}`;
       return a(`open:${rel}`, `Open ${rel}`, () => pickRelation(rel));
     });
-    return [...actions, ...tableCmds];
-  }, [run, exportResult, snapshot, profile, explain, estimateCost, pickRelation, tables]);
+    const metricCmds = metrics.map((m) =>
+      a(`metric:${m.name}`, `Run metric: ${m.name}`, () => {
+        loadSql(`${m.sql};\n`);
+        run(m.sql);
+      }),
+    );
+    return [...actions, ...metricCmds, ...tableCmds];
+  }, [run, exportResult, snapshot, profile, explain, estimateCost, pickRelation, tables, metrics, loadSql]);
 
   return (
     <div
@@ -453,6 +463,7 @@ export default function App() {
             onPick={pickRelation}
             onRemove={removeObject}
             onSetAccess={setAccess}
+            onRecheck={(name) => api.recheckSnapshot(name)}
           />
         </aside>
         <div className="resizer-x" onMouseDown={sidebarW.onMouseDown} />
