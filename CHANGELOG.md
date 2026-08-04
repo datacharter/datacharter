@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **One click from dragged file to contract source.** Every upload in the
+  sidebar has a "save as source" button: the file moves into the workspace,
+  gets declared in charter.yaml, and any detected PII columns are written
+  into the contract on the way — so a quick drag-drop can graduate into
+  governed, committable data without retyping anything.
+
 ### Changed
 - **The drag-and-drop upload cap is now 2 GB** (was 512 MB). Bigger files
   should still be added as sources — registered in place, no copy, no limit.

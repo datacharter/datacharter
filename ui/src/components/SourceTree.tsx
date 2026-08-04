@@ -23,6 +23,7 @@ interface Props {
   onRemove?: (kind: "snapshot" | "upload", name: string) => void;
   onSetAccess?: (a: { source: string; table?: string; column?: string; value: boolean }) => void;
   onRecheck?: (name: string) => Promise<{ changed: boolean; gone: number; new: number }>;
+  onPromote?: (name: string) => void;
 }
 
 interface Remove {
@@ -53,6 +54,7 @@ export default function SourceTree({
   onRemove,
   onSetAccess,
   onRecheck,
+  onPromote,
 }: Props) {
   // Per-snapshot recheck verdicts ("did this number change?"), shown inline.
   const [checks, setChecks] = useState<Record<string, string>>({});
@@ -235,15 +237,30 @@ export default function SourceTree({
             uploads <span className="type">session</span>
           </div>
           <div className="tree-group">
-            {uploads.map((t) =>
-              tableNode(
-                t,
-                t.table,
-                undefined,
-                { label: `Remove ${t.table}`, run: () => onRemove?.("upload", t.table) },
-                "local", // uploads persist their masking toggles via local_access
-              ),
-            )}
+            {uploads.map((t) => (
+              <div key={`up.${t.table}`} className="tree-snapshot-row">
+                {tableNode(
+                  t,
+                  t.table,
+                  undefined,
+                  { label: `Remove ${t.table}`, run: () => onRemove?.("upload", t.table) },
+                  "local", // uploads persist their masking toggles via local_access
+                )}
+                {onPromote && (
+                  <div className="tree-recheck">
+                    <button
+                      type="button"
+                      className="guides-tab"
+                      aria-label={`Save ${t.table} as a source`}
+                      title="Save as a permanent source: moves the file into the workspace and declares it in charter.yaml (detected PII carries over)"
+                      onClick={() => onPromote(t.table)}
+                    >
+                      save as source
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}

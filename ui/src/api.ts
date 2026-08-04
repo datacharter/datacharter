@@ -120,6 +120,10 @@ export const api = {
     request<{ removed: string }>(`/api/snapshot/${name}`, { method: "DELETE" }),
   deleteUpload: (name: string) =>
     request<{ removed: string }>(`/api/uploads/${name}`, { method: "DELETE" }),
+  promoteUpload: (name: string) =>
+    request<{ source: string; path: string; pii: string[] }>(`/api/uploads/${name}/promote`, {
+      method: "POST",
+    }),
   testSource: (f: SourceFormData) =>
     request<{ ok: boolean }>("/api/sources/test", {
       method: "POST",

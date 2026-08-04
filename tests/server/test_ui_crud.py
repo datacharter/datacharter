@@ -245,3 +245,34 @@ def test_upload_over_the_cap_is_rejected_cleanly(demo_client, monkeypatch):
     assert r.status_code == 413
     assert "limit" in r.json()["error"]["message"]
     assert not (ws / ".datacharter" / "uploads" / "big.csv").exists()  # partial removed
+
+
+def test_promote_upload_to_source_one_click(demo_client):
+    # Drag a file → one click → it's a real contract source: file moved into
+    # the workspace, declared in charter.yaml, detected PII carried over, and
+    # the transient upload registration gone.
+    c, ws = demo_client
+    csv = b"who,email\nada,ada@real.com\n"
+    assert c.post("/api/upload", files={"file": ("crm2.csv", csv, "text/csv")}).status_code == 200
+    r = c.post("/api/uploads/crm2/promote")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["source"] == "crm2" and "email" in body["pii"]
+    assert (ws / "crm2.csv").exists()
+    assert not (ws / ".datacharter" / "uploads" / "crm2.csv").exists()
+    charter = (ws / "charter.yaml").read_text()
+    assert "crm2" in charter and "email" in charter
+    # still queryable, now as a charter source (and no longer in uploads)
+    q = c.post("/api/query", json={"sql": "SELECT count(*) FROM crm2"})
+    assert q.status_code == 200 and q.json()["rows"] == [[1]]
+    assert any(s["name"] == "crm2" for s in c.get("/api/sources").json()["sources"])
+    assert c.post("/api/uploads/crm2/promote").status_code == 404  # not an upload anymore
+
+
+def test_promote_rejects_name_collision(demo_client):
+    c, ws = demo_client
+    (ws / "clash.csv").write_text("a\n1\n")
+    assert c.post(
+        "/api/upload", files={"file": ("clash.csv", b"a\n2\n", "text/csv")}
+    ).status_code == 200
+    assert c.post("/api/uploads/clash/promote").status_code == 409

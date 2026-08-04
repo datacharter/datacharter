@@ -737,6 +737,51 @@ def create_app(
         (workspace / ".datacharter" / "snapshots" / f"{name}.sql").unlink(missing_ok=True)
         return {"removed": f"local.{name}"}
 
+    @app.post("/api/uploads/{name}/promote")
+    async def promote_upload(name: str):
+        """One click from dragged file to contract source: move the file into
+        the workspace (uploads live in gitignored .datacharter and would not
+        travel) and declare it in charter.yaml, carrying detected PII along."""
+        blocked = _require_local()
+        if blocked is not None:
+            return blocked
+        src = next((s for s in app.state.engine.sources if s.name == name), None)
+        if src is None or any(s.name == name for s in app.state.charter.sources):
+            return _error(404, "not_found", f"No uploaded table '{name}'.")
+        upload_path = Path(src.path or "")
+        if ".datacharter" not in upload_path.parts:
+            return _error(400, "not_an_upload", f"'{name}' is not an uploaded file.")
+        dest = workspace / upload_path.name
+        if dest.exists():
+            return _error(409, "exists", f"{upload_path.name} already exists in the workspace.")
+
+        pii_cols: list[str] = []
+        try:
+            from datacharter.contracts.pii import detect_pii
+
+            detected = await detect_pii(app.state.engine)
+            pii_cols = detected.get(name, [])
+        except Exception:
+            pass
+
+        await asyncio.to_thread(app.state.engine.remove_source, name)
+        upload_path.rename(dest)
+        form = source_admin.SourceForm(
+            name=name,
+            type=src.type.value,
+            path=upload_path.name,
+            pii={name: pii_cols} if pii_cols else {},
+        )
+        try:
+            await asyncio.to_thread(source_admin.create_source, app.state.engine, workspace, form)
+        except Exception:
+            # Roll back so the data stays queryable as an upload either way.
+            dest.rename(upload_path)
+            await asyncio.to_thread(app.state.engine.add_source, src)
+            raise
+        _refresh_charter()
+        return {"source": name, "path": upload_path.name, "pii": pii_cols}
+
     @app.delete("/api/uploads/{name}")
     async def delete_upload(name: str):
         # Engine-only uploaded tables (never charter sources — those use the Sources tab).

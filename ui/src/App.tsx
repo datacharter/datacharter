@@ -465,6 +465,11 @@ export default function App() {
             onRemove={removeObject}
             onSetAccess={setAccess}
             onRecheck={(name) => api.recheckSnapshot(name)}
+            onPromote={(name) => {
+              api.promoteUpload(name).then(refreshCatalog).catch((e) =>
+                setActionError((e as Error).message),
+              );
+            }}
           />
         </aside>
         <div className="resizer-x" onMouseDown={sidebarW.onMouseDown} />
