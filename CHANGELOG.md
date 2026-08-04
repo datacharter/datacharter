@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-08-03
+
 ### Added
 - **Guides are now fully manageable in the browser** — create (+ New), edit,
   and delete, with a new `DELETE /api/guides/{name}` endpoint. Deleting a
