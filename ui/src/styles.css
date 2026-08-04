@@ -1197,3 +1197,13 @@ table.grid td.rownum, table.grid th.rownum {
 .chat-prose-wrap:hover .chat-msg-copy { opacity: 1; }
 .chat-msg.user .chat-prose-wrap { align-self: flex-end; }
 .chat-msg.user .chat-prose { align-self: auto; }
+
+.degraded-banner {
+  display: flex; align-items: center; gap: 8px; justify-content: center;
+  background: #fff3cd; color: #7a5b00; font-size: 13px; padding: 6px 12px;
+  border-bottom: 1px solid #ffe08a;
+}
+[data-theme="dark"] .degraded-banner { background: #4a3b00; color: #ffe08a; border-color: #6b5600; }
+.degraded-banner button {
+  background: none; border: none; color: inherit; cursor: pointer; font-size: 15px;
+}

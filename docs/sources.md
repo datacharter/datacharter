@@ -116,13 +116,16 @@ sources:
   warehouse:
     type: postgres
     connection: { host: db.internal, database: analytics, user: readonly }
-    credentials: { password: ${WAREHOUSE_PASSWORD} }
+    credentials:
+      password: ${WAREHOUSE_PASSWORD}
     tables: [customers, orders]
 
   events:
     type: parquet
     path: s3://lake/events/*.parquet
-    credentials: { key_id: ${AWS_KEY_ID}, secret: ${AWS_SECRET} }
+    credentials:
+      key_id: ${AWS_KEY_ID}
+      secret: ${AWS_SECRET}
 ```
 
 Every field, per type, is in the [charter.yaml reference](charter-yaml.html).

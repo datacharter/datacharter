@@ -254,7 +254,18 @@ def create_app(
 
     @app.get("/api/health")
     async def health() -> dict:
-        return {"status": "ok", "version": __version__}
+        # Degraded-but-running states, so the UI can say so instead of nothing:
+        # unencrypted state DB (no keyring), a recorder that stopped writing,
+        # a canary that failed to plant.
+        recorder = getattr(app.state, "recorder", None)
+        canary = getattr(app.state, "canary", None)
+        return {
+            "status": "ok",
+            "version": __version__,
+            "state_encrypted": state_key is not None,
+            "audit_recording": not getattr(recorder, "degraded", False),
+            "canary_planted": getattr(canary, "planted", None),
+        }
 
     def _refresh_charter() -> None:
         # Re-read the contract so the catalog/PII map + agent-access reflect an edit.
@@ -972,7 +983,9 @@ def create_app(
         cc.save_deny(workspace, app.state.cc_deny)
         agent_backend.set_backend(workspace, "claude-code")
         app.state.cc_session = {}
-        return {"backend": "claude-code"}
+        version = await asyncio.to_thread(cc.claude_version)
+        print(f"claude code connected: {version or 'version unknown'}", file=sys.stderr)
+        return {"backend": "claude-code", "claude_version": version}
 
     @app.post("/api/agent/ask")
     async def ask(body: AskRequest):

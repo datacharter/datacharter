@@ -5,7 +5,11 @@ import { api, type AuditEntry, type AuditVerify } from "../api";
 export default function AuditView() {
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [verify, setVerify] = useState<AuditVerify | null>(null);
-  const [canary, setCanary] = useState<{ armed: boolean; mode: string | null } | null>(null);
+  const [canary, setCanary] = useState<{
+    armed: boolean;
+    mode: string | null;
+    planted?: boolean | null;
+  } | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -73,14 +77,26 @@ export default function AuditView() {
         )}
         {canary && (
           <span
-            className={canary.armed ? "audit-badge ok" : "audit-badge muted"}
+            className={
+              !canary.armed
+                ? "audit-badge muted"
+                : canary.planted === false
+                  ? "audit-badge broken"
+                  : "audit-badge ok"
+            }
             title={
-              canary.armed
-                ? `Canary tripwires armed (${canary.mode} mode): synthetic honeytokens are planted in local.canaries; if one ever appears in agent output, masking failed and an alarm lands here.`
-                : "Canary tripwires plant synthetic honeytokens in a masked local table. If a token ever appears in agent output, masking provably failed. Enable with `canary: on` in charter.yaml."
+              !canary.armed
+                ? "Canary tripwires plant synthetic honeytokens in a masked local table. If a token ever appears in agent output, masking provably failed. Enable with `canary: on` in charter.yaml."
+                : canary.planted === false
+                  ? "The charter says canary: on, but planting local.canaries FAILED — the honeytoken table is absent and only output scanning is active. Check the server log."
+                  : `Canary tripwires armed (${canary.mode} mode): synthetic honeytokens are planted in local.canaries; if one ever appears in agent output, masking failed and an alarm lands here.`
             }
           >
-            {canary.armed ? `🪤 canary armed (${canary.mode})` : "🪤 canary off"}
+            {!canary.armed
+              ? "🪤 canary off"
+              : canary.planted === false
+                ? "🪤 canary DEGRADED — planting failed"
+                : `🪤 canary armed (${canary.mode})`}
           </span>
         )}
       </header>

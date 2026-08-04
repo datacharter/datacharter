@@ -62,6 +62,11 @@ class FlightRecorder:
         self._session = ""
         self._degraded = False
 
+    @property
+    def degraded(self) -> bool:
+        """True after an append failure — access is NOT being recorded."""
+        return self._degraded
+
     def start_session(
         self,
         surface: str,

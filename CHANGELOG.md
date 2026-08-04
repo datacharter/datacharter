@@ -5,6 +5,34 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-08-04
+
+### Fixed
+- **Claude Code turns now show their SQL.** On real Claude Code streams the
+  query chip ("Open in editor") never rendered — complete tool inputs arrive
+  in `assistant` messages, not the streamed block-start events the parser
+  watched. Caught by a recorded real-transcript fixture that now pins the
+  stream format against drift.
+- Invalid YAML in the sources documentation (flow-style `credentials:` with a
+  `${VAR}` reference) that failed to parse if copied verbatim. Every yaml/sql
+  block in the docs is now loaded/parsed in CI.
+
+### Added
+- **Degraded states now get a banner, not silence.** If the local state DB is
+  unencrypted (no OS keyring), the audit recorder stops writing, or canary
+  planting failed, the app shows a dismissible warning — and `/api/health`
+  reports each state. The Audit view's canary badge distinguishes armed /
+  degraded / off.
+- **Connect logs the Claude Code version** (`claude --version`) so behavior
+  changes after a Claude update are attributable, and the connect response
+  carries it.
+
+### Reliability
+- A weekly CI sweep runs the full test suite on macOS/Windows/Linux across
+  Python 3.11–3.13 plus the wheel gate on every OS; desktop bundles now also
+  build (without publishing) whenever frozen-build inputs change, instead of
+  first failing during a release.
+
 ## [0.22.3] - 2026-08-04
 
 ### Fixed

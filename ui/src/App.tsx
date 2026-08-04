@@ -38,6 +38,9 @@ export default function App() {
   const [profileResult, setProfileResult] = useState<QueryResult | null>(null);
   const [error, setError] = useState<string | null>(null); // query errors: replace the grid
   const [actionError, setActionError] = useState<string | null>(null); // background actions: toast
+  // Degraded-but-running states (unencrypted state DB, dead recorder, unplanted
+  // canary) — each shipped as a SILENT failure once; now they get a banner.
+  const [degraded, setDegraded] = useState<string[]>([]);
   const [previewError, setPreviewError] = useState<string | null>(null); // live-preview parse error
   const [previewExpanded, setPreviewExpanded] = useState(false);
   const [running, setRunning] = useState(false);
@@ -98,6 +101,21 @@ export default function App() {
   }, []);
 
   useEffect(refreshCatalog, [refreshCatalog]);
+
+  useEffect(() => {
+    void api.health().then((h) => {
+      const warns: string[] = [];
+      if (h.state_encrypted === false)
+        warns.push(
+          "Local state DB is UNENCRYPTED (no OS keyring available). Set DATACHARTER_STATE_KEY to encrypt snapshots at rest.",
+        );
+      if (h.audit_recording === false)
+        warns.push("Audit recorder failed — agent access is NOT being recorded. Check the server log.");
+      if (h.canary_planted === false)
+        warns.push("Canary tripwires are DEGRADED — planting local.canaries failed. See the Audit view.");
+      setDegraded(warns);
+    });
+  }, []);
 
   // Auto-show the guided tour only on a populated workspace; empty ones get the launchpad.
   useEffect(() => {
@@ -361,6 +379,14 @@ export default function App() {
       onDrop={onDrop}
     >
       {dragging && <div className="drop-overlay">Drop csv / parquet / json to query it</div>}
+      {degraded.map((w) => (
+        <div key={w} className="degraded-banner" role="alert">
+          ⚠ {w}
+          <button aria-label="Dismiss warning" onClick={() => setDegraded((d) => d.filter((x) => x !== w))}>
+            ×
+          </button>
+        </div>
+      ))}
       {showTutorial && (
         <Tutorial
           actions={{

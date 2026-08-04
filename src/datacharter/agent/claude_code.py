@@ -72,6 +72,23 @@ def claude_available() -> bool:
     return find_claude() is not None
 
 
+def claude_version() -> str | None:
+    """`claude --version` output, logged at connect so a behavior drift after a
+    Claude Code update is attributable instead of a mystery."""
+    binary = find_claude()
+    if not binary:
+        return None
+    import subprocess
+
+    try:
+        out = subprocess.run(
+            [binary, "--version"], capture_output=True, text=True, timeout=15
+        )
+        return (out.stdout or out.stderr).strip().splitlines()[0] or None
+    except Exception:  # noqa: BLE001 — version is diagnostics, never a blocker
+        return None
+
+
 def _deny_path(workspace: Path) -> Path:
     return Path(workspace) / ".datacharter" / "cc_deny.json"
 
@@ -163,6 +180,22 @@ def parse_stream(lines: Iterable[str]) -> Iterator[dict]:
 
     kinds: `session` (init: session_id + tools), `tool_call` (governed tool + SQL),
     `text` (assistant delta), `result` (final text + session_id + is_error)."""
+    seen_tools: set[str] = set()
+
+    def tool_call(block: dict) -> dict | None:
+        name = str(block.get("name", ""))
+        if not name.startswith("mcp__datacharter__"):
+            return None
+        key = block.get("id") or f"{name}:{json.dumps(block.get('input'), sort_keys=True)}"
+        if key in seen_tools:
+            return None
+        seen_tools.add(key)
+        return {
+            "kind": "tool_call",
+            "tool": name.removeprefix("mcp__datacharter__"),
+            "sql": (block.get("input") or {}).get("sql") or "",
+        }
+
     for raw in lines:
         raw = raw.strip()
         if not raw:
@@ -178,13 +211,21 @@ def parse_stream(lines: Iterable[str]) -> Iterator[dict]:
                 "session_id": m.get("session_id"),
                 "tools": m.get("tools", []),
             }
+        elif mtype == "assistant":
+            # Complete tool inputs arrive here — the streamed content_block_start
+            # carries `input: {}`, so relying on stream events alone loses the
+            # SQL (shipped: no query chip ever rendered on real CC turns).
+            for block in (m.get("message") or {}).get("content", []) or []:
+                if isinstance(block, dict) and block.get("type") == "tool_use":
+                    ev = tool_call(block)
+                    if ev:
+                        yield ev
         elif mtype == "stream_event":
             ev = m.get("event", {}) or {}
-            name = str(ev.get("name", ""))
-            if ev.get("type") == "tool_use" and name.startswith("mcp__datacharter__"):
-                label = ev["name"].removeprefix("mcp__datacharter__")
-                sql = (ev.get("input") or {}).get("sql")
-                yield {"kind": "tool_call", "tool": label, "sql": sql or ""}
+            if ev.get("type") == "tool_use":  # legacy stream shape
+                call = tool_call(ev)
+                if call:
+                    yield call
             delta = ev.get("delta") or {}
             if delta.get("type") == "text_delta" and delta.get("text"):
                 yield {"kind": "text", "text": delta["text"]}
