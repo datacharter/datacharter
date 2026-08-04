@@ -23,6 +23,9 @@ _N_TOKENS = 3
 class CanaryGuard:
     tokens: list[str]
     mode: str  # "block" | "log"
+    #: False when planting local.canaries failed — the scanner still runs, but
+    #: the honeytoken table is absent, so surface this instead of "armed".
+    planted: bool = True
 
     def scan(self, text: str) -> str | None:
         """First token found in agent-bound text, else None."""
@@ -50,7 +53,10 @@ def _load_or_create_tokens(workspace: Path) -> list[str]:
 def ensure_canaries(workspace: Path | str, engine, mode: str | None) -> CanaryGuard | None:
     """Plant (or refresh) local.canaries when enabled; returns the guard or None.
 
-    Planting failures disable the guard rather than break startup.
+    A planting failure must not break startup, but it must never be silent
+    either — the charter says `canary: on` and the user believes a tripwire is
+    armed. The scanner still runs (degraded); the failure is warned and exposed
+    via `planted=False`.
     """
     if mode is None:
         return None
@@ -62,6 +68,14 @@ def ensure_canaries(workspace: Path | str, engine, mode: str | None) -> CanaryGu
     sql = f"SELECT * FROM (VALUES {rows}) AS t(email, phone, ssn)"
     try:
         engine.snapshot_sync(sql, "canaries")
-    except Exception:
-        return None
+    except Exception as exc:
+        import sys
+
+        print(
+            f"warning: charter has canary on, but planting local.canaries "
+            f"failed ({exc}) — the honeytoken table is ABSENT and the tripwire "
+            f"is degraded to output scanning only.",
+            file=sys.stderr,
+        )
+        return CanaryGuard(tokens=tokens, mode=mode, planted=False)
     return CanaryGuard(tokens=tokens, mode=mode)

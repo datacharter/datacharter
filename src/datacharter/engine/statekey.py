@@ -27,5 +27,15 @@ def resolve_state_key() -> str | None:
             key = secrets.token_urlsafe(32)
             keyring.set_password("datacharter", "state_encryption_key", key)
         return key
-    except Exception:
+    except Exception as exc:
+        import sys
+
+        # Falling back to an UNENCRYPTED state DB must never be silent — the
+        # user's snapshots may hold real data they believe is encrypted at rest.
+        print(
+            f"warning: no OS keyring available ({exc}) — the local state DB "
+            f"(snapshots, history) will be UNENCRYPTED. Set DATACHARTER_STATE_KEY "
+            f"to encrypt it.",
+            file=sys.stderr,
+        )
         return None

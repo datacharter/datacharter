@@ -5,6 +5,33 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Config typos now refuse instead of silently disabling governance.** A
+  misspelled top-level key (`polices:`, `canry:`) was dropped without a word —
+  the charter looked protected while enforcing nothing. charter.yaml now
+  rejects unknown top-level keys, and `pii: {customers: email}` (scalar) means
+  the email *column* instead of degenerating into a character list that
+  masked nothing.
+- **Eval scores can no longer lie.** An agent/endpoint error mid-run used to
+  score as "0% passed" — an outage dressed up as a result. Errored cases are
+  now reported as errored (⚠, with the reason) and `datacharter eval` exits
+  non-zero. A case with no assertions — which could never fail — is refused at
+  load, as is any typo'd case key (`expects:`).
+- **`audit verify` no longer says ✓ over a deleted log.** An empty or absent
+  chain — the strongest possible tampering — used to verify as "0 entries ✓".
+  It now reports "NOTHING VERIFIED" with its own exit code, in the CLI, the
+  API, the Audit view, and evidence packs.
+- **Silent governance degradation now warns loudly**: canary planting failure
+  (tripwire absent while the charter says `canary: on`), audit-recorder write
+  failure (access not being recorded), keyring failure (state DB unencrypted),
+  and upload/promote PII-detection failure (columns not auto-masked) each
+  print an explicit warning instead of nothing.
+- **Masking honors overrides even without query provenance**, and the
+  agent-access guard no longer skips its check when a query touches no base
+  table (e.g. `read_csv(...)`). The anti-rebinding guard now rejects requests
+  with a missing or empty Host header.
+- `/api/tests/run` no longer reports "passed" when there are zero tests to run.
+
 ## [0.22.2] - 2026-08-04
 
 ### Fixed

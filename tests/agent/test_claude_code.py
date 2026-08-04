@@ -5,7 +5,6 @@ from datacharter.agent.claude_code import (
     GOVERNED_TOOLS,
     build_configs,
     parse_stream,
-    tool_surface_ok,
 )
 
 
@@ -24,13 +23,6 @@ def test_parse_stream_maps_events():
     assert evs[0]["tools"] == ["mcp__datacharter__query"] and evs[0]["session_id"] == "s1"
     assert next(e for e in evs if e["kind"] == "tool_call")["sql"] == "SELECT 1"
     assert evs[-1]["text"] == "Hello" and evs[-1]["is_error"] is False
-
-
-def test_tool_surface_ok():
-    assert tool_surface_ok(GOVERNED_TOOLS) is True
-    assert tool_surface_ok(["mcp__datacharter__query"]) is True   # subset ok
-    assert tool_surface_ok(GOVERNED_TOOLS + ["Bash"]) is False
-    assert tool_surface_ok(["Bash"]) is False
 
 
 async def test_assert_tool_surface_auto_denies_extras(monkeypatch):

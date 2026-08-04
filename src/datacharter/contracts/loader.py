@@ -80,6 +80,9 @@ def load_charter(workspace: Path | str, filename: str = CHARTER_FILE) -> Charter
                 f"the top level — move it under the source it applies to "
                 f"(sources.<name>.{key})."
             )
+    # Whitelist, not blacklist: a typo'd governance key (`polices:`, `canry:`)
+    # that is silently dropped looks enabled while enforcing nothing.
+    _reject_unknown_keys(raw, _TOP_LEVEL_KEYS, filename)
 
     resolver = SecretResolver(workspace)
     warnings: list[str] = []
@@ -181,6 +184,10 @@ def _build_test(name: str, body: Any, filename: str) -> DataTest:
         raise CharterError(f"{filename}: tests.{name}: {exc}") from None
 
 
+_TOP_LEVEL_KEYS = {
+    "version", "sources", "metrics", "tests", "local_access",
+    "audit", "canary", "policies",
+}
 _SOURCE_KEYS = {
     "type", "connection", "credentials", "path", "tables", "pii",
     "agent_access", "row_filters", "context", "max_rows",
@@ -228,6 +235,8 @@ def _build_source(name: str, body: Any, resolver: SecretResolver, warnings: list
     ):
         raise CharterError(f"{ctx}.context: must be a mapping of table -> text.")
 
+    pii = _validate_pii_block(body.get("pii") or {}, f"{ctx}.pii")
+
     max_rows = body.get("max_rows")
     if max_rows is not None and stype not in CONNECTOR_TYPES:
         warnings.append(
@@ -243,7 +252,7 @@ def _build_source(name: str, body: Any, resolver: SecretResolver, warnings: list
             credentials=credentials,
             path=path_value,
             tables=list(body.get("tables") or []),
-            pii={k: list(v) for k, v in (body.get("pii") or {}).items()},
+            pii=pii,
             agent_access=dict(body.get("agent_access") or {}),
             row_filters=dict(body.get("row_filters") or {}),
             table_context=context_raw,
@@ -252,6 +261,27 @@ def _build_source(name: str, body: Any, resolver: SecretResolver, warnings: list
     except ValidationError as exc:
         first = exc.errors()[0]
         raise CharterError(f"{ctx}: {first['loc'][0]}: {first['msg']}") from None
+
+
+def _validate_pii_block(pii: Any, ctx: str) -> dict[str, list[str]]:
+    """`pii: {customers: email}` must mean the email COLUMN — `list("email")`
+    silently became the character list ['e','m',...] and masked nothing."""
+    if not isinstance(pii, dict):
+        raise CharterError(
+            f"{ctx}: must be a mapping of table -> column list "
+            f"(e.g. pii: {{customers: [email]}})."
+        )
+    out: dict[str, list[str]] = {}
+    for table, cols in pii.items():
+        if isinstance(cols, str):
+            cols = [cols]
+        if not isinstance(cols, list) or not all(isinstance(c, str) for c in cols):
+            raise CharterError(
+                f"{ctx}.{table}: must be a list of column names "
+                f"(e.g. [email, phone]) — got {cols!r}."
+            )
+        out[str(table)] = [str(c) for c in cols]
+    return out
 
 
 def _validate_access_block(aa: Any, ctx: str) -> None:

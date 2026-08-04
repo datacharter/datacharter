@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 __all__ = [
     "EvalAssertion", "EvalCase", "EvalSuite", "EvalError",
@@ -29,7 +29,11 @@ class EvalError(Exception):
     """evals/*.yaml problem, phrased so the user knows exactly what to fix."""
 
 
+# extra="forbid" throughout: a typo'd key (`expects:`, `asserts:`) silently
+# dropped leaves a case with nothing to check — which then "passes".
 class EvalAssertion(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     type: str
     value: str | None = None
     pattern: str | None = None
@@ -39,12 +43,16 @@ class EvalAssertion(BaseModel):
 
 
 class EvalCase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     question: str
     expect: list[EvalAssertion] = Field(default_factory=list)
     expected_answer: str | None = None
 
 
 class EvalSuite(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     cases: list[EvalCase]
 
@@ -78,6 +86,13 @@ def parse_suite(name: str, text: str) -> EvalSuite:
             raise EvalError(f"{ctx}: case {i}: {exc}") from None
         for j, a in enumerate(case.expect):
             validate_assertion(a, f"{ctx}: case {i}: expect[{j}]")
+        if not case.expect and not case.expected_answer:
+            # A case with nothing to check can never fail — it would count as
+            # a pass while verifying nothing.
+            raise EvalError(
+                f"{ctx}: case {i} ({case.question!r}) has no assertions — add an "
+                f"'expect' list or an 'expected_answer'."
+            )
         cases.append(case)
     return EvalSuite(name=name, cases=cases)
 

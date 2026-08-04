@@ -45,8 +45,21 @@ export default function AuditView() {
       <header className="audit-header">
         <h2>Audit</h2>
         {verify && (
-          <span className={verify.ok ? "audit-badge ok" : "audit-badge broken"}>
-            {verify.ok ? `✓ chain verified · ${verify.entries} entries` : `⚠ ${verify.detail}`}
+          <span
+            className={
+              !verify.ok
+                ? "audit-badge broken"
+                : verify.entries === 0
+                  ? "audit-badge muted"
+                  : "audit-badge ok"
+            }
+            title={verify.detail}
+          >
+            {!verify.ok
+              ? `⚠ ${verify.detail}`
+              : verify.entries === 0
+                ? "no entries — nothing verified yet"
+                : `✓ chain verified · ${verify.entries} entries`}
           </span>
         )}
         {entries.length > 0 && (

@@ -46,10 +46,11 @@ async def test_run_case_captures_answer_sql_and_scalar(demo):
         _query_then_answer("SELECT count(*) AS n FROM store.orders", "There are 90 orders.")
     )
     agent = Agent(box, AgentConfig(llm=llm))
-    answer, sqls, scalar = await run_case(agent, "how many orders?")
+    answer, sqls, scalar, error = await run_case(agent, "how many orders?")
     assert "90 orders" in answer
     assert any("store.orders" in s for s in sqls)
     assert scalar == 90
+    assert error is None
 
 
 def test_score_case_all_assertions_pass():

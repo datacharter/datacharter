@@ -730,11 +730,16 @@ def _cmd_audit(args: argparse.Namespace) -> int:
         return 1
     if action == "verify":
         ok, n, detail = verify_chain(ws)
-        if ok:
-            print(f"{detail} ✓")
-            return 0
-        print(detail, file=sys.stderr)
-        return 1
+        if not ok:
+            print(detail, file=sys.stderr)
+            return 1
+        if n == 0:
+            # Empty/absent is its own exit code: a deleted log must never
+            # look like a verified one to scripted auditors.
+            print(f"⚠ {detail}", file=sys.stderr)
+            return 2
+        print(f"{detail} ✓")
+        return 0
 
     if action == "export":
         from datetime import UTC, datetime
@@ -908,6 +913,7 @@ def _cmd_eval(args: argparse.Namespace) -> int:
     from datacharter.agent.llm import LLMError
 
     worst = 1.0
+    errored = 0
     try:
         for suite in suites:
             record = asyncio.run(
@@ -921,6 +927,7 @@ def _cmd_eval(args: argparse.Namespace) -> int:
 
             save_run(ws, record)
             worst = min(worst, record.overall["with_guides"])
+            errored += record.overall.get("errored", 0)
     except LLMError as exc:
         print(f"\nAgent endpoint error: {exc}", file=sys.stderr)
         print(
@@ -931,6 +938,10 @@ def _cmd_eval(args: argparse.Namespace) -> int:
     finally:
         engine.close()
 
+    if errored:
+        # An outage is not a scorecard: never exit green when cases errored.
+        print(f"\n{errored} case run(s) errored — agent endpoint problem.", file=sys.stderr)
+        return 2
     if args.threshold is not None and worst < args.threshold:
         print(f"\nBelow threshold ({worst:.0%} < {args.threshold:.0%}).", file=sys.stderr)
         return 1
@@ -938,19 +949,28 @@ def _cmd_eval(args: argparse.Namespace) -> int:
 
 
 def _print_scorecard(record) -> None:
+    def _mark(outcome) -> str:
+        if outcome.error is not None:
+            return "⚠"
+        return "✓" if outcome.passed else "✗"
+
     print(f"\nSuite: {record.suite}")
     for case in record.cases:
-        mark = "✓" if case.with_guides.passed else "✗"
+        mark = _mark(case.with_guides)
         print(f"  {mark} {case.question}")
+        if case.with_guides.error is not None:
+            print(f"      errored (not evaluated): {case.with_guides.error}")
         if case.without_guides is not None:
-            off = "✓" if case.without_guides.passed else "✗"
-            print(f"      guides on: {mark}   guides off: {off}")
+            print(f"      guides on: {mark}   guides off: {_mark(case.without_guides)}")
     o = record.overall
     print(f"\n  {o['with_guides']:.0%} passed", end="")
     if "lift" in o:
         print(
             f"  (guides off: {o['without_guides']:.0%}  →  lift: {o['lift']:+.0%})", end=""
         )
+    if o.get("errored"):
+        print(f"  ⚠ {o['errored']} case run(s) ERRORED — fix the agent endpoint "
+              f"before trusting these numbers", end="")
     print()
 
 

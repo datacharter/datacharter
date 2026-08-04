@@ -24,6 +24,9 @@ class CaseOutcome:
     sqls: list[str]
     scalar: Any
     assertions: list[AssertionOutcome] = field(default_factory=list)
+    #: Set when the agent errored (endpoint down, LLM failure) — the case was
+    #: never actually evaluated, which is a different fact than "failed".
+    error: str | None = None
 
 
 @dataclass
@@ -54,10 +57,11 @@ def _scalar_from_tool_result(detail: str) -> Any:
     return None
 
 
-async def run_case(agent: Agent, question: str) -> tuple[str, list[str], Any]:
+async def run_case(agent: Agent, question: str) -> tuple[str, list[str], Any, str | None]:
     answer_parts: list[str] = []
     sqls: list[str] = []
     scalar: Any = None
+    error: str | None = None
     async for ev in agent.run(question):
         if ev.kind == "text":
             answer_parts.append(ev.text)
@@ -65,9 +69,14 @@ async def run_case(agent: Agent, question: str) -> tuple[str, list[str], Any]:
             sqls.append(ev.sql)
         elif ev.kind == "tool_result" and ev.tool == "query":
             scalar = _scalar_from_tool_result(ev.detail)
-        elif ev.kind in ("done", "error"):
+        elif ev.kind == "error":
+            # The agent never finished — score_case on a partial answer would
+            # report "failed" (or "0% passed") for what is really an outage.
+            error = ev.detail or "agent error"
             break
-    return "".join(answer_parts), sqls, scalar
+        elif ev.kind == "done":
+            break
+    return "".join(answer_parts), sqls, scalar, error
 
 
 def score_case(case: EvalCase, answer: str, sqls: list[str], scalar: Any) -> CaseOutcome:
@@ -117,7 +126,12 @@ async def _run_and_score(
     last: CaseOutcome | None = None
     for _ in range(max(1, samples)):
         agent = Agent(toolbox, AgentConfig(llm=llm))
-        answer, sqls, scalar = await run_case(agent, case.question)
+        answer, sqls, scalar, error = await run_case(agent, case.question)
+        if error is not None:
+            last = CaseOutcome(
+                passed=False, answer=answer, sqls=sqls, scalar=scalar, error=error
+            )
+            continue
         last = score_case(case, answer, sqls, scalar)
         if judge and case.expected_answer:
             verdict = await judge_answer(llm, case.question, case.expected_answer, answer)
@@ -125,7 +139,8 @@ async def _run_and_score(
             last.passed = last.passed and verdict
         passes += 1 if last.passed else 0
     assert last is not None
-    last.passed = passes * 2 >= max(1, samples)  # majority
+    if last.error is None:
+        last.passed = passes * 2 >= max(1, samples)  # majority
     return last
 
 
@@ -147,6 +162,11 @@ async def run_suite(
     n = len(results) or 1
     on_rate = sum(1 for r in results if r.with_guides.passed) / n
     overall = {"with_guides": on_rate}
+    errored = sum(1 for r in results if r.with_guides.error is not None) + sum(
+        1 for r in results if r.without_guides and r.without_guides.error is not None
+    )
+    if errored:
+        overall["errored"] = errored
     if compare:
         off_rate = sum(1 for r in results if r.without_guides and r.without_guides.passed) / n
         overall["without_guides"] = off_rate

@@ -35,9 +35,13 @@ def allowed_hosts(host: str) -> frozenset[str] | None:
 
 
 def host_allowed(request: Request, allowed: frozenset[str] | None) -> bool:
-    """False iff the `Host` header names a host outside the allowlist."""
+    """False iff the `Host` header is absent/empty or names a host outside the
+    allowlist. Every legitimate HTTP/1.1 client sends Host — an empty one is a
+    crafted request and must not slip past the rebinding guard."""
+    if allowed is None:
+        return True
     host_name = (request.headers.get("host") or "").rsplit(":", 1)[0].strip("[]").lower()
-    return not (allowed is not None and host_name and host_name not in allowed)
+    return bool(host_name) and host_name in allowed
 
 
 def origin_allowed(request: Request, allowed: frozenset[str] | None) -> bool:

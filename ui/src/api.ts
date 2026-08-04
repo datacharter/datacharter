@@ -239,12 +239,13 @@ export interface EvalCaseOutcome {
   passed: boolean;
   answer: string;
   sqls: string[];
+  error?: string | null;
 }
 
 export interface EvalRun {
   started_at?: string;
   suite: string;
-  overall: { with_guides: number; without_guides?: number; lift?: number };
+  overall: { with_guides: number; without_guides?: number; lift?: number; errored?: number };
   cases: { question: string; with_guides: EvalCaseOutcome }[];
 }
 

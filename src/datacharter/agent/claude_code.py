@@ -120,10 +120,6 @@ def _dc_bin() -> str:
     return shutil.which("datacharter") or "datacharter"
 
 
-def tool_surface_ok(tools: list[str]) -> bool:
-    return set(tools).issubset(set(GOVERNED_TOOLS))
-
-
 def build_configs(
     serve_url: str, dc_bin: str, tmpdir: Path, deny: list[str] | None = None
 ) -> tuple[Path, Path]:

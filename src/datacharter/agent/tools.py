@@ -261,9 +261,32 @@ class ToolBox:
             elif rels:
                 if any(self._masked(s, t, outcol) for (s, t) in rels):
                     idx.add(i)
-            elif outcol.lower() in self._pii or outcol.lower() in self._auto_pii:
+            elif (
+                outcol.lower() in self._pii
+                or outcol.lower() in self._auto_pii
+                or self._override_masks_name(outcol)
+            ):
                 idx.add(i)
         return idx
+
+    def _override_masks_name(self, outcol: str) -> bool:
+        """Provenance-blind last resort: the name check alone ignored overrides,
+        so a user-masked non-PII-named column leaked when lineage AND relations
+        were both unavailable. We cannot attribute the column, so any explicit
+        `off` override matching the name masks it (explicit `on` cannot unmask
+        here — unattributed means unproven)."""
+        want = outcol.lower()
+        for src_ov in self._overrides.values():
+            for key, v in (src_ov.get("columns") or {}).items():
+                if v is False and key.rpartition(".")[2].lower() == want:
+                    return True
+            if any(v is False for v in (src_ov.get("tables") or {}).values()) or (
+                src_ov.get("source") is False
+            ):
+                # A table/source switched fully off: without provenance we can't
+                # rule this column out of it — fail closed.
+                return True
+        return False
 
     def _lineage_masked(self, qualified: str) -> bool:
         parts = qualified.split(".")

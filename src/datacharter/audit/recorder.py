@@ -60,6 +60,7 @@ class FlightRecorder:
         self._dir = Path(workspace) / FLIGHT_DIR
         self._enabled = enabled
         self._session = ""
+        self._degraded = False
 
     def start_session(
         self,
@@ -131,7 +132,20 @@ class FlightRecorder:
                 entry["hash"] = canonical_hash(entry)
                 with open(seg, "a") as f:
                     f.write(json.dumps(entry, default=str) + "\n")
-        except Exception:  # auditing must never break a query
+            self._degraded = False
+        except Exception as exc:  # auditing must never break a query...
+            # ...but dropping every write forever (e.g. a corrupt tail line)
+            # must not be silent: the user believes access is being recorded.
+            if not self._degraded:
+                self._degraded = True
+                import sys
+
+                print(
+                    f"warning: audit recorder failed to append ({exc}) — agent "
+                    f"access is NOT being recorded until this is fixed "
+                    f"(check {self._dir}).",
+                    file=sys.stderr,
+                )
             return
 
     def _tail(self) -> tuple[Path, str, int]:

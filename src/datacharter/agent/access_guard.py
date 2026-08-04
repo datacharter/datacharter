@@ -39,6 +39,7 @@ def check_query_access(
         return
     node = _top_select_node(tree)
     alias_map, relations = _collect_tables(tree)
+    _masked_lower = {n.lower() for n in masked_names}
 
     violations: set[str] = set()
 
@@ -55,6 +56,10 @@ def check_query_access(
             src, tbl = _split(q)
             if is_masked(src, tbl, col):
                 return col
+        if not relations:
+            # No BASE_TABLE collected (table functions, VALUES): the loop above
+            # was vacuous, which silently passed every ref — match by name.
+            return col if col.lower() in _masked_lower else None
         return None
 
     def walk(n: object, allowed: bool) -> None:

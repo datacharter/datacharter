@@ -73,7 +73,9 @@ def run_battery(base_url: str) -> list[tuple[str, bool, str]]:
             masked = _json.loads(out)["rows"][0][0] == "•••"
         except (ValueError, KeyError, IndexError):
             masked = False
-        assert masked or "policy" in out, out[:120]
+        # No substring escape hatch: either the value is structurally masked or
+        # the tool refused with an explicit policy error. Anything else fails.
+        assert masked or out.startswith("Error: policy"), out[:120]
         return "masked" if masked else "policy-refused"
 
     def upload():
@@ -103,6 +105,9 @@ def run_battery(base_url: str) -> list[tuple[str, bool, str]]:
     def audit_verify():
         body = client.get("/api/audit/verify").raise_for_status().json()
         assert body["ok"] is True, body
+        # The masked-tool check above recorded an access — an empty chain here
+        # means the recorder is broken, not that there was nothing to audit.
+        assert body["entries"] >= 1, body
         return f"{body['entries']} entries"
 
     check("health", health)

@@ -275,10 +275,24 @@ export default function EvalsView() {
               {pct(latest.overall.lift)}
             </span>
           )}
+          {(latest.overall.errored ?? 0) > 0 && (
+            <span className="guides-error">
+              {" · "}⚠ {latest.overall.errored} case run(s) errored — agent endpoint
+              problem, scores incomplete
+            </span>
+          )}
           <ul>
             {latest.cases.map((c, i) => (
               <li key={i}>
-                {c.with_guides.passed ? "✓" : "✗"} {c.question}
+                {c.with_guides.error != null
+                  ? "⚠"
+                  : c.with_guides.passed
+                    ? "✓"
+                    : "✗"}{" "}
+                {c.question}
+                {c.with_guides.error != null && (
+                  <span className="guides-error"> — errored: {c.with_guides.error}</span>
+                )}
                 {c.with_guides.sqls.length > 0 && <pre>{c.with_guides.sqls.join("\n")}</pre>}
               </li>
             ))}

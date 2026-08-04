@@ -35,8 +35,22 @@ def read_entries(
 
 
 def verify_chain(workspace: Path | str) -> tuple[bool, int, str]:
-    """Walk the full chain; returns (ok, entries_checked, detail)."""
+    """Walk the full chain; returns (ok, entries_checked, detail).
+
+    An empty or absent log is NOT a verified chain — deleting the whole log is
+    the strongest tampering move and must never read as success. Callers can
+    tell the states apart: ok+n>0 verified, ok+n==0 nothing-to-verify, not-ok
+    broken."""
     entries = read_entries(workspace)
+    if not entries:
+        root = Path(workspace) / FLIGHT_DIR
+        state = (
+            "no audit log directory exists" if not root.is_dir() else "the audit log is empty"
+        )
+        return True, 0, (
+            f"{state} — NOTHING VERIFIED. Normal for a new workspace; if agents "
+            f"have run here, the log may have been deleted."
+        )
     prev = GENESIS
     expected_seq = 1
     for e in entries:
@@ -102,7 +116,8 @@ def export_pack(
         z.writestr(
             "verification.txt",
             f"{detail}\nverified-at: {datetime.now(UTC).isoformat()}\nresult: "
-            + ("OK" if ok else "FAILED") + "\n",
+            + ("FAILED" if not ok else "EMPTY — NOTHING VERIFIED" if n == 0 else "OK")
+            + "\n",
         )
         charter = workspace / "charter.yaml"
         z.writestr("charter.yaml", charter.read_text() if charter.exists() else "(absent)\n")

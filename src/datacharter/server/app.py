@@ -6,6 +6,7 @@ import asyncio
 import contextlib
 import json
 import re
+import sys
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -316,14 +317,19 @@ def create_app(
     @app.get("/api/canary")
     async def canary_status() -> dict:
         guard = getattr(app.state, "canary", None)
-        return {"armed": guard is not None, "mode": getattr(guard, "mode", None)}
+        return {
+            "armed": guard is not None,
+            "mode": getattr(guard, "mode", None),
+            "planted": getattr(guard, "planted", None),
+        }
 
     @app.get("/api/audit/verify")
     async def audit_verify() -> dict:
         from datacharter.audit.evidence import verify_chain
 
         ok, n, detail = verify_chain(workspace)
-        return {"ok": ok, "entries": n, "detail": detail}
+        status = "broken" if not ok else "empty" if n == 0 else "verified"
+        return {"ok": ok, "entries": n, "detail": detail, "status": status}
 
     @app.get("/api/guides/suggestions")
     async def guide_suggestions() -> dict:
@@ -456,7 +462,12 @@ def create_app(
                 results.append({"name": t.name, "passed": not n, "failing_rows": int(n or 0)})
             except (DataTestError, EngineError, QueryNotAllowed) as exc:
                 results.append({"name": t.name, "passed": False, "error": str(exc)})
-        return {"results": results, "passed": all(r["passed"] for r in results)}
+        # all([]) is True — zero tests must read as "nothing ran", not "passed".
+        return {
+            "results": results,
+            "passed": bool(results) and all(r["passed"] for r in results),
+            "count": len(results),
+        }
 
     @app.get("/api/evals")
     async def list_evals() -> dict:
@@ -778,13 +789,21 @@ def create_app(
             return _error(409, "exists", f"{upload_path.name} already exists in the workspace.")
 
         pii_cols: list[str] = []
+        pii_warning: str | None = None
         try:
             from datacharter.contracts.pii import detect_pii
 
             detected = await detect_pii(app.state.engine)
             pii_cols = detected.get(name, [])
-        except Exception:
-            pass
+        except Exception as exc:
+            # The charter gets pii: {} baked in — the user must know detection
+            # never ran, not read the absence as "scanned clean".
+            pii_warning = (
+                f"PII detection failed ({exc}) — '{name}' was promoted with NO "
+                f"declared PII. Declare pii columns in charter.yaml if this "
+                f"table holds personal data."
+            )
+            print(f"warning: {pii_warning}", file=sys.stderr)
 
         await asyncio.to_thread(app.state.engine.remove_source, name)
         upload_path.rename(dest)
@@ -802,7 +821,10 @@ def create_app(
             await asyncio.to_thread(app.state.engine.add_source, src)
             raise
         _refresh_charter()
-        return {"source": name, "path": upload_path.name, "pii": pii_cols}
+        out = {"source": name, "path": upload_path.name, "pii": pii_cols}
+        if pii_warning:
+            out["warning"] = pii_warning
+        return out
 
     @app.delete("/api/uploads/{name}")
     async def delete_upload(name: str):
@@ -850,15 +872,26 @@ def create_app(
         # Startup's PII auto-detect never saw this table — a dragged file with
         # an email column must not reach the agent unmasked. Re-detect and
         # rebuild the toolbox so the default-masked rule holds for uploads too.
+        upload_warning: str | None = None
         try:
             from datacharter.contracts.pii import detect_pii
 
             detected = await detect_pii(app.state.engine)
             app.state.auto_pii |= {c.lower() for cols in detected.values() for c in cols}
-        except Exception:  # detection must never break the upload itself
-            pass
+        except Exception as exc:  # detection must never break the upload itself…
+            # …but silent failure means an email column reaches agents unmasked
+            # while the user believes auto-masking is on.
+            upload_warning = (
+                f"PII auto-detection failed ({exc}) — columns in '{stem}' are NOT "
+                f"auto-masked. Toggle masking in the source tree if this file "
+                f"holds personal data."
+            )
+            print(f"warning: {upload_warning}", file=sys.stderr)
         _refresh_charter()
-        return {"table": stem}
+        out = {"table": stem}
+        if upload_warning:
+            out["warning"] = upload_warning
+        return out
 
     @app.get("/api/stream/query")
     async def stream_query(
