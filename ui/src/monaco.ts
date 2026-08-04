@@ -30,8 +30,10 @@ export function registerCompletions(
   if (registered) return;
   registered = true;
   m.languages.registerCompletionItemProvider("sql", {
-    // `.` so `customers.` or an alias `c.` triggers scoped column completion.
-    triggerCharacters: ["."],
+    // Pop suggestions where a column/table is expected: after `.` (scoped),
+    // and proactively after a space, comma, or `(` — not only while a word is
+    // being typed. Without these, columns never appear after `SELECT `/`, `.
+    triggerCharacters: [".", ",", " ", "("],
     provideCompletionItems(model, position) {
       const word = model.getWordUntilPosition(position);
       const range = new m.Range(
@@ -79,18 +81,19 @@ export function registerCompletions(
             })),
           };
         }
-        return { suggestions: [] };
+        // Unknown qualifier (typo, a CTE, or catalog not loaded yet): fall
+        // through to the full list rather than showing an empty widget.
       }
 
+      // Rank the group the user most likely wants to the TOP: tables right
+      // after FROM/JOIN, columns everywhere else — keywords always last, so a
+      // data editor surfaces your schema, not `AND`/`AS`, first. (Monaco sorts
+      // by sortText; the numeric prefix decides the group order.)
+      const afterFrom = /\b(?:from|join)\s+[\w.]*$/.test(lineToCursor);
+      const colRank = afterFrom ? "2" : "0";
+      const tblRank = afterFrom ? "0" : "1";
+
       const suggestions: monaco.languages.CompletionItem[] = [];
-      for (const kw of KEYWORDS) {
-        suggestions.push({
-          label: kw,
-          kind: m.languages.CompletionItemKind.Keyword,
-          insertText: kw,
-          range,
-        });
-      }
       for (const t of tables) {
         const relation = relationOf(t);
         suggestions.push({
@@ -98,6 +101,7 @@ export function registerCompletions(
           kind: m.languages.CompletionItemKind.Class,
           insertText: relation,
           detail: `${t.columns.length} columns`,
+          sortText: `${tblRank}_${relation}`,
           range,
         });
       }
@@ -110,9 +114,19 @@ export function registerCompletions(
             kind: m.languages.CompletionItemKind.Field,
             insertText: col,
             detail: relationOf(t),
+            sortText: `${colRank}_${col}`,
             range,
           });
         }
+      }
+      for (const kw of KEYWORDS) {
+        suggestions.push({
+          label: kw,
+          kind: m.languages.CompletionItemKind.Keyword,
+          insertText: kw,
+          sortText: `9_${kw}`,
+          range,
+        });
       }
       return { suggestions };
     },

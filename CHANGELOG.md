@@ -5,6 +5,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.23.4] - 2026-08-04
+
+### Fixed
+- **SQL autocomplete surfaces your columns, not keywords.** The suggestion list
+  now pops proactively where a column or table is expected — after `SELECT`, a
+  comma, `FROM`, or `(` — and ranks your schema to the top (columns first in a
+  SELECT/WHERE, tables first after FROM), instead of burying columns under
+  `AND`/`AS`/`AVG`. An unresolved `qualifier.` (a typo or CTE) now falls back to
+  the full list rather than showing an empty popup.
+
+
 ## [0.23.3] - 2026-08-04
 
 ### Fixed
