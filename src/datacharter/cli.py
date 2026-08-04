@@ -235,23 +235,26 @@ def _cmd_mcp(args: argparse.Namespace) -> int:
         asyncio.run(serve_stdio(RemoteToolBox(args.serve_url)))
         return 0
 
-    from datacharter.agent.tools import ToolBox
+
     from datacharter.contracts import load_charter
 
     ws = Path(args.directory).resolve()
     if not (ws / "charter.yaml").exists():
         print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
         return 1
+    from datacharter.agent.factory import build_toolbox, detect_auto_pii
     from datacharter.audit import FlightRecorder
     from datacharter.audit.canary import ensure_canaries
 
     charter = load_charter(ws)
     engine = _open_engine(ws, charter.sources)
-    toolbox = ToolBox(
-        engine, charter.sources, guides=charter.guides,
+    # F-5: this path shipped without auto_pii/local_access — external MCP
+    # clients received value-detected PII unmasked. The factory makes that
+    # omission impossible.
+    toolbox = build_toolbox(
+        engine, charter, auto_pii=asyncio.run(detect_auto_pii(engine)),
         recorder=FlightRecorder(ws, enabled=charter.audit_enabled),
         canary=ensure_canaries(ws, engine, charter.canary_mode),
-        policies=charter.policies,
     )
     # stdout is the MCP protocol channel; diagnostics go to stderr.
     print(f"datacharter MCP server on stdio ({ws})", file=sys.stderr)
@@ -852,7 +855,6 @@ def _cmd_eval(args: argparse.Namespace) -> int:
     import asyncio
 
     from datacharter.agent.eval_runner import run_suite
-    from datacharter.agent.tools import ToolBox
     from datacharter.contracts import load_charter
     from datacharter.contracts.evals import EvalError, load_suites
 
@@ -894,9 +896,12 @@ def _cmd_eval(args: argparse.Namespace) -> int:
 
     llm = _local_llm(args.model) if args.local else LLMClient()
     engine = _open_engine(ws, charter.sources)
-    box = ToolBox(engine, charter.sources, guides=charter.guides, policies=charter.policies)
+    from datacharter.agent.factory import build_toolbox, detect_auto_pii
+
+    auto_pii = asyncio.run(detect_auto_pii(engine))
+    box = build_toolbox(engine, charter, auto_pii=auto_pii)
     box_off = (
-        ToolBox(engine, charter.sources, guides="", policies=charter.policies)
+        build_toolbox(engine, charter, auto_pii=auto_pii, guides_override="")
         if args.compare_guides else None
     )
 

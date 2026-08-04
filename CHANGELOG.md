@@ -5,6 +5,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.22.2] - 2026-08-04
+
+### Fixed
+- **`datacharter mcp` and `datacharter eval` now mask value-detected PII.**
+  Both commands hand-assembled their governed tool surface and skipped PII
+  auto-detection and snapshot access overrides — an external MCP client (or an
+  eval run) could read emails raw from a column whose name gave nothing away,
+  while the same query in the app was masked. Every entry path — serve, MCP
+  stdio, eval, the compare-guides arm, demo seeding — now builds its tools
+  through one shared factory, and a regression test bans hand-assembly
+  outright.
+- **Editing a source no longer erases its governance.** Saving a source from
+  the connection form (e.g. changing a hostname) silently dropped that
+  source's masking overrides, row filters, and table context. They now
+  survive any edit unless explicitly replaced.
+
 ## [0.22.1] - 2026-08-04
 
 ### Fixed

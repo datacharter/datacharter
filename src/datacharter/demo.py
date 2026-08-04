@@ -179,7 +179,7 @@ def seed_governance(workspace: Path) -> None:
         import asyncio
         import json as _json
 
-        from datacharter.agent.tools import ToolBox
+        from datacharter.agent.factory import build_toolbox, detect_auto_pii
         from datacharter.audit import FlightRecorder
         from datacharter.contracts import load_charter
         from datacharter.engine.session import Engine
@@ -192,9 +192,9 @@ def seed_governance(workspace: Path) -> None:
         try:
             recorder = FlightRecorder(workspace)
             recorder.start_session("demo", model="demo-tour", question=SEED_QUESTION)
-            box = ToolBox(
-                engine, charter.sources, guides=charter.guides,
-                recorder=recorder, policies=charter.policies,
+            box = build_toolbox(
+                engine, charter, auto_pii=asyncio.run(detect_auto_pii(engine)),
+                recorder=recorder,
             )
             for sql in SEED_QUERIES:
                 asyncio.run(box.run("query", _json.dumps({"sql": sql})))

@@ -20,8 +20,8 @@ from starlette.background import BackgroundTask
 from datacharter import __version__
 from datacharter.agent import Agent, AgentConfig
 from datacharter.agent.cache import AnswerCache, contract_fingerprint
+from datacharter.agent.factory import build_toolbox
 from datacharter.agent.llm import LLMClient
-from datacharter.agent.tools import ToolBox
 from datacharter.contracts import Charter, CharterError, load_charter
 from datacharter.engine import history
 from datacharter.engine.guard import QueryNotAllowed
@@ -202,11 +202,9 @@ def create_app(
 
         app.state.recorder = FlightRecorder(workspace, enabled=loaded.audit_enabled)
         app.state.canary = ensure_canaries(workspace, engine, loaded.canary_mode)
-        app.state.toolbox = ToolBox(
-            engine, loaded.sources, auto_pii=app.state.auto_pii,
-            local_access=loaded.local_access, guides=loaded.guides,
+        app.state.toolbox = build_toolbox(
+            engine, loaded, auto_pii=app.state.auto_pii,
             recorder=app.state.recorder, canary=app.state.canary,
-            policies=loaded.policies,
         )
         try:
             yield
@@ -265,11 +263,9 @@ def create_app(
         app.state.canary = ensure_canaries(
             workspace, app.state.engine, app.state.charter.canary_mode
         )
-        app.state.toolbox = ToolBox(
-            app.state.engine, app.state.charter.sources,
-            auto_pii=app.state.auto_pii, local_access=app.state.charter.local_access,
-            guides=app.state.charter.guides, recorder=app.state.recorder,
-            canary=app.state.canary, policies=app.state.charter.policies,
+        app.state.toolbox = build_toolbox(
+            app.state.engine, app.state.charter, auto_pii=app.state.auto_pii,
+            recorder=app.state.recorder, canary=app.state.canary,
         )
 
     def _require_local():
@@ -491,10 +487,12 @@ def create_app(
 
         suites = [s for s in load_suites(workspace) if not body.suite or s.name == body.suite]
         box = app.state.toolbox
+        # The guides-off arm differs ONLY in guides — same policies, canary,
+        # masking, and audit as the real surface (F-9: it used to run ungoverned).
         box_off = (
-            ToolBox(
-                app.state.engine, app.state.charter.sources,
-                auto_pii=app.state.auto_pii, local_access=app.state.charter.local_access, guides="",
+            build_toolbox(
+                app.state.engine, app.state.charter, auto_pii=app.state.auto_pii,
+                recorder=app.state.recorder, canary=app.state.canary, guides_override="",
             )
             if body.compare_guides
             else None

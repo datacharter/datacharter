@@ -51,6 +51,13 @@ def upsert_source(workspace: Path, name: str, body: dict) -> None:
     _reject_literal_credentials(body)
     path = workspace / CHARTER_FILE
     y, data = _load(path)
+    # Governance survives an edit (F-6): the source form carries connection
+    # shape only — replacing the body wholesale silently stripped masking
+    # overrides, row-level security, and table context on any hostname change.
+    existing = (data.get("sources") or {}).get(name) or {}
+    for key in ("agent_access", "row_filters", "context"):
+        if key in existing and key not in body:
+            body[key] = existing[key]
     data["sources"][name] = body
     _write(path, y, data)
 

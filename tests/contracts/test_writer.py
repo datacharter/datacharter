@@ -112,3 +112,25 @@ def test_set_agent_access_local_writes_top_level(tmp_path):
     la = _reload(tmp_path)["local_access"]
     assert la["columns"]["snap.email"] is True
     assert "local" not in (_reload(tmp_path).get("sources") or {})  # not a fake source
+
+
+def test_upsert_source_preserves_governance_keys(tmp_path):
+    # F-6: editing a source (e.g. changing a hostname) silently ERASED
+    # agent_access, row_filters, and context — row-level security dropped by a
+    # connection edit. Governance must survive unless explicitly replaced.
+    (tmp_path / "charter.yaml").write_text(
+        "version: 1\n"
+        "sources:\n"
+        "  crm:\n"
+        "    type: csv\n"
+        "    path: a.csv\n"
+        "    agent_access:\n      columns:\n        people.email: false\n"
+        "    row_filters:\n      people: \"region = 'US'\"\n"
+        "    context:\n      people: one row per person\n"
+    )
+    upsert_source(tmp_path, "crm", {"type": "csv", "path": "b.csv"})
+    body = _reload(tmp_path)["sources"]["crm"]
+    assert body["path"] == "b.csv"
+    assert body["agent_access"]["columns"]["people.email"] is False
+    assert body["row_filters"]["people"] == "region = 'US'"
+    assert body["context"]["people"] == "one row per person"
