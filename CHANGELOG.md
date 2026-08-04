@@ -5,6 +5,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- **The drag-and-drop upload cap is now 2 GB** (was 512 MB). Bigger files
+  should still be added as sources — registered in place, no copy, no limit.
+
 ### Fixed
 - **Dragged/uploaded files now have masking toggles** — and their PII columns
   are auto-detected the moment they land, so an uploaded CSV with an email

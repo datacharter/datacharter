@@ -33,7 +33,7 @@ from datacharter.server import agent_backend, llm_admin, security, source_admin
 HEARTBEAT_S = 1.0
 DEFAULT_TIMEOUT_S = 60.0
 
-_MAX_UPLOAD_BYTES = 512 * 1024 * 1024  # 512 MB cap on a single upload
+_MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024  # 2 GB cap on a single upload (it is copied)
 
 
 class QueryRequest(BaseModel):

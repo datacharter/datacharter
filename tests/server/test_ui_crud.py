@@ -234,3 +234,14 @@ def test_uploaded_file_pii_is_auto_masked_and_toggleable(demo_client):
               "arguments": '{"sql": "SELECT contact_email FROM people2 LIMIT 1"}'},
     ).json()["result"]
     assert "ada@real.com" in out
+
+
+def test_upload_over_the_cap_is_rejected_cleanly(demo_client, monkeypatch):
+    from datacharter.server import app as app_mod
+
+    monkeypatch.setattr(app_mod, "_MAX_UPLOAD_BYTES", 10)  # tiny cap for the test
+    c, ws = demo_client
+    r = c.post("/api/upload", files={"file": ("big.csv", b"a,b\n" + b"1,2\n" * 10, "text/csv")})
+    assert r.status_code == 413
+    assert "limit" in r.json()["error"]["message"]
+    assert not (ws / ".datacharter" / "uploads" / "big.csv").exists()  # partial removed

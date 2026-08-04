@@ -48,7 +48,7 @@ one; **Explain** shows the engine's plan. Both live next to the Run button.
 ## Files, snapshots, exports
 
 Drag a CSV, Parquet, JSON, or Excel file onto the window and it's queryable
-instantly (uploads are copied into the workspace and capped at **512 MB** —
+instantly (uploads are copied into the workspace and capped at **2 GB** —
 for bigger files, add them as a [source](sources.html) instead: that registers
 the file in place, no copy, no size limit, with pushdown). **Snapshot** saves a result as a reusable `local.<name>` table —
 each snapshot in the sidebar has a **recheck** button that re-runs its query
