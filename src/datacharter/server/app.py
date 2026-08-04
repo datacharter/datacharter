@@ -826,7 +826,14 @@ def create_app(
             return _error(403, "offline", "Offline mode: connecting an LLM is disabled.")
         llm_admin.save_llm(workspace, form)
         app.state.llm = llm_admin.load_llm(workspace)
-        return llm_admin.llm_status(app.state.llm)
+        # Configuring an LLM means USE it — otherwise a Claude Code (or
+        # disconnected) backend silently swallows the new connection and there
+        # is no way to switch back.
+        agent_backend.set_backend(workspace, "llm")
+        app.state.cc_session = {}
+        status = llm_admin.llm_status(app.state.llm)
+        status["backend"] = "llm"
+        return status
 
     @app.post("/api/agent/backend")
     async def set_agent_backend(form: BackendForm) -> dict:
@@ -858,6 +865,12 @@ def create_app(
 
     @app.post("/api/agent/ask")
     async def ask(body: AskRequest):
+        if agent_backend.get_backend(workspace) == "none":
+
+            async def no_agent() -> AsyncIterator[str]:
+                yield _sse("error", {"detail": "No agent connected — connect one first."})
+
+            return StreamingResponse(no_agent(), media_type="text/event-stream")
         if agent_backend.get_backend(workspace) == "claude-code":
             from datacharter.agent import claude_code as cc
 

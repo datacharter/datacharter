@@ -176,3 +176,27 @@ def test_local_llm_detection_empty_when_nothing_runs(demo_client, monkeypatch):
     monkeypatch.setattr(llm_admin, "detect_local_llms", fake_detect)
     c, _ = demo_client
     assert c.get("/api/llm/local").json() == {"runtimes": []}
+
+
+def test_configuring_an_llm_switches_the_backend(demo_client):
+    # The dead-end: Claude Code connected, user configures an LLM, backend
+    # silently stayed claude-code with no way back.
+    from datacharter.server import agent_backend
+
+    c, ws = demo_client
+    agent_backend.set_backend(ws, "claude-code")
+    r = c.post("/api/agent/config", json={"base_url": "http://127.0.0.1:11434/v1",
+                                          "model": "qwen2.5:7b"})
+    assert r.status_code == 200 and r.json()["backend"] == "llm"
+    assert agent_backend.get_backend(ws) == "llm"
+
+
+def test_disconnect_backend_and_ask_refuses_cleanly(demo_client):
+    from datacharter.server import agent_backend
+
+    c, ws = demo_client
+    assert c.post("/api/agent/backend", json={"backend": "none"}).status_code == 200
+    assert agent_backend.get_backend(ws) == "none"
+    assert c.get("/api/agent/available").json()["backend"] == "none"
+    r = c.post("/api/agent/ask", json={"question": "hi"})
+    assert "No agent connected" in r.text

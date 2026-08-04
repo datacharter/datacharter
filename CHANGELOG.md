@@ -11,6 +11,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   only, silent when absent) and their loaded models listed under "Running on
   this machine" — one click connects, no API key, and if several runtimes or
   models are up you pick from the list. (`GET /api/llm/local`)
+- **You can now disconnect and switch agents.** A connected agent (including
+  Claude Code) has a disconnect button, and configuring an LLM while another
+  backend is active actually switches to it — previously Claude Code was a
+  dead end with no path back to a local or hosted model.
 
 ### Changed
 - **Typo'd charter keys are now load errors.** An unknown key in a source,

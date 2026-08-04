@@ -6,7 +6,8 @@ import json
 from pathlib import Path
 
 _CONFIG_FILE = ".datacharter/agent.json"
-_VALID = ("llm", "claude-code")
+#: "none" = explicitly disconnected: the chat shows the connect choices again.
+_VALID = ("llm", "claude-code", "none")
 
 
 def get_backend(workspace: Path) -> str:

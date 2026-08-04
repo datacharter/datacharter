@@ -33,13 +33,21 @@ export default function ChatPanel({
   const scroller = useRef<HTMLDivElement>(null);
   const nearBottom = useRef(true);
   const claudeCode = status?.backend === "claude-code";
-  const available = status ? status.available || claudeCode : null;
+  const disconnected = status?.backend === "none";
+  const available = status ? !disconnected && (status.available || claudeCode) : null;
   const model = claudeCode ? "Claude Code (your subscription)" : (status?.model ?? "");
+
 
   const refresh = useCallback(() => {
     api.agentStatus().then(setStatus).catch(() => setStatus({ available: false } as AgentStatus));
   }, []);
   useEffect(refresh, [refresh]);
+
+  const disconnect = useCallback(async () => {
+    await api.setAgentBackend("none").catch(() => undefined);
+    setMessages([]);
+    refresh();
+  }, [refresh]);
 
   useEffect(() => {
     if (nearBottom.current && scroller.current) {
@@ -153,8 +161,20 @@ export default function ChatPanel({
         >
           🗑
         </button>
-        <button className="chat-config" title="Configure LLM" onClick={() => setConfiguring(true)}>
+        <button
+          className="chat-config"
+          title="Switch agent — connect a different LLM (local models are auto-detected)"
+          onClick={() => setConfiguring(true)}
+        >
           ⚙
+        </button>
+        <button
+          className="chat-config"
+          title="Disconnect this agent"
+          aria-label="Disconnect agent"
+          onClick={disconnect}
+        >
+          ⏏
         </button>
       </div>
       <div
