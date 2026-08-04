@@ -5,7 +5,7 @@ import LLMConfig from "./LLMConfig";
 // global.fetch spy over top-level vi.mock: the api module builds on fetch, and
 // mocking at the seam keeps request shapes honest.
 function stubFetch(routes: Record<string, unknown>) {
-  return vi.spyOn(global, "fetch").mockImplementation(async (input) => {
+  return vi.spyOn(globalThis, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
     const url = String(input);
     for (const [path, body] of Object.entries(routes)) {
       if (url.includes(path)) {
@@ -40,7 +40,7 @@ describe("LLMConfig local-runtime picker", () => {
     fireEvent.click(btn);
     await waitFor(() => expect(onDone).toHaveBeenCalled());
     const configCall = spy.mock.calls.find(
-      ([u, init]) => String(u).includes("/api/agent/config") && init?.method === "POST",
+      (call) => String(call[0]).includes("/api/agent/config") && call[1]?.method === "POST",
     );
     expect(configCall).toBeTruthy();
     const sent = JSON.parse(String(configCall![1]!.body));
@@ -57,7 +57,8 @@ describe("LLMConfig local-runtime picker", () => {
   });
 
   it("shows the endpoint error instead of closing when connect fails", async () => {
-    vi.spyOn(global, "fetch").mockImplementation(async (input, init) => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.includes("/api/llm/local")) {
         return new Response(

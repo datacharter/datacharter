@@ -38,7 +38,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "ruff>=0.6"]
+# mcp: the official SDK, used only as a CONFORMANCE CLIENT in tests — our
+# server speaks hand-rolled JSON-RPC and must satisfy a real client.
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "ruff>=0.6", "mcp>=1.0"]
 desktop = ["pywebview>=5.0"]
 snowflake = ["snowflake-connector-python>=3.12"]
 

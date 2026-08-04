@@ -42,4 +42,6 @@ exclude:
   - TUTORIAL_MODE.md
   - ROADMAP-strategy.md
   - LAUNCH.md
+  - QA-PLAN.md
+  - RELEASE-RITUAL.md
   - superpowers

@@ -130,6 +130,29 @@ jobs:
           test "$GOT" = "$WANT"
           test -d desktop/dist/DataCharter.app/Contents/Frameworks/pytz
 
+      - name: Window proof macOS (launch the real GUI, assert liveness, screenshot)
+        if: matrix.kind == 'dmg'
+        shell: bash
+        run: |
+          # The battery proves the server; this proves the .app actually opens
+          # as a GUI (pywebview/WKWebView wiring only breaks at launch).
+          "$BIN" --demo & APP_PID=$!
+          sleep 60
+          if ! ps -p $APP_PID > /dev/null; then
+            echo "::error::app process died within 60s of GUI launch"
+            exit 1
+          fi
+          screencapture -x macos-app-screenshot.png || true
+          kill $APP_PID || true
+
+      - name: Upload macOS screenshot
+        if: always() && matrix.kind == 'dmg'
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-app-screenshot
+          path: macos-app-screenshot.png
+          if-no-files-found: ignore
+
       - name: Window proof (launch the real GUI, assert the window, screenshot)
         if: matrix.kind == 'zip'
         shell: powershell
