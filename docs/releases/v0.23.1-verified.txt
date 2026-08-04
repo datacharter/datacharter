@@ -1,0 +1,14 @@
+version: 0.23.1
+date: 2026-08-04
+who: release_gate.sh (automated; run on the release machine)
+wheel-gate: pass
+journey: pass
+claude-code-round: pass
+notes: |
+    ✓ claude-binary: 2.1.221 (Claude Code)
+    ✓ tool-surface: governed surface asserted (36 denied)
+    ✓ data-question: tools=['list_tables', 'query'] answer='3'
+    ✓ pii-masked: raw emails absent from every event
+    ✓ follow-up-memory: answer='3'
+    ✓ local-llm: ollama/qwen2.5:7b: 'The people table contains 3 rows.\n\n```vega-lite\n{\n  "data": {"values": [{"count_'
+  claude live check: 6/6 passed
