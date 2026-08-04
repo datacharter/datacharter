@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Desktop: Claude Code's data tools actually work now.** The frozen app has
+  no `datacharter` console script, so the MCP bridge Claude Code spawns could
+  never start — it connected anyway and every tool call silently returned
+  nothing. The app now re-execs itself as the bridge, and the connect-time
+  check fails closed in both directions: missing tools refuse the connection
+  with a real error instead of yielding an agent that answers nothing.
+
 ## [0.22.0] - 2026-08-04
 
 ### Fixed

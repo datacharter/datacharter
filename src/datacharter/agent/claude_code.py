@@ -107,8 +107,13 @@ async def _stderr_tail(proc) -> str:
 
 
 def _dc_bin() -> str:
-    # Must be the SAME datacharter that's serving (it needs `mcp --serve-url`); prefer the
-    # console script next to the running interpreter over whatever is first on PATH.
+    # Must be the SAME datacharter that's serving (it needs `mcp --serve-url`).
+    # Frozen desktop app: there is no console script — the app binary re-execs
+    # itself (the desktop entry dispatches an `mcp` argv to the CLI). Otherwise
+    # prefer the script next to the running interpreter over whatever's on PATH
+    # (a PATH hit could be a different, version-mismatched install).
+    if getattr(sys, "frozen", False):
+        return sys.executable
     sibling = Path(sys.executable).parent / "datacharter"
     if sibling.exists():
         return str(sibling)
@@ -237,6 +242,17 @@ async def assert_tool_surface(
     extras: list[str] = []
     for _ in range(4):
         tools = await probe_tools(serve_url, dc_bin, deny)
+        # Fail closed in BOTH directions: extra tools are a governance breach,
+        # but MISSING governed tools mean the MCP bridge is dead — connecting
+        # anyway gives an agent that silently answers nothing.
+        missing = sorted(set(GOVERNED_TOOLS) - set(tools))
+        if missing:
+            raise ClaudeGovernanceError(
+                "Refusing to connect: the DataCharter data tools are not reachable "
+                f"from Claude Code (missing: {', '.join(missing)}). The MCP bridge "
+                f"({dc_bin}) likely failed to start — reconnect after checking that "
+                "the app can launch its own `mcp` subprocess."
+            )
         extras = sorted(set(tools) - set(GOVERNED_TOOLS))
         if not extras:
             return deny

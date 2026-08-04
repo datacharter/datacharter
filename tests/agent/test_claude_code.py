@@ -156,3 +156,44 @@ def test_system_context_frames_the_data_agent():
     with_guides = system_context("- revenue is net of refunds")
     assert with_guides.startswith(ctx)
     assert "revenue is net of refunds" in with_guides
+
+
+def test_dc_bin_in_frozen_app_is_the_app_itself(monkeypatch):
+    # The dmg has no `datacharter` console script — the bridge must re-exec
+    # the app binary (user-reported: CC connected but every tool call was void).
+    import sys
+
+    from datacharter.agent.claude_code import _dc_bin
+
+    app_bin = "/Applications/DataCharter.app/Contents/MacOS/DataCharter"
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", app_bin)
+    assert _dc_bin() == app_bin
+
+
+def test_assert_tool_surface_refuses_when_tools_missing(monkeypatch):
+    # A dead MCP bridge yields an EMPTY tool list — the old subset check passed
+    # it and the user got an agent that silently answers nothing. Fail closed.
+    import asyncio
+
+    from datacharter.agent import claude_code as cc
+
+    async def dead_probe(serve_url, dc_bin, deny):
+        return []  # bridge dead: no tools at all
+
+    monkeypatch.setattr(cc, "probe_tools", dead_probe)
+    import pytest as _pytest
+
+    with _pytest.raises(cc.ClaudeGovernanceError, match="not reachable"):
+        asyncio.run(cc.assert_tool_surface("http://127.0.0.1:1", dc_bin="x"))
+
+
+def test_desktop_main_dispatches_mcp_argv(monkeypatch):
+    from datacharter import desktop
+
+    called = {}
+    monkeypatch.setattr(
+        "datacharter.cli.main", lambda argv: (called.setdefault("argv", argv), 0)[1]
+    )
+    assert desktop.main(["mcp", "/tmp/ws", "--serve-url", "http://x"]) == 0
+    assert called["argv"][0] == "mcp"

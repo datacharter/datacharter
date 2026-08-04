@@ -48,6 +48,14 @@ def _demo_workspace() -> Path:
 
 
 def main(argv: list[str] | None = None) -> int:
+    args_in = sys.argv[1:] if argv is None else argv
+    if args_in and args_in[0] == "mcp":
+        # The frozen app re-execs ITSELF as the Claude Code MCP bridge (there
+        # is no `datacharter` console script inside the bundle) — delegate the
+        # whole argv to the real CLI.
+        from datacharter.cli import main as cli_main
+
+        return cli_main(args_in)
     parser = argparse.ArgumentParser(
         prog="datacharter-desktop", description="DataCharter desktop app"
     )
