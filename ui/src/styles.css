@@ -1177,3 +1177,10 @@ table.grid td.rownum, table.grid th.rownum {
 .evals-editor, .evals-datatests { margin-top: 18px; }
 .evals-editor .guides-content { font-family: var(--mono, monospace); font-size: 0.85rem; }
 .preview-error.expanded { white-space: pre-wrap; overflow: visible; text-overflow: clip; }
+
+/* Detected local LLM runtimes in the connect dialog */
+.llm-local { margin: 8px 0 14px; padding: 10px; background: var(--bg-raised); border-radius: 8px; }
+.llm-local h4 { margin: 0 0 8px; font-size: 12.5px; }
+.llm-local-runtime { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.llm-local-provider { font-size: 11.5px; color: var(--text-dim); min-width: 70px; }
+.llm-local-models { display: flex; flex-wrap: wrap; gap: 6px; }

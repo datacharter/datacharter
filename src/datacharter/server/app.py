@@ -814,6 +814,12 @@ def create_app(
         status["claude_code_available"] = claude_available()
         return status
 
+    @app.get("/api/llm/local")
+    async def local_llms() -> dict:
+        if app.state.offline:
+            return {"runtimes": []}
+        return {"runtimes": await llm_admin.detect_local_llms()}
+
     @app.post("/api/agent/config")
     async def agent_config(form: llm_admin.LLMConfigForm):
         if app.state.offline:

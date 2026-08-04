@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, type AgentStatus } from "../api";
+
+type LocalRuntime = { provider: string; base_url: string; models: string[] };
 
 export default function LLMConfig({
   current,
@@ -15,6 +17,14 @@ export default function LLMConfig({
   const [apiKey, setApiKey] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [msgKind, setMsgKind] = useState<"ok" | "pending" | "error">("pending");
+  const [runtimes, setRuntimes] = useState<LocalRuntime[]>([]);
+
+  useEffect(() => {
+    api
+      .localLLMs()
+      .then((r) => setRuntimes(r.runtimes))
+      .catch(() => undefined);
+  }, []);
 
   const save = async () => {
     setMsg("Saving…");
@@ -32,9 +42,47 @@ export default function LLMConfig({
     }
   };
 
+  // One click: a detected local model needs no key — connect straight away.
+  const useLocal = async (rt: LocalRuntime, m: string) => {
+    setBaseUrl(rt.base_url);
+    setModel(m);
+    setMsg(`Connecting ${m}…`);
+    setMsgKind("pending");
+    try {
+      await api.configureLLM({ base_url: rt.base_url, model: m });
+      onDone();
+    } catch (e) {
+      setMsg((e as Error).message);
+      setMsgKind("error");
+    }
+  };
+
   return (
     <div className="llm-config">
       <h3>Connect an LLM</h3>
+      {runtimes.length > 0 && (
+        <div className="llm-local">
+          <h4>Running on this machine</h4>
+          {runtimes.map((rt) => (
+            <div key={rt.provider} className="llm-local-runtime">
+              <span className="llm-local-provider">{rt.provider}</span>
+              <div className="llm-local-models">
+                {rt.models.map((m) => (
+                  <button
+                    key={m}
+                    className="guides-tab"
+                    onClick={() => useLocal(rt, m)}
+                    aria-label={`Use local model ${m}`}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+          <p className="hint">One click — local models need no API key. Data stays on this machine.</p>
+        </div>
+      )}
       <div className="source-form">
         <label>
           Base URL

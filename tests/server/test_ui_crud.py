@@ -147,3 +147,32 @@ def test_data_tests_run_reports_pass_and_fail(demo_client):
     assert by_name["customers_nonempty"]["passed"] is True
     assert by_name["customers_at_least_100"]["passed"] is False
     assert body["passed"] is False
+
+
+def test_local_llm_detection_lists_running_runtimes(demo_client, monkeypatch):
+    # The connect dialog lists models from locally-running runtimes; probing is
+    # loopback-only with silent failures, so absent runtimes just don't appear.
+    from datacharter.server import llm_admin
+
+    async def fake_detect():
+        return [
+            {"provider": "ollama", "base_url": "http://127.0.0.1:11434/v1",
+             "models": ["qwen3:8b", "llama3.2:3b"]}
+        ]
+
+    monkeypatch.setattr(llm_admin, "detect_local_llms", fake_detect)
+    c, _ = demo_client
+    body = c.get("/api/llm/local").json()
+    assert body["runtimes"][0]["provider"] == "ollama"
+    assert "qwen3:8b" in body["runtimes"][0]["models"]
+
+
+def test_local_llm_detection_empty_when_nothing_runs(demo_client, monkeypatch):
+    from datacharter.server import llm_admin
+
+    async def fake_detect():
+        return []
+
+    monkeypatch.setattr(llm_admin, "detect_local_llms", fake_detect)
+    c, _ = demo_client
+    assert c.get("/api/llm/local").json() == {"runtimes": []}

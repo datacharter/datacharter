@@ -80,3 +80,41 @@ def llm_status(client: LLMClient | None) -> dict:
         "base_url": getattr(client, "base_url", None),
         "has_key": bool(getattr(client, "api_key", None)),
     }
+
+
+#: Local OpenAI-compatible runtimes worth probing, with their discovery URLs.
+LOCAL_RUNTIMES = [
+    ("ollama", "http://127.0.0.1:11434/api/tags", "http://127.0.0.1:11434/v1"),
+    ("lm-studio", "http://127.0.0.1:1234/v1/models", "http://127.0.0.1:1234/v1"),
+    ("vllm", "http://127.0.0.1:8000/v1/models", "http://127.0.0.1:8000/v1"),
+    ("llama.cpp", "http://127.0.0.1:8080/v1/models", "http://127.0.0.1:8080/v1"),
+]
+
+
+async def detect_local_llms() -> list[dict]:
+    """Probe known local LLM runtimes and list their loaded models.
+
+    Short timeouts, loopback only, failures are silent — a runtime that isn't
+    running simply doesn't appear."""
+    import asyncio
+
+    import httpx
+
+    async def probe(provider: str, url: str, base_url: str) -> dict | None:
+        try:
+            async with httpx.AsyncClient(timeout=0.8) as client:
+                resp = await client.get(url)
+                resp.raise_for_status()
+                body = resp.json()
+        except Exception:
+            return None
+        if "models" in body:  # ollama /api/tags
+            models = [m.get("name") for m in body["models"] if m.get("name")]
+        else:  # OpenAI-style /v1/models
+            models = [m.get("id") for m in body.get("data", []) if m.get("id")]
+        if not models:
+            return None
+        return {"provider": provider, "base_url": base_url, "models": sorted(models)}
+
+    results = await asyncio.gather(*(probe(*rt) for rt in LOCAL_RUNTIMES))
+    return [r for r in results if r]

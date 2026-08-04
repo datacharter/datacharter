@@ -51,6 +51,11 @@ datacharter serve --local              # uses qwen3:8b by default
 datacharter serve --local --model ...  # choose another Ollama model
 ```
 
+Easier still: the **Connect an LLM** dialog detects runtimes already running
+on your machine — Ollama, LM Studio, vLLM, llama.cpp — and lists their loaded
+models under **Running on this machine**. One click connects; local models
+need no API key.
+
 - `--local` targets Ollama at `http://127.0.0.1:11434/v1`.
 - The default model is `qwen3:8b`; override with `--model`.
 - DataCharter never auto-installs third-party software. If Ollama is not

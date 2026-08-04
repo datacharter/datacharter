@@ -185,6 +185,10 @@ export const api = {
     request<{ metrics: { name: string; sql: string; dimensions: string[]; has_time: boolean }[] }>(
       "/api/metrics",
     ),
+  localLLMs: () =>
+    request<{ runtimes: { provider: string; base_url: string; models: string[] }[] }>(
+      "/api/llm/local",
+    ),
   runDataTests: () =>
     request<{
       results: { name: string; passed: boolean; failing_rows?: number; error?: string }[];

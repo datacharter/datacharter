@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **The Connect an LLM dialog now finds models already running on your
+  machine.** Ollama, LM Studio, vLLM, and llama.cpp are probed (loopback
+  only, silent when absent) and their loaded models listed under "Running on
+  this machine" — one click connects, no API key, and if several runtimes or
+  models are up you pick from the list. (`GET /api/llm/local`)
+
 ## [0.19.2] - 2026-08-03
 
 ### Fixed
