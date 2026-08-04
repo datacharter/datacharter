@@ -1016,6 +1016,10 @@ def create_app(
                         yield _sse("text", {"text": ev["text"]})
                     elif ev["kind"] == "tool_call":
                         yield _sse("tool_call", {"tool": ev["tool"], "sql": ev.get("sql", "")})
+                    elif ev["kind"] == "error":
+                        # run_turn's timeout/exit/no-result diagnostics — dropping
+                        # them left the user staring at an empty answer.
+                        yield _sse("error", {"detail": ev.get("detail") or "Claude Code error"})
                     elif ev["kind"] == "result":
                         if ev.get("is_error"):
                             yield _sse("error", {"detail": ev.get("text") or "Claude Code error"})

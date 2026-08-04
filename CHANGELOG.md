@@ -6,6 +6,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- **Claude Code failures now reach the chat instead of dying silently.** A
+  turn that timed out, crashed, or ended without a result produced an empty
+  answer with no explanation — the timeout/exit diagnostics were dropped
+  before the UI. They now stream as visible errors, including the exit code
+  and Claude's stderr.
 - **Config typos now refuse instead of silently disabling governance.** A
   misspelled top-level key (`polices:`, `canry:`) was dropped without a word —
   the charter looked protected while enforcing nothing. charter.yaml now

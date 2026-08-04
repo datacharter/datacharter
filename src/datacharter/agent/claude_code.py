@@ -310,6 +310,7 @@ async def run_turn(
             *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=_env()
         )
         assert proc.stdout is not None
+        saw_result = False
         try:
             while True:
                 try:
@@ -330,7 +331,23 @@ async def run_turn(
                 if not line:
                     break
                 for ev in parse_stream([line.decode()]):
+                    saw_result = saw_result or ev["kind"] == "result"
                     yield ev
+            # The stream can end without a `result` (crash, auth failure, killed
+            # subprocess) — silence here used to reach the user as an empty
+            # answer with no explanation.
+            tail = await _stderr_tail(proc)
+            await proc.wait()
+            if proc.returncode != 0:
+                yield {
+                    "kind": "error",
+                    "detail": f"Claude Code exited with code {proc.returncode}.{tail}",
+                }
+            elif not saw_result:
+                yield {
+                    "kind": "error",
+                    "detail": f"Claude Code ended its stream without a result.{tail}",
+                }
         finally:
             if proc.returncode is None:
                 proc.kill()
