@@ -96,6 +96,17 @@ try {
     }
   });
 
+  await step("tour-not-replayed", async () => {
+    // "Quit and relaunch: no tour replay" — reload after dismissal and the
+    // tour must stay dismissed (localStorage persistence, shipped defect #1).
+    await page.reload({ waitUntil: "networkidle" });
+    await page.getByText("store", { exact: true }).first().waitFor({ timeout: 15000 });
+    const skip = page.getByText("Skip tour", { exact: true });
+    if (await skip.isVisible().catch(() => false)) {
+      throw new Error("tour replayed after reload — dismissal did not persist");
+    }
+  });
+
   await step("query", async () => {
     await dismissTour();
     await runSql(

@@ -54,20 +54,20 @@ jobs:
       - name: Wheel gate (smoke battery + MCP)
         run: .gateenv/bin/python scripts/wheel_gate.py
 
-      - name: Human release ritual (docs/RELEASE-RITUAL.md)
+      - name: Release-machine gate file (docs/RELEASE-RITUAL.md)
         env:
           REQUIRE_VERIFIED: ${{ vars.REQUIRE_VERIFIED }}
         run: |
           VER=$(.gateenv/bin/python -c "from datacharter import __version__; print(__version__)")
           FILE="docs/releases/v${VER}-verified.txt"
           if [ -f "$FILE" ]; then
-            echo "human verification on file:"
+            echo "release-machine verification on file:"
             cat "$FILE"
           elif [ "$REQUIRE_VERIFIED" = "true" ]; then
-            echo "::error::$FILE missing — run the 12-minute ritual (docs/RELEASE-RITUAL.md) and commit it before releasing."
+            echo "::error::$FILE missing — run 'bash scripts/release_gate.sh' on the release machine (live Claude round + journey on the wheel) and commit the file it writes before tagging."
             exit 1
           else
-            echo "::warning::No human verification file ($FILE). Automated gates only. Set repo variable REQUIRE_VERIFIED=true to make the ritual mandatory."
+            echo "::warning::No verification file ($FILE). Set repo variable REQUIRE_VERIFIED=true to make the release-machine gate mandatory."
           fi
 
   publish:
