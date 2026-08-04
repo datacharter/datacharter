@@ -43,6 +43,13 @@ def run_battery(base_url: str) -> list[tuple[str, bool, str]]:
         assert body["status"] == "ok"
         return body["version"]
 
+    def ui_served():
+        # The artifact must serve the real explorer, not a 404 shell — the UI
+        # bundle is gitignored and has shipped missing from fresh checkouts.
+        body = client.get("/").raise_for_status().text
+        assert 'id="root"' in body, body[:120]
+        return "index.html with #root"
+
     def timestamptz():
         body = client.post(
             "/api/query",
@@ -111,6 +118,7 @@ def run_battery(base_url: str) -> list[tuple[str, bool, str]]:
         return f"{body['entries']} entries"
 
     check("health", health)
+    check("ui-served", ui_served)
     check("timestamptz-fetch", timestamptz)
     check("tables", tables)
     check("masked-tool", masked_tool)

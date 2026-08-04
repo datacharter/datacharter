@@ -70,19 +70,43 @@ jobs:
           PYI=.buildenv/bin/pyinstaller; [ -f "$PYI" ] || PYI=.buildenv/Scripts/pyinstaller.exe
           "$PYI" desktop/datacharter.spec --workpath desktop/build --distpath desktop/dist -y
 
-      - name: Smoke battery (real endpoints against the FROZEN build)
+      - name: Resolve frozen binary path
         shell: bash
         run: |
           if [ "${{ matrix.kind }}" = "dmg" ]; then
-            BIN="desktop/dist/DataCharter.app/Contents/MacOS/DataCharter"
+            echo "BIN=desktop/dist/DataCharter.app/Contents/MacOS/DataCharter" >> "$GITHUB_ENV"
           else
-            BIN="desktop/dist/DataCharter.exe"
+            echo "BIN=desktop/dist/DataCharter.exe" >> "$GITHUB_ENV"
           fi
+
+      - name: Selftest (import every module + dynamic tripwires, in the FROZEN build)
+        shell: bash
+        run: |
+          # Catches modules PyInstaller silently dropped (pytz, multipart,
+          # ruamel each shipped missing from a green build).
+          "$BIN" --selftest
+
+      - name: Smoke battery (real endpoints against the FROZEN build)
+        shell: bash
+        run: |
           # Exercises timestamptz fetch (pytz), upload (multipart), contract
-          # writes (ruamel), masking, snapshots, audit — the classes that only
-          # break in frozen builds. Any red check fails the build.
+          # writes (ruamel), masking, snapshots, audit, and that / serves the
+          # real UI — the classes that only break in frozen builds.
           "$BIN" --smoke --demo
           echo "smoke battery passed on ${{ matrix.label }}"
+
+      - name: MCP bridge handshake (the FROZEN app re-execing itself)
+        shell: bash
+        run: |
+          # Claude Code spawns this exact binary as its MCP bridge; the argv
+          # dispatch shipped dead once. Real initialize + tools/list + query.
+          WS="$RUNNER_TEMP/bridge-ws"
+          mkdir -p "$WS"
+          printf 'a,b\n1,2\n' > "$WS/f.csv"
+          printf 'version: 1\nsources:\n  f:\n    type: csv\n    path: f.csv\n' \
+            > "$WS/charter.yaml"
+          PY=.buildenv/bin/python; [ -f "$PY" ] || PY=.buildenv/Scripts/python.exe
+          "$PY" scripts/bridge_check.py "$BIN" "$WS"
 
       - name: Bundle assertions (version + critical modules present)
         if: matrix.kind == 'dmg'
@@ -118,9 +142,9 @@ jobs:
           $bmp.Save("$env:GITHUB_WORKSPACE\windows-app-screenshot.png")
           Stop-Process -Name DataCharter -Force -ErrorAction SilentlyContinue
           if (-not $title) { Write-Error "No app window ever appeared"; exit 1 }
-          # The window must serve the real UI, not a 404 shell.
-          $ui = Select-String -Path "src\datacharter\server\static\index.html" -Pattern 'id="root"' -Quiet
-          if (-not $ui) { Write-Error "UI bundle missing from the build"; exit 1 }
+          # UI-served proof moved into the smoke battery's `ui-served` check,
+          # which fetches / from the FROZEN app — the old source-checkout grep
+          # here could never fail.
 
       - name: Upload window screenshot
         if: always() && matrix.kind == 'zip'

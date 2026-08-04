@@ -35,3 +35,4 @@ src/datacharter/server/static/
 # Local agent settings stay untracked; the committed run skill does not.
 .claude/*
 !.claude/skills/
+.buildenv/

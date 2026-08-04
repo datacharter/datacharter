@@ -65,7 +65,19 @@ def main(argv: list[str] | None = None) -> int:
         "--smoke", action="store_true",
         help="Start the server headless, check health, exit (CI verification)",
     )
+    parser.add_argument(
+        "--selftest", action="store_true",
+        help="Import every module + dynamic-dep tripwires, exit (CI verification)",
+    )
     args = parser.parse_args(argv)
+
+    if args.selftest:
+        from datacharter.selftest import format_results as fmt
+        from datacharter.selftest import run_selftest
+
+        results = run_selftest()
+        _say(fmt(results))
+        return 0 if all(ok for _, ok, _ in results) else 1
 
     handle = ServerHandle()
 
