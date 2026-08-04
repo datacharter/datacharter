@@ -104,3 +104,49 @@ jobs:
           uv venv
           uv pip install -e ".[dev]"
           .venv/bin/pytest -m e2e -q
+
+  journey:
+    # The first-session user journey, in a real browser, against the BUILT
+    # wheel — the artifact users install, not the source tree. Six of the
+    # fifteen launch-week defects lived on paths only this layer can see.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - uses: astral-sh/setup-uv@v7
+      - name: Build wheel (UI bundled)
+        run: |
+          ./scripts/build_ui.sh
+          uv build
+      - name: Install the wheel into a clean venv
+        run: |
+          uv venv journey-venv
+          uv pip install --python journey-venv/bin/python dist/*.whl
+      - name: Install playwright chromium
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Serve a fresh workspace from the wheel
+        run: |
+          journey-venv/bin/datacharter init /tmp/journey-ws
+          nohup journey-venv/bin/datacharter serve /tmp/journey-ws --port 8399 \
+            > /tmp/journey-serve.log 2>&1 &
+          for i in $(seq 30); do
+            curl -sf http://127.0.0.1:8399/api/health && break; sleep 1
+          done
+      - name: Run the journey
+        run: node scripts/journey.mjs --port 8399
+      - name: Server log on failure
+        if: failure()
+        run: cat /tmp/journey-serve.log
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: journey-shots
+          path: journey-shots/
+          if-no-files-found: ignore
