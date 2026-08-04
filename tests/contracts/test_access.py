@@ -72,5 +72,6 @@ def test_build_overrides_leaves_attach_sources_alone():
     )
     ov = build_overrides([pg], local_access={"tables": {"snap": False}})
     assert ov["crm"] == {"source": True}
-    assert "memory" not in ov
     assert ov["local"]["tables"]["snap"] is False
+    # local_access also reaches memory-registered uploads by design
+    assert ov["memory"]["tables"]["snap"] is False

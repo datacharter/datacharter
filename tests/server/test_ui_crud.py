@@ -200,3 +200,37 @@ def test_disconnect_backend_and_ask_refuses_cleanly(demo_client):
     assert c.get("/api/agent/available").json()["backend"] == "none"
     r = c.post("/api/agent/ask", json={"question": "hi"})
     assert "No agent connected" in r.text
+
+
+def test_uploaded_file_pii_is_auto_masked_and_toggleable(demo_client):
+    # A dragged file with an obvious PII column must not reach the agent
+    # unmasked (startup detection never saw it), and its toggles must persist
+    # via local_access and enforce on the agent surface.
+    c, _ = demo_client
+    csv = b"person_name,contact_email\nada,ada@real.com\n"
+    r = c.post("/api/upload", files={"file": ("people2.csv", csv, "text/csv")})
+    assert r.status_code == 200 and r.json()["table"] == "people2"
+
+    def access():
+        t = [t for t in c.get("/api/tables").json()["tables"] if t["table"] == "people2"][0]
+        return {k: v["masked"] for k, v in t["access"].items()}
+
+    assert access()["contact_email"] is True  # auto-detected post-upload
+    out = c.post(
+        "/api/tool",
+        json={"name": "query",
+              "arguments": '{"sql": "SELECT contact_email FROM people2 LIMIT 1"}'},
+    ).json()["result"]
+    assert "ada@real.com" not in out
+
+    # toggle the whole upload real via the tree's path (source="local")
+    assert c.post(
+        "/api/agent-access", json={"source": "local", "table": "people2", "value": True}
+    ).status_code == 200
+    assert access() == {"person_name": False, "contact_email": False}
+    out = c.post(
+        "/api/tool",
+        json={"name": "query",
+              "arguments": '{"sql": "SELECT contact_email FROM people2 LIMIT 1"}'},
+    ).json()["result"]
+    assert "ada@real.com" in out

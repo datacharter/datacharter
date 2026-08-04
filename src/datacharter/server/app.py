@@ -780,6 +780,17 @@ def create_app(
                 out.write(chunk)
         source = Source(name=stem, type=types[suffix], path=str(dest))
         await asyncio.to_thread(app.state.engine.add_source, source)
+        # Startup's PII auto-detect never saw this table — a dragged file with
+        # an email column must not reach the agent unmasked. Re-detect and
+        # rebuild the toolbox so the default-masked rule holds for uploads too.
+        try:
+            from datacharter.contracts.pii import detect_pii
+
+            detected = await detect_pii(app.state.engine)
+            app.state.auto_pii |= {c.lower() for cols in detected.values() for c in cols}
+        except Exception:  # detection must never break the upload itself
+            pass
+        _refresh_charter()
         return {"table": stem}
 
     @app.get("/api/stream/query")

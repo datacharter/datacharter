@@ -236,10 +236,13 @@ export default function SourceTree({
           </div>
           <div className="tree-group">
             {uploads.map((t) =>
-              tableNode(t, t.table, undefined, {
-                label: `Remove ${t.table}`,
-                run: () => onRemove?.("upload", t.table),
-              }),
+              tableNode(
+                t,
+                t.table,
+                undefined,
+                { label: `Remove ${t.table}`, run: () => onRemove?.("upload", t.table) },
+                "local", // uploads persist their masking toggles via local_access
+              ),
             )}
           </div>
         </div>

@@ -40,6 +40,15 @@ def build_overrides(sources, local_access: dict | None = None) -> dict:
             t, _, c = key.partition(".")
             for engine_name in (t, f"{s.name}__{t}"):
                 mem_columns[f"{engine_name}.{c}"] = v
+    # `local_access` also governs uploaded tables (they live under `memory`
+    # with no charter source to hang overrides on) — charter-derived entries
+    # keep precedence.
+    if local_access:
+        for t, v in (local_access.get("tables") or {}).items():
+            mem_tables.setdefault(t, v)
+        for key, v in (local_access.get("columns") or {}).items():
+            mem_columns.setdefault(key, v)
+
     if mem_tables or mem_columns:
         mem = overrides.setdefault("memory", {})
         mem["tables"] = {**mem_tables, **(mem.get("tables") or {})}

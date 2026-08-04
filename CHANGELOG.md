@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Dragged/uploaded files now have masking toggles** — and their PII columns
+  are auto-detected the moment they land, so an uploaded CSV with an email
+  column is masked from agents by default instead of slipping past the
+  startup-only detection. Upload toggles persist via `local_access`.
+
 ## [0.20.0] - 2026-08-03
 
 ### Added
