@@ -1,8 +1,29 @@
 """Desktop plumbing: config/recents, server thread, and the smoke path."""
 
+from pathlib import Path
+
+import pytest
+
 from datacharter.cli import main as cli_main
 from datacharter.desktop import main as desktop_main
 from datacharter.desktop.core import ServerHandle, load_config, remember, save_config
+
+
+@pytest.fixture
+def ui_bundle():
+    """The battery's ui-served check needs a UI bundle; CI checkouts have none
+    (it's gitignored — real bundles are verified in the wheel/frozen gates)."""
+    import datacharter.server as srv
+
+    static = Path(srv.__file__).parent / "static"
+    index = static / "index.html"
+    created = not index.exists()
+    if created:
+        static.mkdir(exist_ok=True)
+        index.write_text('<!doctype html><div id="root"></div>')
+    yield
+    if created:
+        index.unlink(missing_ok=True)
 
 
 def test_config_roundtrip(tmp_path):
@@ -36,13 +57,13 @@ def test_server_handle_serves_and_stops(tmp_path):
         h.stop()
 
 
-def test_smoke_with_workspace(tmp_path, capsys):
+def test_smoke_with_workspace(tmp_path, capsys, ui_bundle):
     cli_main(["init", str(tmp_path), "--demo"])
     assert desktop_main(["--smoke", "--workspace", str(tmp_path)]) == 0
     assert "smoke OK" in capsys.readouterr().err
 
 
-def test_smoke_falls_back_to_demo(capsys):
+def test_smoke_falls_back_to_demo(capsys, ui_bundle):
     assert desktop_main(["--smoke", "--demo"]) == 0
     assert "smoke OK" in capsys.readouterr().err
 
