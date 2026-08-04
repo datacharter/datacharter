@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-08-04
+
 ### Fixed
 - **Claude Code answers data questions with data, not file searches.** Every
   turn now carries explicit data-agent framing — without it, Claude Code's
