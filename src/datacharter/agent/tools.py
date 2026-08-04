@@ -178,6 +178,8 @@ class ToolBox:
             table = row[idx["name"]]
             if db == "memory" and str(table).lower() in aliases:
                 continue
+            if db == "local" and str(table).lower() == "canaries":
+                continue  # never advertise the honeytoken table to the agent
             relation = table if db == "memory" else f"{db}.{table}"
             out.append({"relation": relation, "columns": list(row[idx["column_names"]])})
         return json.dumps(out)

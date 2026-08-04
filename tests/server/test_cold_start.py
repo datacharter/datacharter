@@ -150,9 +150,10 @@ def test_load_demo_pristine_seeds_tour_parity(empty_client):
     assert any("Revenue" in g["content"] for g in guides)
     entries = c.get("/api/audit").json()["entries"]
     assert len(entries) >= 2  # one allowed aggregate + one policy refusal
+    # The canary honeytoken table must NOT surface in the catalog — it is not
+    # real data and would pollute the sidebar and SQL autocomplete.
     tables = c.get("/api/tables").json()["tables"]
-    canaries = [t for t in tables if t["table"] == "canaries"]
-    assert canaries and any(a["masked"] for a in canaries[0]["access"].values())
+    assert not any(t["table"] == "canaries" for t in tables)
 
 
 def test_load_demo_on_nonpristine_workspace_stays_minimal(empty_client):

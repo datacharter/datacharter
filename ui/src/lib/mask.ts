@@ -14,7 +14,7 @@ export function withoutColumns(result: QueryResult, names: Set<string>): QueryRe
 }
 
 export interface ExportPlan {
-  body: { sql: string; format: string; mask_columns?: string[] };
+  body: { sql: string; format: string; mask_columns?: string[]; agent_view?: boolean };
   filename: string;
 }
 
@@ -27,9 +27,10 @@ export function exportRequest(
   resultColumns: string[],
 ): ExportPlan {
   const maskCols = agentView ? resultColumns.filter((c) => masked.has(c.toLowerCase())) : [];
-  const suffix = maskCols.length ? "-agent-view" : "";
+  // agent_view lets the SERVER add the charter's PII floor authoritatively, so
+  // an agent-view export can't leak raw PII even if maskCols is incomplete.
   return {
-    body: maskCols.length ? { sql, format, mask_columns: maskCols } : { sql, format },
-    filename: `datacharter-export${suffix}.${format}`,
+    body: agentView ? { sql, format, mask_columns: maskCols, agent_view: true } : { sql, format },
+    filename: `datacharter-export${agentView ? "-agent-view" : ""}.${format}`,
   };
 }

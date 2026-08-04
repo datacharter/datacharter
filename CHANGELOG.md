@@ -5,6 +5,34 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.23.3] - 2026-08-04
+
+### Fixed
+- **SQL autocomplete now completes columns.** Typing `table.` (or a FROM/JOIN
+  alias like `c.`) lists that table's columns; `source.` lists its tables. The
+  canary honeytoken table no longer pollutes the sidebar or completions.
+- **"Agent view" now shows exactly what the agent receives.** It runs the
+  current query through the governed tool surface — masking, row filters, AND
+  policies — so a policy-refused query shows the refusal, not a client-side
+  re-mask that ignored governance.
+
+### Security / governance
+- **`aggregates only` now rejects row-enumerating aggregates** (`list`,
+  `string_agg`, `first`/`last`, `arg_min`/`arg_max`, `histogram`, …) even
+  inside a `GROUP BY` — they re-emit the individual values the policy exists to
+  suppress. Genuine summaries (`count`, `sum`, `min`/`max`, `median`) are
+  unchanged.
+- **Ordering or grouping by a masked column via its position** (`ORDER BY 3`,
+  `GROUP BY 2`) is now refused, like the named form already was.
+- **Agent-view exports mask the charter's PII authoritatively** — the server
+  applies the PII floor, so an agent-view export can't leak raw PII even if the
+  client's mask list is incomplete. (A plain export of your own data is
+  unchanged.)
+- **External MCP clients' accesses are now attributed to an audit session**
+  instead of recording with no session, and `datacharter eval` records and
+  arms its tripwire like the served eval path.
+
+
 ## [0.23.2] - 2026-08-04
 
 ### Fixed

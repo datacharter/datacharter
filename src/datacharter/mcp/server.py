@@ -83,6 +83,11 @@ async def _dispatch(id_: object, message: dict, toolbox: ToolBox) -> dict | None
         recorder = getattr(toolbox, "recorder", None)
         if recorder is not None:
             recorder.start_session("mcp", client=params.get("clientInfo"))
+        # A proxy toolbox (`mcp --serve-url`) has no local recorder; ask the
+        # serve process to open the session so accesses are attributed.
+        remote_start = getattr(toolbox, "start_session", None)
+        if remote_start is not None:
+            await remote_start(params.get("clientInfo"))
         result = {
             "protocolVersion": version,
             "capabilities": {"tools": {}},

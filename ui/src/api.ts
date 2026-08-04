@@ -80,6 +80,14 @@ export const api = {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ sql, row_limit: rowLimit, record }),
     }),
+  // The governed tool surface — exactly what a connected agent receives for
+  // this SQL: masking, policies, and row filters applied (or a refusal string).
+  runToolQuery: (sql: string) =>
+    request<{ result: string }>("/api/tool", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "query", arguments: JSON.stringify({ sql }) }),
+    }),
   history: (limit = 50) =>
     request<{ entries: HistoryEntry[] }>(`/api/history?limit=${limit}`),
   explain: (sql: string) =>

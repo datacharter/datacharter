@@ -1207,3 +1207,10 @@ table.grid td.rownum, table.grid th.rownum {
 .degraded-banner button {
   background: none; border: none; color: inherit; cursor: pointer; font-size: 15px;
 }
+
+.agent-refusal {
+  margin: 12px; padding: 12px 14px; border-radius: 8px; font-size: 13px;
+  background: #fff3cd; color: #7a5b00; border: 1px solid #ffe08a;
+}
+[data-theme="dark"] .agent-refusal { background: #4a3b00; color: #ffe08a; border-color: #6b5600; }
+.agent-refusal pre { margin: 8px 0 0; white-space: pre-wrap; font-size: 12px; }

@@ -14,7 +14,9 @@ class RemoteToolBox:
     def __init__(
         self, serve_url: str, *, _transport: httpx.AsyncBaseTransport | None = None
     ) -> None:
-        self._url = serve_url.rstrip("/") + "/api/tool"
+        base = serve_url.rstrip("/")
+        self._url = base + "/api/tool"
+        self._session_url = base + "/api/mcp/session"
         self._transport = _transport
 
     async def run(self, name: str, arguments: str) -> str:
@@ -22,3 +24,12 @@ class RemoteToolBox:
             resp = await client.post(self._url, json={"name": name, "arguments": arguments or "{}"})
             resp.raise_for_status()
             return resp.json()["result"]
+
+    async def start_session(self, client_info: dict | None) -> None:
+        """Attribute this MCP client's accesses to a real audit session on the
+        serve process — otherwise proxied tool calls record with no session."""
+        try:
+            async with httpx.AsyncClient(transport=self._transport, timeout=30) as client:
+                await client.post(self._session_url, json={"client": client_info})
+        except Exception:  # audit attribution is best-effort, never blocks a turn
+            return

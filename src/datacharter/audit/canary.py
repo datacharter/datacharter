@@ -13,9 +13,11 @@ import secrets
 from dataclasses import dataclass
 from pathlib import Path
 
-__all__ = ["CanaryGuard", "ensure_canaries", "CANARY_FILE"]
+__all__ = ["CanaryGuard", "ensure_canaries", "CANARY_FILE", "CANARY_TABLE"]
 
 CANARY_FILE = ".datacharter/canary.json"
+#: The honeytoken snapshot's name under the local catalog (`local.canaries`).
+CANARY_TABLE = "canaries"
 _N_TOKENS = 3
 
 
@@ -71,7 +73,7 @@ def ensure_canaries(workspace: Path | str, engine, mode: str | None) -> CanaryGu
     )
     sql = f"SELECT * FROM (VALUES {rows}) AS t(email, phone, ssn)"
     try:
-        engine.snapshot_sync(sql, "canaries")
+        engine.snapshot_sync(sql, CANARY_TABLE)
     except Exception as exc:
         import sys
 

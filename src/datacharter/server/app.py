@@ -23,6 +23,7 @@ from datacharter.agent import Agent, AgentConfig
 from datacharter.agent.cache import AnswerCache, contract_fingerprint
 from datacharter.agent.factory import build_toolbox
 from datacharter.agent.llm import LLMClient
+from datacharter.audit.canary import CANARY_TABLE
 from datacharter.contracts import Charter, CharterError, load_charter
 from datacharter.engine import history
 from datacharter.engine.guard import QueryNotAllowed
@@ -61,6 +62,11 @@ class ExportRequest(BaseModel):
     sql: str
     format: str = Field(pattern=r"^(csv|parquet|json|xlsx)$")
     mask_columns: list[str] = Field(default_factory=list)
+    #: "Export what the agent sees" — the server then masks the charter's PII
+    #: authoritatively, so the file can't leak raw PII even if the client's
+    #: mask_columns list is wrong. A plain (raw) export of your own data is the
+    #: default; this only tightens the agent-view export.
+    agent_view: bool = False
 
 
 class SnapshotRequest(BaseModel):
@@ -595,6 +601,13 @@ def create_app(
         result = await app.state.toolbox.run(body.name, body.arguments)
         return {"result": result}
 
+    @app.post("/api/mcp/session")
+    async def mcp_session(body: dict) -> dict:
+        # An external MCP client (via `datacharter mcp --serve-url`) opens a
+        # session so its proxied /api/tool accesses are attributed in the audit.
+        app.state.recorder.start_session("mcp", client=(body or {}).get("client"))
+        return {"ok": True}
+
     @app.post("/api/demo")
     async def load_demo() -> dict:
         """Populate the workspace with the demo `store` source (idempotent).
@@ -684,6 +697,8 @@ def create_app(
                 continue
             if db == "memory" and str(name).lower() in aliases:
                 continue
+            if db == "local" and str(name).lower() == CANARY_TABLE:
+                continue  # the honeytoken table is not real data — never surface it
             cols = list(row[idx["column_names"]])
             access = {
                 c: {
@@ -762,7 +777,18 @@ def create_app(
 
     @app.post("/api/export")
     async def export(body: ExportRequest) -> FileResponse:
-        sql = _mask_export_sql(body.sql, body.mask_columns)
+        mask = list(body.mask_columns)
+        if body.agent_view:
+            # Authoritative floor: whatever the client asked to mask, the
+            # charter's declared + auto-detected PII columns in the result are
+            # ALWAYS masked in an agent-view export.
+            result = await app.state.engine.query(body.sql, timeout_s=30)
+            charter_pii = app.state.auto_pii | {
+                c.lower() for s in app.state.charter.sources
+                for cols in s.pii.values() for c in cols
+            }
+            mask += [c for c in result.columns if c.lower() in charter_pii and c not in mask]
+        sql = _mask_export_sql(body.sql, mask)
         dest = workspace / ".datacharter" / "tmp" / f"export-{uuid.uuid4().hex[:8]}.{body.format}"
         await asyncio.to_thread(app.state.engine.export_sync, sql, body.format, dest)
         media = {

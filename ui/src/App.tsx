@@ -46,6 +46,10 @@ export default function App() {
   const [running, setRunning] = useState(false);
   const [tab, setTab] = useState<Tab>("results");
   const [agentView, setAgentView] = useState(false);
+  // The TRUE agent view: the current SQL re-run through the governed tool
+  // surface (masking + policies + row filters), or the refusal it would get.
+  const [agentResult, setAgentResult] = useState<QueryResult | null>(null);
+  const [agentRefusal, setAgentRefusal] = useState<string | null>(null);
   const [exportFormat, setExportFormat] = useState("csv");
   const [planText, setPlanText] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -91,6 +95,38 @@ export default function App() {
   tablesRef.current = tables;
   const resultRef = useRef(result);
   resultRef.current = result;
+
+  // When Agent view is on, run the current SQL through the governed tool
+  // surface so the grid shows EXACTLY what the agent receives — including a
+  // policy refusal or row-filtered rows, not just client-side column masking.
+  useEffect(() => {
+    if (!agentView || !result) {
+      setAgentResult(null);
+      setAgentRefusal(null);
+      return;
+    }
+    let cancelled = false;
+    setAgentResult(null);
+    setAgentRefusal(null);
+    api
+      .runToolQuery(sqlRef.current)
+      .then(({ result: text }) => {
+        if (cancelled) return;
+        if (text.startsWith("Error:")) {
+          setAgentRefusal(text.replace(/^Error:\s*/, ""));
+        } else {
+          try {
+            setAgentResult(JSON.parse(text) as QueryResult);
+          } catch {
+            setAgentRefusal("Could not parse the agent result.");
+          }
+        }
+      })
+      .catch((e) => !cancelled && setAgentRefusal((e as Error).message));
+    return () => {
+      cancelled = true;
+    };
+  }, [agentView, result]);
 
   const refreshCatalog = useCallback(() => {
     Promise.allSettled([
@@ -658,14 +694,27 @@ export default function App() {
                   </button>
                 </div>
               )}
-              {!error && tab === "results" && result && (
-                <ResultsGrid result={result} maskColumns={agentView ? maskedColumns : undefined} />
+              {!error && tab === "results" && result && agentView && (
+                agentRefusal ? (
+                  <div className="agent-refusal">
+                    <strong>Agent view — refused.</strong> This is exactly what a
+                    connected agent gets for this query:
+                    <pre>{agentRefusal}</pre>
+                  </div>
+                ) : agentResult ? (
+                  <ResultsGrid result={agentResult} />
+                ) : (
+                  <div className="empty-state">Running the agent’s governed query…</div>
+                )
+              )}
+              {!error && tab === "results" && result && !agentView && (
+                <ResultsGrid result={result} />
               )}
               {!error && tab === "chart" && result && (
                 <ChartPanel
-                  result={result}
+                  result={agentView && agentResult ? agentResult : result}
                   dark={dark}
-                  maskColumns={agentView ? maskedColumns : undefined}
+                  maskColumns={agentView && !agentResult ? maskedColumns : undefined}
                 />
               )}
               {!error && tab === "profile" &&

@@ -160,3 +160,84 @@ def test_file_path_table_is_refused(csv_ws, tmp_path):
         out = _run(csv_ws, sql)
         assert "STOLEN" not in out, sql
         assert "not allowed" in out or "Error" in out, sql
+
+
+# -- round-2 design fixes (0.23.3) ---------------------------------------------
+
+def _run_policy(ws_sql):  # helper import placeholder
+    pass
+
+
+def test_aggregate_only_rejects_row_enumerating_aggregates():
+    # F-F: list()/string_agg()/first() re-emit individual rows, even under GROUP BY.
+    from datacharter.contracts.policies import parse_policies
+    from datacharter.engine.policy_guard import PolicyRefusal, check_policies
+
+    pol = parse_policies({"crm.customers": ["aggregates only"]})
+    for sql in [
+        "SELECT list(email) FROM crm.customers",
+        "SELECT tier, list(email) FROM crm.customers GROUP BY tier",
+        "SELECT string_agg(email, ',') FROM crm.customers",
+        "SELECT first(email) FROM crm.customers",
+        "SELECT arg_max(email, id) FROM crm.customers",
+    ]:
+        with pytest.raises(PolicyRefusal):
+            check_policies(sql, pol)
+    # genuine summary aggregates still pass
+    assert check_policies("SELECT count(*), max(id) FROM crm.customers", pol) is None
+
+
+def test_ordinal_order_by_over_masked_column_refused():
+    # B-14: ORDER BY 2 references a masked select-list column by position.
+    from datacharter.agent.access_guard import AgentAccessDenied, check_query_access
+
+    def masked(s, t, c):
+        return c.lower() == "email"
+
+    for sql in [
+        "SELECT name, email FROM crm.customers ORDER BY 2",
+        "SELECT name, email FROM crm.customers GROUP BY 2",
+    ]:
+        with pytest.raises(AgentAccessDenied):
+            check_query_access(sql, is_masked=masked, masked_names={"email"})
+    # ordering by a non-masked ordinal is fine
+    check_query_access(
+        "SELECT name, email FROM crm.customers ORDER BY 1",
+        is_masked=masked, masked_names={"email"},
+    )
+
+
+def test_agent_view_export_masks_charter_pii_even_with_empty_client_list(sqlite_ws):
+    # F-H: an agent-view export applies the charter PII floor server-side, so a
+    # wrong/empty client mask list can't leak raw PII to the file.
+    import csv as _csv
+
+    from fastapi.testclient import TestClient
+
+    from datacharter.server import create_app
+
+    app = create_app(sqlite_ws)
+    with TestClient(app, base_url="http://127.0.0.1") as client:
+        resp = client.post("/api/export", json={
+            "sql": "SELECT name, email FROM crm.customers",
+            "format": "csv", "mask_columns": [], "agent_view": True,
+        })
+        assert resp.status_code == 200
+        assert SECRET not in resp.text
+        rows = list(_csv.reader(resp.text.splitlines()))
+        assert rows[1][1] == "•••"  # email masked despite empty client mask list
+
+
+def test_canary_hidden_from_agent_list_tables(sqlite_ws):
+    # The honeytoken must never be advertised to the agent either.
+    charter = load_charter(sqlite_ws)
+    engine = _open_engine(sqlite_ws, charter.sources)
+    try:
+        box = build_toolbox(engine, charter, auto_pii=asyncio.run(detect_auto_pii(engine)))
+        # arm canaries via the factory path
+        from datacharter.audit.canary import ensure_canaries
+        ensure_canaries(sqlite_ws, engine, "block")
+        listed = json.loads(asyncio.run(box.run("list_tables", "{}")))
+        assert not any("canaries" in t["relation"] for t in listed)
+    finally:
+        engine.close()

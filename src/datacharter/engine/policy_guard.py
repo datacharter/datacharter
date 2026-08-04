@@ -23,8 +23,30 @@ _AGGREGATES = {
     "stddev", "stddev_pop", "stddev_samp", "var_pop", "var_samp", "variance",
     "approx_count_distinct", "approx_quantile", "quantile", "quantile_cont",
     "quantile_disc", "mode", "bool_and", "bool_or", "bit_and", "bit_or",
-    "arg_min", "arg_max", "first", "last", "string_agg", "list", "histogram",
 }
+
+# "Aggregates" that re-emit individual values (a collection, or one row's
+# value) rather than a summary statistic — banned under `aggregate_only`.
+_ROW_ENUMERATING = {
+    "list", "array_agg", "string_agg", "group_concat", "histogram",
+    "first", "last", "arbitrary", "any_value", "arg_min", "arg_max",
+    "min_by", "max_by", "list_distinct", "array_distinct",
+}
+
+
+def _uses_row_enumerating(items: list) -> bool:
+    """True if any select item calls a row-enumerating aggregate anywhere."""
+
+    def walk(node: object) -> bool:
+        if isinstance(node, dict):
+            if str(node.get("function_name", "")).lower() in _ROW_ENUMERATING:
+                return True
+            return any(walk(v) for v in node.values())
+        if isinstance(node, list):
+            return any(walk(x) for x in node)
+        return False
+
+    return walk(items)
 
 
 class PolicyRefusal(Exception):
@@ -66,9 +88,14 @@ def _is_aggregate_select(node: dict) -> bool:
     for mod in node.get("modifiers") or []:
         if "DISTINCT" in str(mod.get("type", "")):
             return False  # DISTINCT is row egress
+    items = node.get("select_list") or []
+    # `list()`, `string_agg()`, `first()`, … re-emit the individual rows they
+    # aggregate over, so they are NOT "aggregate only" even inside a GROUP BY
+    # (`SELECT region, list(email) … GROUP BY region` enumerates every email).
+    if _uses_row_enumerating(items):
+        return False
     if node.get("group_expressions") or node.get("group_sets"):
         return True
-    items = node.get("select_list") or []
     if not items:
         return False
     for item in items:

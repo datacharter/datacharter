@@ -84,6 +84,14 @@ def check_query_access(
     if isinstance(node, dict) and node.get("type") == "SELECT_NODE":
         for key, value in node.items():
             walk(value, allowed=(key == "select_list"))
+        # ORDER BY 3 / GROUP BY 2 reference a select-list column by POSITION —
+        # an integer constant the walk above never sees. Resolve the ordinal to
+        # its select item and re-check it as a non-projection use, so ordering
+        # or grouping by a masked column is refused like `ORDER BY email` is.
+        select_list = node.get("select_list") or []
+        for pos in _ordinal_positions(node):
+            if 1 <= pos <= len(select_list):
+                walk(select_list[pos - 1], allowed=False)
     else:
         walk(node, allowed=False)  # set-op / unusual top node: nothing is allowed
 
@@ -94,6 +102,30 @@ def check_query_access(
             f"(values return as '•••') but not used in WHERE, JOIN, "
             f"GROUP BY, ORDER BY, or a subquery."
         )
+
+
+def _int_const(expr: object) -> int | None:
+    if isinstance(expr, dict) and expr.get("class") == "CONSTANT":
+        val = expr.get("value") or {}
+        if (val.get("type") or {}).get("id") == "INTEGER" and not val.get("is_null"):
+            v = val.get("value")
+            return v if isinstance(v, int) else None
+    return None
+
+
+def _ordinal_positions(node: dict) -> set[int]:
+    """Integer positions referenced by ORDER BY / GROUP BY (`ORDER BY 3`)."""
+    out: set[int] = set()
+    for mod in node.get("modifiers") or []:
+        for order in mod.get("orders") or []:
+            pos = _int_const(order.get("expression"))
+            if pos is not None:
+                out.add(pos)
+    for g in node.get("group_expressions") or []:
+        pos = _int_const(g)
+        if pos is not None:
+            out.add(pos)
+    return out
 
 
 def _failclosed_token_scan(sql: str, masked_names: set[str]) -> None:

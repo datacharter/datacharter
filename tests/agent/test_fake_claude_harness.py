@@ -178,3 +178,22 @@ async def test_argv_contract_is_enforced_by_the_fake(serve_url, fake_claude, tmp
     _, err = await proc.communicate()
     assert proc.returncode == 64
     assert b"contract violation" in err
+
+
+async def test_mcp_proxy_accesses_get_a_session(serve_url, fake_claude):
+    # B-10: an external MCP client via --serve-url must attribute its accesses
+    # to a real audit session, not session=''.
+    from datacharter.agent.remote_tools import RemoteToolBox
+    from datacharter.mcp.server import handle_message
+
+    box = RemoteToolBox(serve_url)
+    await handle_message(
+        {"jsonrpc": "2.0", "id": 1, "method": "initialize",
+         "params": {"clientInfo": {"name": "probe", "version": "1"}}},
+        box,
+    )
+    await box.run("query", '{"sql": "SELECT contact FROM people LIMIT 1"}')
+    import httpx
+    entries = httpx.get(f"{serve_url}/api/audit", timeout=10).json()["entries"]
+    sessions = [e for e in entries if e.get("type") == "session" and e.get("surface") == "mcp"]
+    assert sessions, "no mcp session recorded for the proxied access"

@@ -907,11 +907,20 @@ def _cmd_eval(args: argparse.Namespace) -> int:
     llm = _local_llm(args.model) if args.local else LLMClient()
     engine = _open_engine(ws, charter.sources)
     from datacharter.agent.factory import build_toolbox, detect_auto_pii
+    from datacharter.audit import FlightRecorder
+    from datacharter.audit.canary import ensure_canaries
 
     auto_pii = asyncio.run(detect_auto_pii(engine))
-    box = build_toolbox(engine, charter, auto_pii=auto_pii)
+    # Audit + canary parity with the server's eval path: eval runs the agent
+    # surface, so its accesses must be recorded and its tripwire armed too.
+    recorder = FlightRecorder(ws, enabled=charter.audit_enabled)
+    canary = ensure_canaries(ws, engine, charter.canary_mode)
+    box = build_toolbox(engine, charter, auto_pii=auto_pii, recorder=recorder, canary=canary)
     box_off = (
-        build_toolbox(engine, charter, auto_pii=auto_pii, guides_override="")
+        build_toolbox(
+            engine, charter, auto_pii=auto_pii, recorder=recorder, canary=canary,
+            guides_override="",
+        )
         if args.compare_guides else None
     )
 
