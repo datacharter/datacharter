@@ -67,8 +67,32 @@ class SnapshotRequest(BaseModel):
     name: str = Field(pattern=r"^[a-z][a-z0-9_]{0,62}$")
 
 
+class HistoryTurn(BaseModel):
+    role: str = Field(pattern="^(user|assistant)$")
+    text: str = Field(max_length=20000)
+
+
 class AskRequest(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
+    #: Prior turns, oldest first — the chat sends these so follow-up questions
+    #: ("and which tier is biggest?") keep their context.
+    history: list[HistoryTurn] = Field(default_factory=list, max_length=40)
+
+
+def _bounded_history(turns: list[HistoryTurn]) -> list[dict]:
+    """Most recent turns within a character budget — local models have small
+    contexts, and an unbounded transcript would crowd out the schema."""
+    budget = 6000
+    kept: list[dict] = []
+    for turn in reversed(turns):
+        text = turn.text.strip()
+        if not text:
+            continue
+        budget -= len(text)
+        if budget < 0 and kept:
+            break
+        kept.append({"role": turn.role, "content": text[:6000]})
+    return list(reversed(kept))
 
 
 class ToolRequest(BaseModel):
@@ -980,7 +1004,7 @@ def create_app(
         )
 
         async def events() -> AsyncIterator[str]:
-            async for ev in agent.run(body.question):
+            async for ev in agent.run(body.question, history=_bounded_history(body.history)):
                 yield _sse(
                     ev.kind,
                     {"text": ev.text, "tool": ev.tool, "detail": ev.detail, "sql": ev.sql},

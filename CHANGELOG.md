@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **The chat remembers the conversation.** Follow-up questions ("and which
+  tier is biggest?") now carry the prior turns to LLM backends — including
+  local models — bounded to what a small context window can hold. Clearing
+  the chat clears the memory.
+
 ## [0.21.0] - 2026-08-04
 
 ### Added

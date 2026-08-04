@@ -70,10 +70,16 @@ export default function ChatPanel({
     setMessages((m) => [...m, { role: "user", text: question, tools: [] }]);
     setMessages((m) => [...m, { role: "assistant", text: "", tools: [] }]);
 
+    // Prior turns ride along so follow-ups keep their context; the server
+    // bounds them to what a local model's context can hold.
+    const history = messages
+      .filter((m) => m.text.trim())
+      .slice(-20)
+      .map((m) => ({ role: m.role, text: m.text }));
     const resp = await fetch("/api/agent/ask", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ question }),
+      body: JSON.stringify({ question, history }),
     });
     if (!resp.body) {
       setBusy(false);
@@ -108,7 +114,7 @@ export default function ChatPanel({
       }
     }
     setBusy(false);
-  }, [input, busy]);
+  }, [input, busy, messages]);
 
   if (configuring) {
     return (

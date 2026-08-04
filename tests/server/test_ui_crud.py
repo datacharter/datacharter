@@ -276,3 +276,45 @@ def test_promote_rejects_name_collision(demo_client):
         "/api/upload", files={"file": ("clash.csv", b"a\n2\n", "text/csv")}
     ).status_code == 200
     assert c.post("/api/uploads/clash/promote").status_code == 409
+
+
+def test_ask_threads_history_to_the_llm(demo_client, monkeypatch):
+    # Follow-up questions must carry prior turns — the loop supported history
+    # but the API never wired it through.
+    captured: dict = {}
+
+    class StubLLM:
+        model = "stub"
+
+        async def stream(self, messages, tools):
+            captured["messages"] = messages
+            from datacharter.agent.llm import Delta
+
+            yield Delta(text="the pro tier")
+
+    c, _ = demo_client
+    c.app.state.llm = StubLLM()  # type: ignore[attr-defined]
+    r = c.post(
+        "/api/agent/ask",
+        json={
+            "question": "and which tier is biggest?",
+            "history": [
+                {"role": "user", "text": "How many customers are on each tier?"},
+                {"role": "assistant", "text": "pro: 2, free: 1"},
+            ],
+        },
+    )
+    assert r.status_code == 200 and "pro tier" in r.text
+    roles = [m["role"] for m in captured["messages"]]
+    assert roles[:3] == ["system", "user", "assistant"]  # history precedes the new question
+    assert captured["messages"][1]["content"] == "How many customers are on each tier?"
+    assert captured["messages"][-1]["content"] == "and which tier is biggest?"
+
+
+def test_ask_history_is_bounded(demo_client):
+    from datacharter.server.app import HistoryTurn, _bounded_history
+
+    turns = [HistoryTurn(role="user", text="x" * 3000) for _ in range(10)]
+    kept = _bounded_history(turns)
+    assert 0 < len(kept) < 10
+    assert sum(len(m["content"]) for m in kept) <= 6000 + 3000  # budget + one overshoot
