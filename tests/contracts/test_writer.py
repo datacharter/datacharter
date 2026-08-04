@@ -124,6 +124,7 @@ def test_upsert_source_preserves_governance_keys(tmp_path):
         "  crm:\n"
         "    type: csv\n"
         "    path: a.csv\n"
+        "    pii:\n      people: [email, ssn]\n"
         "    agent_access:\n      columns:\n        people.email: false\n"
         "    row_filters:\n      people: \"region = 'US'\"\n"
         "    context:\n      people: one row per person\n"
@@ -134,3 +135,6 @@ def test_upsert_source_preserves_governance_keys(tmp_path):
     assert body["agent_access"]["columns"]["people.email"] is False
     assert body["row_filters"]["people"] == "region = 'US'"
     assert body["context"]["people"] == "one row per person"
+    # B-6: the declared PII map is governance too — a connection edit must not
+    # silently un-declare which columns are sensitive.
+    assert list(body["pii"]["people"]) == ["email", "ssn"]

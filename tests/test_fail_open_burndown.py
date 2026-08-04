@@ -237,3 +237,130 @@ def test_masked_output_column_honors_off_override_without_provenance():
         provenance={},
     )
     assert box._mask_indices(result) == {0}
+
+
+# -- round-2 audit siblings + hardening (0.23.2) --------------------------------
+
+def test_expected_answer_only_eval_is_not_a_free_pass_without_judge():
+    # B-7 (F-3 sibling): a case with only expected_answer and no `expect` can be
+    # graded ONLY by the judge; without --judge it must be errored, not passed.
+    import asyncio
+
+    from datacharter.agent.eval_runner import run_suite
+    from datacharter.contracts.evals import EvalCase, EvalSuite
+
+    class ScriptedLLM:
+        async def stream(self, messages, tools):
+            class D:
+                text = "I have no idea."
+                tool_calls = None
+            yield D()
+
+    class NullBox:
+        guides = ""
+        recorder = None
+        canary = None
+
+    suite = EvalSuite(name="s", cases=[EvalCase(question="q", expected_answer="2")])
+    rec = asyncio.run(run_suite(suite, NullBox(), llm=ScriptedLLM()))
+    out = rec.cases[0].with_guides
+    assert out.passed is False
+    assert out.error and "judge" in out.error
+    assert rec.overall["with_guides"] == 0.0
+    assert rec.overall.get("errored") == 1
+
+
+def test_audit_verify_reports_broken_on_a_corrupt_line_not_a_crash():
+    # B-9: one garbage byte must read as tampering, not a 500/traceback.
+    import json as _json
+    import tempfile
+    from pathlib import Path
+
+    from datacharter.audit.evidence import verify_chain
+    from datacharter.audit.recorder import FlightRecorder
+
+    ws = Path(tempfile.mkdtemp())
+    rec = FlightRecorder(ws)
+    rec.start_session("t")
+    rec.record_access("query", _json.dumps({"sql": "SELECT 1"}), "{}")
+    seg = next(iter(sorted((ws / ".datacharter" / "flight").glob("[0-9]*.jsonl"))))
+    with seg.open("a") as f:
+        f.write("{ not json\n")
+    ok, n, detail = verify_chain(ws)
+    assert ok is False and "BROKEN" in detail
+
+
+def test_offline_attestation_flags_non_loopback_bind(tmp_path, capsys):
+    # B-8: the attestation must not claim "localhost only" on 0.0.0.0.
+    import json as _json
+
+    from datacharter.cli import _print_attestation
+
+    _print_attestation(tmp_path, "0.0.0.0", 9000)
+    out = capsys.readouterr().out
+    assert "localhost only" not in out and "REACHABLE ON THE NETWORK" in out
+    record = _json.loads((tmp_path / ".datacharter" / "attestation.json").read_text())
+    assert record["loopback_only"] is False
+
+    _print_attestation(tmp_path, "127.0.0.1", 9000)
+    assert "localhost only" in capsys.readouterr().out
+
+
+def test_mutating_source_endpoints_refused_off_loopback(tmp_path):
+    # F-J: masking-off and source rewrites must be loopback-only, like guide edits.
+    from fastapi.testclient import TestClient
+
+    from datacharter.cli import main as cli_main
+    from datacharter.server import create_app
+
+    assert cli_main(["init", str(tmp_path)]) == 0
+    app = create_app(tmp_path, host="0.0.0.0")
+    with TestClient(app, base_url="http://10.0.0.5") as client:
+        r1 = client.post(
+            "/api/agent-access",
+            json={"source": "local", "table": "t", "column": None, "value": False},
+        )
+        r2 = client.post("/api/sources", json={"name": "x", "type": "csv", "path": "x.csv"})
+        assert r1.status_code == 403 and r2.status_code == 403
+
+
+def test_mcp_handler_exception_returns_error_frame_not_crash():
+    # B-13: a raise inside a handler must become a JSON-RPC error, not kill stdio.
+    import asyncio
+
+    from datacharter.mcp.server import handle_message
+
+    class BoomBox:
+        guides = ""
+        recorder = None
+
+        async def run(self, name, args):
+            raise RuntimeError("boom")
+
+    resp = asyncio.run(handle_message(
+        {"jsonrpc": "2.0", "id": 7, "method": "tools/call",
+         "params": {"name": "query", "arguments": {"sql": "SELECT 1"}}},
+        BoomBox(),
+    ))
+    assert resp["id"] == 7 and resp["error"]["code"] == -32603
+
+
+def test_canary_token_with_quote_does_not_break_startup(tmp_path, capsys):
+    # B-12: tokens come from a user-writable file; a quote must be escaped.
+    import json as _json
+
+    from datacharter.audit.canary import CANARY_FILE, ensure_canaries
+
+    path = tmp_path / CANARY_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(_json.dumps({"tokens": ["ca'nary", "b", "c"]}))
+
+    captured = {}
+
+    class Engine:
+        def snapshot_sync(self, sql, name):
+            captured["sql"] = sql  # must be valid, no unescaped quote breaking it
+
+    guard = ensure_canaries(tmp_path, Engine(), "block")
+    assert guard is not None and guard.planted is True
+    assert "ca''nary" in captured["sql"]

@@ -154,10 +154,14 @@ def _print_attestation(workspace: Path, host: str, port: int) -> None:
         "File sources stay local; any explicitly-configured remote source "
         "(s3/gcs/azure, attached databases) still connects to its host."
     )
+    from datacharter.server.security import LOOPBACK_HOSTS
+
+    loopback_only = host.lower() in LOOPBACK_HOSTS
     record = {
         "mode": "offline",
         "started": started,
         "bind": f"{host}:{port}",
+        "loopback_only": loopback_only,
         "llm": "disabled",
         "note": note,
     }
@@ -166,7 +170,8 @@ def _print_attestation(workspace: Path, host: str, port: int) -> None:
     (state / "attestation.json").write_text(json.dumps(record, indent=2))
     print("OFFLINE MODE — no-egress attestation")
     print(f"  started: {started}")
-    print(f"  bind:    {host}:{port} (localhost only)")
+    bind_note = "localhost only" if loopback_only else "⚠ REACHABLE ON THE NETWORK (not loopback)"
+    print(f"  bind:    {host}:{port} ({bind_note})")
     print("  LLM agent: DISABLED — no data is sent to any model endpoint")
     print(f"  note: {note}")
     print("  written to .datacharter/attestation.json")
@@ -759,10 +764,10 @@ def _cmd_audit(args: argparse.Namespace) -> int:
     sessions: dict[str, dict] = {}
     order: list[str] = []
     for e in entries:
-        if e["type"] == "session":
+        if e.get("type") == "session":
             sessions[e["session"]] = {"meta": e, "accesses": 0, "errors": 0, "last": e["ts"]}
             order.append(e["session"])
-        elif e["type"] == "access" and e.get("session") in sessions:
+        elif e.get("type") == "access" and e.get("session") in sessions:
             s = sessions[e["session"]]
             s["accesses"] += 1
             s["errors"] += 1 if e.get("error") else 0

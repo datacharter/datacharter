@@ -25,7 +25,13 @@ def read_entries(
         for line in seg.read_text().splitlines():
             if not line.strip():
                 continue
-            e = json.loads(line)
+            try:
+                e = json.loads(line)
+            except ValueError:
+                # A corrupt/injected line is tampering, not a reason to crash —
+                # surface it as a broken-chain sentinel the verifier reports.
+                out.append({"_corrupt": True, "_raw": line[:200]})
+                continue
             if since and e.get("ts", "") < since:
                 continue
             if until and e.get("ts", "") > until:
@@ -54,6 +60,11 @@ def verify_chain(workspace: Path | str) -> tuple[bool, int, str]:
     prev = GENESIS
     expected_seq = 1
     for e in entries:
+        if e.get("_corrupt"):
+            return False, expected_seq - 1, (
+                f"chain BROKEN at seq {expected_seq}: an unparseable entry was "
+                "found (the log was edited or truncated)"
+            )
         if e.get("seq") != expected_seq:
             return False, expected_seq - 1, (
                 f"chain BROKEN at seq {expected_seq}: entry missing or reordered "

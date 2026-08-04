@@ -55,7 +55,7 @@ def upsert_source(workspace: Path, name: str, body: dict) -> None:
     # shape only — replacing the body wholesale silently stripped masking
     # overrides, row-level security, and table context on any hostname change.
     existing = (data.get("sources") or {}).get(name) or {}
-    for key in ("agent_access", "row_filters", "context"):
+    for key in ("agent_access", "row_filters", "context", "pii"):
         if key in existing and key not in body:
             body[key] = existing[key]
     data["sources"][name] = body

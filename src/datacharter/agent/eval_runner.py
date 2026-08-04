@@ -132,6 +132,15 @@ async def _run_and_score(
                 passed=False, answer=answer, sqls=sqls, scalar=scalar, error=error
             )
             continue
+        if not case.expect and not judge:
+            # An `expected_answer`-only case can ONLY be graded by the judge —
+            # scoring it against an empty assertion list is `all([])` == True,
+            # a silent 100% pass that verified nothing (F-3's failure class).
+            last = CaseOutcome(
+                passed=False, answer=answer, sqls=sqls, scalar=scalar,
+                error="expected_answer requires --judge to grade; not evaluated",
+            )
+            continue
         last = score_case(case, answer, sqls, scalar)
         if judge and case.expected_answer:
             verdict = await judge_answer(llm, case.question, case.expected_answer, answer)

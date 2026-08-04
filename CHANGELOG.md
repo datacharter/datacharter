@@ -5,6 +5,33 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.23.2] - 2026-08-04
+
+### Fixed
+- **Editing a source no longer un-declares its PII.** Saving a source without
+  resending the `pii:` block (any non-UI client) silently dropped it — the
+  same failure class as the 0.22.2 governance-preservation fix, now covering
+  the PII map too.
+- **`expected_answer`-only eval cases no longer report a false pass.** Such a
+  case can be graded only by `--judge`; without it the case is now reported as
+  errored (not evaluated) instead of a silent 100%.
+- **`audit verify` reports a broken chain on a corrupt entry** instead of
+  crashing — a truncated or injected line reads as tampering, as intended, in
+  the CLI and the API.
+
+### Security / hardening
+- **Turning masking on/off and editing sources are now loopback-only.** These
+  contract-rewriting endpoints join the guide/eval editors behind the same
+  local-only gate, so a server bound to the network can't have its governance
+  changed remotely.
+- **The offline attestation tells the truth about its bind address** — it no
+  longer prints "localhost only" when bound to all interfaces, and records
+  `loopback_only` in the attestation file.
+- An MCP client can no longer crash the stdio session with a request that
+  errors mid-handler; the error is returned as a proper JSON-RPC frame. Canary
+  tokens are escaped before use.
+
+
 ## [0.23.1] - 2026-08-04
 
 ### Security

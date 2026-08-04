@@ -62,8 +62,12 @@ def ensure_canaries(workspace: Path | str, engine, mode: str | None) -> CanaryGu
         return None
     workspace = Path(workspace)
     tokens = _load_or_create_tokens(workspace)
+
+    def q(value: str) -> str:  # tokens come from a user-writable file — never interpolate raw
+        return "'" + value.replace("'", "''") + "'"
+
     rows = ", ".join(
-        f"('{t}@tripwire.invalid', '{t}', '{t}')" for t in tokens
+        f"({q(t + '@tripwire.invalid')}, {q(t)}, {q(t)})" for t in tokens
     )
     sql = f"SELECT * FROM (VALUES {rows}) AS t(email, phone, ssn)"
     try:

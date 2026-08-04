@@ -65,6 +65,15 @@ async def handle_message(message: dict, toolbox: ToolBox) -> dict | None:
     if "id" not in message:  # a notification carries no id and takes no response
         return None
     id_ = message["id"]
+    try:
+        return await _dispatch(id_, message, toolbox)
+    except Exception as exc:  # noqa: BLE001 — a handler error must not kill the stdio loop
+        # Without this a raise in the canary scan or recorder tears down the
+        # whole session with no JSON-RPC frame — the client just sees a dead pipe.
+        return _error(id_, -32603, f"Internal error: {type(exc).__name__}")
+
+
+async def _dispatch(id_: object, message: dict, toolbox: ToolBox) -> dict | None:
     method = message.get("method")
 
     if method == "initialize":

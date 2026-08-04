@@ -557,6 +557,9 @@ def create_app(
 
     @app.post("/api/sources")
     async def add_source(form: source_admin.SourceForm) -> dict:
+        blocked = _require_local()
+        if blocked is not None:
+            return blocked
         await asyncio.to_thread(source_admin.create_source, app.state.engine, workspace, form)
         _refresh_charter()
         return {"name": form.name}
@@ -566,6 +569,11 @@ def create_app(
         from datacharter.contracts.writer import ContractWriteError
         from datacharter.contracts.writer import set_agent_access as write_access
 
+        # Turning masking on/off rewrites the contract — a remote client must
+        # never be able to do it (these are the settings the whole guard rests on).
+        blocked = _require_local()
+        if blocked is not None:
+            return blocked
         # "local" is the reserved pseudo-source for local.* snapshots; otherwise the
         # source must be declared in the charter.
         if body.source != "local" and not any(
@@ -624,6 +632,9 @@ def create_app(
 
     @app.put("/api/sources/{name}")
     async def edit_source(name: str, form: source_admin.SourceForm):
+        blocked = _require_local()
+        if blocked is not None:
+            return blocked
         if name != form.name:
             return _error(400, "name_mismatch", "Source name cannot be changed.")
         if not any(s.name == name for s in app.state.charter.sources):
@@ -634,6 +645,9 @@ def create_app(
 
     @app.delete("/api/sources/{name}")
     async def remove_source(name: str):
+        blocked = _require_local()
+        if blocked is not None:
+            return blocked
         if not any(s.name == name for s in app.state.charter.sources):
             return _error(404, "not_found", f"Source '{name}' does not exist.")
         await asyncio.to_thread(source_admin.delete_source, app.state.engine, workspace, name)
