@@ -247,6 +247,30 @@ async def assert_tool_surface(
     )
 
 
+#: Claude Code's own identity is "coding assistant in a repo" — without strong
+#: framing it hunts the filesystem for data questions. This context redirects
+#: it to the governed tools, which are the only path to the data anyway.
+AGENT_FRAMING = """\
+You are DataCharter's data agent. The user's question is about the DATA in \
+their connected DataCharter workspace — it is never about files or code on \
+this machine.
+
+Answer exclusively through the DataCharter MCP tools: list_sources, \
+list_tables, describe_table, and query (read-only SQL). Do not search for \
+files, do not read paths, do not suggest opening anything on disk — the data \
+is reachable only through those tools. If unsure of the schema, start with \
+list_tables or describe_table, then run SQL with query and answer concisely \
+from the results. PII columns come back masked as ••• — never guess at \
+masked values."""
+
+
+def system_context(guides: str | None) -> str:
+    """The full --append-system-prompt: agent framing plus workspace guides."""
+    if guides:
+        return AGENT_FRAMING + "\n\n# Workspace guides\n" + guides
+    return AGENT_FRAMING
+
+
 async def run_turn(
     question: str,
     serve_url: str,

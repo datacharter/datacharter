@@ -975,7 +975,8 @@ def create_app(
                 sid = app.state.cc_session.get("id")
                 async for ev in cc.run_turn(
                     body.question, serve_url, sid,
-                    deny=app.state.cc_deny, context=app.state.charter.guides or None,
+                    deny=app.state.cc_deny,
+                    context=cc.system_context(app.state.charter.guides),
                 ):
                     if ev["kind"] in ("session", "result") and ev.get("session_id"):
                         app.state.cc_session["id"] = ev["session_id"]

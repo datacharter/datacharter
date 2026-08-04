@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Claude Code answers data questions with data, not file searches.** Every
+  turn now carries explicit data-agent framing — without it, Claude Code's
+  coding-assistant instincts sent it hunting the filesystem instead of
+  querying the workspace through the governed tools.
+
 ### Added
 - **The chat remembers the conversation.** Follow-up questions ("and which
   tier is biggest?") now carry the prior turns to LLM backends — including

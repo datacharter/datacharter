@@ -143,3 +143,16 @@ def test_claude_absent_reports_unavailable(monkeypatch):
     monkeypatch.setattr(cc.shutil, "which", lambda _n: None)
     monkeypatch.setattr(cc, "_EXTRA_BIN_DIRS", ())
     assert cc.find_claude() is None and cc.claude_available() is False
+
+
+def test_system_context_frames_the_data_agent():
+    # Claude Code's default persona hunts the filesystem for data questions —
+    # every turn must carry the data-agent framing (user-reported).
+    from datacharter.agent.claude_code import system_context
+
+    ctx = system_context(None)
+    for must in ("MCP tools", "list_tables", "query", "Do not search for files"):
+        assert must in ctx
+    with_guides = system_context("- revenue is net of refunds")
+    assert with_guides.startswith(ctx)
+    assert "revenue is net of refunds" in with_guides
