@@ -26,11 +26,19 @@ def _serialize(con: duckdb.DuckDBPyConnection, sql: str) -> dict | None:
     return None if isinstance(tree, dict) and tree.get("error") else tree
 
 
-def _subquery_node(con: duckdb.DuckDBPyConnection, table: str, predicate: str, alias: str):
-    tmpl = f'SELECT * FROM (SELECT * FROM "{table}" WHERE {predicate}) AS "{alias}"'
+def _quoted_relation(node: dict) -> str:
+    """The fully-qualified, quoted relation from a BASE_TABLE node — keeping
+    catalog/schema so an ATTACH table (`crm.customers`) rewrites to the real
+    relation, not a bare `customers` that doesn't exist."""
+    parts = [node.get("catalog_name"), node.get("schema_name"), node.get("table_name")]
+    return ".".join(f'"{p}"' for p in parts if p)
+
+
+def _subquery_node(con: duckdb.DuckDBPyConnection, relation: str, predicate: str, alias: str):
+    tmpl = f'SELECT * FROM (SELECT * FROM {relation} WHERE {predicate}) AS "{alias}"'
     tree = _serialize(con, tmpl)
     if tree is None:
-        raise RowFilterError(f"Invalid row_filter for '{table}': {predicate!r}")
+        raise RowFilterError(f"Invalid row_filter for '{relation}': {predicate!r}")
     return tree["statements"][0]["node"]["from_table"]
 
 
@@ -56,11 +64,14 @@ def apply_row_filters(sql: str, filters: dict[str, str]) -> str:
             if isinstance(node, dict):
                 if node.get("type") == "BASE_TABLE":
                     name = node.get("table_name")
-                    pred = filters.get(name) if name else None
+                    # Filter keys are lowercased (identifiers are
+                    # case-insensitive); look up the same way or `Customers`
+                    # slips past the filter entirely.
+                    pred = filters.get(name.lower()) if name else None
                     if pred is not None:
                         touched["hit"] = True
                         alias = node.get("alias") or name
-                        return _subquery_node(con, name, pred, alias)
+                        return _subquery_node(con, _quoted_relation(node), pred, alias)
                 return {k: walk(v) for k, v in node.items()}
             if isinstance(node, list):
                 return [walk(x) for x in node]

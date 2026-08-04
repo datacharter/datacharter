@@ -66,7 +66,53 @@ def extract_provenance(sql: str) -> dict | None:
     lineage = _lineage(tree, alias_map, relations)
     if lineage:
         result["lineage"] = lineage
+    column_sources = _column_sources(tree, alias_map, relations)
+    if column_sources is not None:
+        result["column_sources"] = column_sources
     return result
+
+
+# A whole-row reference (`to_json(c)`, `c::VARCHAR`, `list(c)`, `c.*`) embeds
+# EVERY column of a relation; marked so masking treats it as touching them all.
+WHOLE_ROW_SUFFIX = ".*"
+
+
+def _column_sources(
+    tree: dict, alias_map: dict[str, str], relations: list[str]
+) -> list[list[str]] | None:
+    """Per-output-column source columns, aligned by SELECT-list POSITION.
+
+    Unlike name-keyed `lineage`, this covers computed and unaliased items — the
+    exact case (`SELECT lower(email)`) where name-keying dropped the column and
+    masking failed open. Returns None when positions can't be aligned to outputs
+    (a bare top-level `*` expands to an unknown number of columns) so callers
+    fall back to whole-result handling.
+    """
+    statements = tree.get("statements") if isinstance(tree, dict) else None
+    node = statements[0].get("node") if statements else None
+    if not isinstance(node, dict) or node.get("type") != "SELECT_NODE":
+        return None
+    out: list[list[str]] = []
+    for entry in node.get("select_list") or []:
+        if entry.get("type") == "STAR":
+            rel = entry.get("relation_name")
+            if not rel:
+                return None  # bare `*` — output width unknown, can't align
+            # `c.*` — a whole-row expansion of one relation.
+            out.append([alias_map.get(rel, rel) + WHOLE_ROW_SUFFIX])
+            continue
+        refs: list[list[str]] = []
+        _collect_column_refs(entry, refs)
+        sources: set[str] = set()
+        for ref in refs:
+            # A bare name that is actually a table alias is a WHOLE-ROW value
+            # (`to_json(c)`), not a column — expand it to the whole relation.
+            if len(ref) == 1 and ref[0] in alias_map:
+                sources.add(alias_map[ref[0]] + WHOLE_ROW_SUFFIX)
+            else:
+                sources.add(_resolve(ref, alias_map, relations))
+        out.append(sorted(sources))
+    return out
 
 
 def _resolve(names: list[str], alias_map: dict[str, str], relations: list[str]) -> str:

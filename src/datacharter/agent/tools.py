@@ -162,12 +162,22 @@ class ToolBox:
     async def _list_tables(self, _args: dict) -> str:
         result = await self._engine.query("SHOW ALL TABLES", timeout_s=30)
         idx = {c: i for i, c in enumerate(result.columns)}
+        # The flat `src__table` compat views duplicate the native ATTACH
+        # relations; never advertise them — the agent should only ever see the
+        # canonical `src.table` the charter governs.
+        aliases = {
+            f"{s.name}__{t}".lower()
+            for s in self._engine.sources
+            for t in (s.tables or [])
+        }
         out = []
         for row in result.rows:
             db = row[idx["database"]]
             if db in ("system", "temp"):
                 continue
             table = row[idx["name"]]
+            if db == "memory" and str(table).lower() in aliases:
+                continue
             relation = table if db == "memory" else f"{db}.{table}"
             out.append({"relation": relation, "columns": list(row[idx["column_names"]])})
         return json.dumps(out)
@@ -238,11 +248,16 @@ class ToolBox:
         )
 
     def _mask_indices(self, result: QueryResult) -> set[int]:
-        """Which output columns to mask. Prefer per-column lineage; when it's missing
-        (e.g. SELECT *), resolve each column against the query's touched relations so
-        agent-access overrides still apply; last resort is a name-based PII check."""
+        """Which output columns to mask.
+
+        Positional `column_sources` is authoritative when present: it attributes
+        every output column — including computed ones (`lower(email)`) and
+        whole-row values (`to_json(c)`) — to its input columns, so an expression
+        wrapper can no longer strip masking. Only when it is absent (a bare
+        `SELECT *`, a set operation) do we fall back to resolving each output
+        column name against the touched relations, then a name-based PII check.
+        """
         prov = result.provenance or {}
-        lineage = prov.get("lineage") or {}
         rels = []
         for r in prov.get("relations") or []:
             parts = str(r).split(".")
@@ -252,6 +267,15 @@ class ToolBox:
                 # Unqualified relation = a `memory` view (file source / upload);
                 # resolving under "memory" lets its remapped overrides apply.
                 rels.append(("memory", parts[0]))
+
+        col_sources = prov.get("column_sources")
+        if col_sources is not None and len(col_sources) == len(result.columns):
+            return {
+                i for i, srcs in enumerate(col_sources)
+                if any(self._source_ref_masked(s) for s in srcs)
+            }
+
+        lineage = prov.get("lineage") or {}
         idx = set()
         for i, outcol in enumerate(result.columns):
             srcs = lineage.get(outcol)
@@ -268,6 +292,33 @@ class ToolBox:
             ):
                 idx.add(i)
         return idx
+
+    def _source_ref_masked(self, ref: str) -> bool:
+        """Is this positional source-column reference masked? A `relation.*`
+        whole-row marker masks if the relation carries ANY masking at all —
+        a serialized row embeds every column, so one masked field taints it."""
+        if ref.endswith(".*"):
+            return self._whole_row_masked(ref[:-2])
+        return self._lineage_masked(ref)
+
+    def _whole_row_masked(self, qualified: str) -> bool:
+        # Fail closed: without the relation's column list we can't prove the
+        # row is clean, so any active masking (declared/auto PII, or an `off`
+        # override anywhere) masks the whole-row value.
+        if self._pii or self._auto_pii:
+            return True
+        parts = qualified.split(".")
+        source, table = (parts[-2], parts[-1]) if len(parts) >= 2 else ("memory", parts[-1])
+        src_ov = self._overrides.get(source) or self._overrides.get("memory") or {}
+        if src_ov.get("source") is False or any(
+            v is False for v in (src_ov.get("tables") or {}).values()
+        ):
+            return True
+        return any(
+            v is False and key.rpartition(".")[2]
+            for key, v in (src_ov.get("columns") or {}).items()
+            if key.split(".")[0].lower() in (table.lower(), qualified.lower())
+        )
 
     def _override_masks_name(self, outcol: str) -> bool:
         """Provenance-blind last resort: the name check alone ignored overrides,

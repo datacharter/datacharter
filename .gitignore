@@ -36,3 +36,4 @@ src/datacharter/server/static/
 .claude/*
 !.claude/skills/
 .buildenv/
+journey-shots/

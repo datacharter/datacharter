@@ -5,6 +5,31 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.23.1] - 2026-08-04
+
+### Security
+This release closes four ways an agent could reach data outside the contract,
+found in a fresh adversarial audit. If you connect any agent (Claude Code, a
+local model, or an external MCP client) to a governed workspace, upgrade.
+
+- **Masking held only for a bare column reference.** Any expression over a
+  masked column — `lower(email)`, `CAST(email AS VARCHAR)`, `email || ''`, a
+  `CASE`, `string_agg`/`list`, or a whole-row value like `to_json(row)` —
+  returned the raw value. Masking is now attributed by select-list position and
+  fails closed for whole-row values, so no wrapper can strip it.
+- **The flat `source__table` compat view of a database source was ungoverned.**
+  Policies and agent-access overrides bound only the canonical `source.table`;
+  the alias returned raw rows and ignored masking toggles, and `list_tables`
+  advertised it. The alias is now hidden and governed identically, and policies
+  match both spellings.
+- **A different identifier case turned governance off.** `crm.Customers` skipped
+  row filters and agent-access overrides that `crm.customers` enforced. All
+  relation/column matching is now case-insensitive, as DuckDB itself is.
+- **An agent could read arbitrary local files.** DuckDB's replacement scan lets
+  a file path be named as a table (`SELECT * FROM '/path/to/file'`), bypassing
+  the function denylist. File-path and URL table names are now refused.
+
+
 ## [0.23.0] - 2026-08-04
 
 ### Fixed

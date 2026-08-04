@@ -141,6 +141,58 @@ def _reject_forbidden(con: duckdb.DuckDBPyConnection, sql: str) -> None:
             f"Filesystem/remote function(s) not allowed in a query: "
             f"{', '.join(sorted(found))}. Query your data through its defined source."
         )
+    files = _file_tables(con, sql)
+    if files:
+        # DuckDB's replacement scan reads a file NAMED AS A TABLE
+        # (`FROM '/etc/passwd'`, `FROM 'data/*.csv'`) with no function node, so
+        # the function denylist misses it — arbitrary file read / SSRF. A real
+        # source is a registered relation (a bare identifier), never a path.
+        raise QueryNotAllowed(
+            f"Reading a file path directly is not allowed: {', '.join(sorted(files))}. "
+            f"Query your data through its defined source."
+        )
+
+
+# A table name that is really a file path or URL: a path/glob character, a URL
+# scheme, or a data-file extension. Registered relations are bare identifiers.
+_FILE_TABLE = re.compile(
+    r"[/\\*?]|://|\.(?:csv|tsv|txt|parquet|parq|json|jsonl|ndjson|xlsx|xls|"
+    r"arrow|feather|orc|avro|db|sqlite|duckdb|gz|zst|bz2|blob)\b",
+    re.IGNORECASE,
+)
+
+
+def _file_tables(con: duckdb.DuckDBPyConnection, sql: str) -> set[str]:
+    """BASE_TABLE names that are file paths / URLs (replacement scans)."""
+    try:
+        tree = json.loads(con.execute("SELECT json_serialize_sql(?)", [sql]).fetchone()[0])
+    except Exception:
+        return set()
+    if isinstance(tree, dict) and tree.get("error"):
+        return set()
+    found: set[str] = set()
+
+    def walk(node: object) -> None:
+        if isinstance(node, dict):
+            if node.get("type") == "BASE_TABLE":
+                name = node.get("table_name")
+                # Only a lone table_name can be a replacement scan; a genuine
+                # catalog.schema.table reference has separate qualifier parts.
+                if (
+                    isinstance(name, str)
+                    and not node.get("catalog_name")
+                    and not node.get("schema_name")
+                    and _FILE_TABLE.search(name)
+                ):
+                    found.add(name)
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(tree)
+    return found
 
 
 def _token_scan(sql: str) -> set[str]:

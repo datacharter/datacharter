@@ -36,7 +36,11 @@ def _refuse(msg: str) -> None:
 
 
 def _matches(policy_key: str, relation: str) -> bool:
-    pk, r = policy_key.lower(), relation.lower()
+    # ATTACH sources register twice: the native `src.table` and a flat compat
+    # view `src__table`. A policy on `src.table` must bind BOTH, or the agent
+    # queries the alias and the policy never fires.
+    pk = policy_key.lower().replace("__", ".")
+    r = relation.lower().replace("__", ".")
     return pk == r or r.endswith("." + pk) or pk.endswith("." + r)
 
 
