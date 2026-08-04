@@ -7,13 +7,13 @@
     "url": "https://github.com/datacharter/datacharter",
     "source": "github"
   },
-  "version": "0.22.0",
+  "version": "0.22.1",
   "packages": [
     {
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "datacharter",
-      "version": "0.22.0",
+      "version": "0.22.1",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
