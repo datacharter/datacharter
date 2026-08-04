@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-08-03
+
 ### Added
 - **The Connect an LLM dialog now finds models already running on your
   machine.** Ollama, LM Studio, vLLM, and llama.cpp are probed (loopback
