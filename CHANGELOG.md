@@ -6,6 +6,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Chat text is selectable and copyable.** Highlight any lines of an answer
+  and copy them; every message also grows a hover ⧉ that copies it whole.
+  Dragging selected text no longer triggers the file-drop overlay — that now
+  appears only for actual files.
 - **One click from dragged file to contract source.** Every upload in the
   sidebar has a "save as source" button: the file moves into the workspace,
   gets declared in charter.yaml, and any detected PII columns are written

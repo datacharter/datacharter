@@ -349,6 +349,9 @@ export default function App() {
     <div
       className={dragging ? "app dragging" : "app"}
       onDragOver={(e) => {
+        // Only actual files get the drop overlay — dragging selected TEXT
+        // (e.g. copying lines out of a chat answer) must not interrupt.
+        if (!e.dataTransfer.types.includes("Files")) return;
         e.preventDefault();
         setDragging(true);
       }}

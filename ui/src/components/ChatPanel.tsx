@@ -248,7 +248,19 @@ export function Message({
           )}
         </div>
       ))}
-      {prose && <div className="chat-prose">{renderProse(prose)}</div>}
+      {prose && (
+        <div className="chat-prose-wrap">
+          <div className="chat-prose">{renderProse(prose)}</div>
+          <button
+            className="chat-msg-copy"
+            title="Copy this message"
+            aria-label="Copy message"
+            onClick={() => navigator.clipboard?.writeText(prose).catch(() => {})}
+          >
+            ⧉
+          </button>
+        </div>
+      )}
       {spec && <VegaBlock spec={spec} dark={dark} />}
     </div>
   );
