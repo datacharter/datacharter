@@ -9,10 +9,20 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 HERE = Path(SPECPATH)  # noqa: F821 - provided by PyInstaller
 
-datas = collect_data_files("datacharter")
+# The bundle must carry the real version (About box reads Info.plist).
+_init = (HERE.parent / "src" / "datacharter" / "__init__.py").read_text()
+VERSION = next(
+    line.split('"')[1] for line in _init.splitlines() if line.startswith("__version__")
+)
+
+# pytz: DuckDB's client imports it DYNAMICALLY for TIMESTAMP WITH TIME ZONE
+# results, so PyInstaller's static trace misses it — without the explicit
+# entries every tz-aware query fails only in the frozen builds.
+datas = collect_data_files("datacharter") + collect_data_files("pytz")
 hiddenimports = (
     collect_submodules("uvicorn")
     + [
+        "pytz",
         "keyring.backends.macOS",
         "keyring.backends.Windows",
         "keyring.backends.SecretService",
@@ -60,6 +70,8 @@ else:
         info_plist={
             "CFBundleName": "DataCharter",
             "CFBundleDisplayName": "DataCharter",
+            "CFBundleShortVersionString": VERSION,
+            "CFBundleVersion": VERSION,
             "NSHighResolutionCapable": True,
             "LSMinimumSystemVersion": "12.0",
         },

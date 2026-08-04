@@ -39,6 +39,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null); // query errors: replace the grid
   const [actionError, setActionError] = useState<string | null>(null); // background actions: toast
   const [previewError, setPreviewError] = useState<string | null>(null); // live-preview parse error
+  const [previewExpanded, setPreviewExpanded] = useState(false);
   const [running, setRunning] = useState(false);
   const [tab, setTab] = useState<Tab>("results");
   const [agentView, setAgentView] = useState(false);
@@ -593,8 +594,21 @@ export default function App() {
               </label>
             </div>
             {previewError && !error && (
-              <div className="preview-error" title={previewError}>
-                ⚠ live preview: {previewError.split("\n")[0]}
+              <div
+                className={previewExpanded ? "preview-error expanded" : "preview-error"}
+                title={previewExpanded ? "Click to collapse" : "Click to expand; text is selectable"}
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  // Don't collapse under the user while they select text to copy.
+                  if (window.getSelection()?.toString()) return;
+                  setPreviewExpanded((v) => !v);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") setPreviewExpanded((v) => !v);
+                }}
+              >
+                ⚠ live preview: {previewExpanded ? previewError : previewError.split("\n")[0]}
               </div>
             )}
             <div className="tab-body">

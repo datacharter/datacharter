@@ -5,6 +5,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.19.2] - 2026-08-03
+
+### Fixed
+- **Desktop: the pytz fix now actually reaches the frozen apps.** 0.19.1
+  declared the dependency, but PyInstaller cannot trace DuckDB's dynamic
+  import, so the dmg/exe still lacked it — pytz is now bundled explicitly.
+  Timezone-aware parquet queries work in the desktop apps.
+- **Desktop: the About box shows the real version** instead of 0.0.0
+  (the bundle's Info.plist now carries the app version).
+- **Error banners are copyable** — the live-preview error chip expands on
+  click to the full message and its text is selectable.
+
 ## [0.19.1] - 2026-08-03
 
 ### Fixed
