@@ -289,3 +289,29 @@ def test_local_access_values_validated_too(tmp_path):
     )
     with pytest.raises(CharterError, match="true .*or false"):
         load_charter(ws)
+
+
+def test_typoed_source_key_is_rejected_not_ignored(tmp_path):
+    # 'agent_acces' (typo) silently dropped = governance that looks enabled but
+    # enforces nothing — same class as the top-level-key bug.
+    text = (
+        "version: 1\nsources:\n  crm:\n    type: csv\n    path: d.csv\n"
+        "    agent_acces:\n      source: false\n"
+    )
+    with pytest.raises(CharterError, match="unknown key.*agent_acces"):
+        load_charter(write_charter(tmp_path, text))
+
+
+def test_typoed_metric_and_test_keys_rejected(tmp_path):
+    text = (
+        "version: 1\nsources: {}\nmetrics:\n  rev:\n    relation: t\n"
+        "    expression: sum(x)\n    time_colum: d\n"
+    )
+    with pytest.raises(CharterError, match="unknown key.*time_colum"):
+        load_charter(write_charter(tmp_path, text))
+    text = (
+        "version: 1\nsources: {}\ntests:\n  t1:\n    relation: t\n"
+        "    type: row_count\n    minimum: 1\n"
+    )
+    with pytest.raises(CharterError, match="unknown key.*minimum"):
+        load_charter(write_charter(tmp_path, text))

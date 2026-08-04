@@ -70,7 +70,7 @@ jobs:
           PYI=.buildenv/bin/pyinstaller; [ -f "$PYI" ] || PYI=.buildenv/Scripts/pyinstaller.exe
           "$PYI" desktop/datacharter.spec --workpath desktop/build --distpath desktop/dist -y
 
-      - name: Smoke (headless server + health check)
+      - name: Smoke battery (real endpoints against the FROZEN build)
         shell: bash
         run: |
           if [ "${{ matrix.kind }}" = "dmg" ]; then
@@ -78,8 +78,22 @@ jobs:
           else
             BIN="desktop/dist/DataCharter.exe"
           fi
+          # Exercises timestamptz fetch (pytz), upload (multipart), contract
+          # writes (ruamel), masking, snapshots, audit — the classes that only
+          # break in frozen builds. Any red check fails the build.
           "$BIN" --smoke --demo
-          echo "smoke passed on ${{ matrix.label }}"
+          echo "smoke battery passed on ${{ matrix.label }}"
+
+      - name: Bundle assertions (version + critical modules present)
+        if: matrix.kind == 'dmg'
+        shell: bash
+        run: |
+          PLIST="desktop/dist/DataCharter.app/Contents/Info.plist"
+          WANT=$(.buildenv/bin/python -c "from datacharter import __version__; print(__version__)")
+          GOT=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$PLIST")
+          echo "Info.plist version: $GOT (want $WANT)"
+          test "$GOT" = "$WANT"
+          test -d desktop/dist/DataCharter.app/Contents/Frameworks/pytz
 
       - name: Window proof (launch the real GUI, assert the window, screenshot)
         if: matrix.kind == 'zip'

@@ -35,8 +35,27 @@ jobs:
           name: dist
           path: dist/
 
-  publish:
+  # The artifact is what ships: install the built wheel into a clean env and
+  # run the runtime smoke battery + MCP handshake before anything publishes.
+  gate:
     needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - name: Install the wheel into a clean environment
+        run: |
+          uv venv .gateenv --python 3.12
+          uv pip install --python .gateenv/bin/python dist/*.whl
+      - name: Wheel gate (smoke battery + MCP)
+        run: .gateenv/bin/python scripts/wheel_gate.py
+
+  publish:
+    needs: [build, gate]
     runs-on: ubuntu-latest
     environment:
       name: pypi

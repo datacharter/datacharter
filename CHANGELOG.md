@@ -12,6 +12,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   this machine" — one click connects, no API key, and if several runtimes or
   models are up you pick from the list. (`GET /api/llm/local`)
 
+### Changed
+- **Typo'd charter keys are now load errors.** An unknown key in a source,
+  metric, or test body (e.g. `agent_acces:`) was silently ignored — governance
+  that looked enabled while enforcing nothing. The error lists the allowed
+  spellings.
+
+### Reliability
+- **Every release now gates on the built artifacts, not just unit tests.**
+  A runtime smoke battery (timezone-aware fetch, uploads, contract writes,
+  masking, snapshots, audit chain) runs against the frozen dmg/exe in desktop
+  CI and against the built wheel before anything publishes to PyPI, and the
+  bundle asserts its version and critical modules. This is the class of check
+  that would have caught the 0.19.0 desktop pytz and About-box issues.
+
 ## [0.19.2] - 2026-08-03
 
 ### Fixed

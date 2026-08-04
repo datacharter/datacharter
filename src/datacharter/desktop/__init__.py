@@ -62,9 +62,18 @@ def main(argv: list[str] | None = None) -> int:
     handle = ServerHandle()
 
     if args.smoke:
+        from datacharter.smoke import format_results, run_battery
+
         ws = _resolve_initial(args) or _demo_workspace()
         handle.start(ws)
         ok = handle.wait_ready(timeout_s=120)  # cold CI runners: exe extract + duckdb ext fetch
+        battery: list[tuple[str, bool, str]] = []
+        if ok:
+            # The battery is the point: it exercises the failure classes that
+            # only break in the built artifact (dynamic imports, data files).
+            battery = run_battery(handle.url)
+            _say(format_results(battery))
+            ok = all(passed for _, passed, _ in battery)
         handle.stop()
         detail = f" ({handle.error})" if handle.error else ""
         _say(("smoke OK" if ok else "smoke FAILED") + detail)

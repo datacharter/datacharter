@@ -136,6 +136,7 @@ def load_charter(workspace: Path | str, filename: str = CHARTER_FILE) -> Charter
 def _build_metric(name: str, body: Any, filename: str) -> Metric:
     if not isinstance(body, dict):
         raise CharterError(f"{filename}: metrics.{name} must be a mapping.")
+    _reject_unknown_keys(body, _METRIC_KEYS, f"{filename}: metrics.{name}")
     relation, expression = body.get("relation"), body.get("expression")
     if not relation or not expression:
         raise CharterError(f"{filename}: metrics.{name} needs a 'relation' and an 'expression'.")
@@ -163,6 +164,7 @@ def _build_metric(name: str, body: Any, filename: str) -> Metric:
 def _build_test(name: str, body: Any, filename: str) -> DataTest:
     if not isinstance(body, dict):
         raise CharterError(f"{filename}: tests.{name} must be a mapping.")
+    _reject_unknown_keys(body, _TEST_KEYS, f"{filename}: tests.{name}")
     try:
         return DataTest(
             name=name,
@@ -179,10 +181,31 @@ def _build_test(name: str, body: Any, filename: str) -> DataTest:
         raise CharterError(f"{filename}: tests.{name}: {exc}") from None
 
 
+_SOURCE_KEYS = {
+    "type", "connection", "credentials", "path", "tables", "pii",
+    "agent_access", "row_filters", "context", "max_rows",
+}
+_METRIC_KEYS = {"relation", "expression", "dimensions", "joins", "time_column"}
+_TEST_KEYS = {"type", "relation", "column", "columns", "values", "min", "max", "expression"}
+
+
+def _reject_unknown_keys(body: dict, allowed: set, ctx: str) -> None:
+    """A typo'd governance key that is silently dropped looks enabled while
+    enforcing nothing — the exact failure class of the top-level-key bug.
+    Fail closed with the spelling that would have worked."""
+    unknown = sorted(set(body) - allowed)
+    if unknown:
+        raise CharterError(
+            f"{ctx}: unknown key(s) {', '.join(map(repr, unknown))} — "
+            f"allowed: {', '.join(sorted(allowed))}."
+        )
+
+
 def _build_source(name: str, body: Any, resolver: SecretResolver, warnings: list[str]) -> Source:
     ctx = f"sources.{name}"
     if not isinstance(body, dict):
         raise CharterError(f"{ctx}: must be a mapping.")
+    _reject_unknown_keys(body, _SOURCE_KEYS, ctx)
     type_raw = body.get("type")
     try:
         stype = SourceType(type_raw)
