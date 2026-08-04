@@ -1,0 +1,14 @@
+version: 0.23.4
+date: 2026-08-04
+who: release_gate.sh (automated; run on the release machine)
+wheel-gate: pass
+journey: pass
+claude-code-round: pass
+notes: |
+    ✓ claude-binary: 2.1.221 (Claude Code)
+    ✓ tool-surface: governed surface asserted (36 denied)
+    ✓ data-question: tools=['list_tables', 'query'] answer='3'
+    ✓ pii-masked: raw emails absent from every event
+    ✓ follow-up-memory: answer='3'
+    ✓ local-llm: ollama/qwen2.5:7b: 'brtc_people_rptpeople\n ```sql\nSELECT COUNT(*) AS row_count FROM people\n LIMIT 1;'
+  claude live check: 6/6 passed
