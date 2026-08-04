@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-08-04
+
 ### Added
 - **Chat text is selectable and copyable.** Highlight any lines of an answer
   and copy them; every message also grows a hover ⧉ that copies it whole.
