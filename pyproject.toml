@@ -29,6 +29,9 @@ dependencies = [
     "uvicorn>=0.30",
     "httpx>=0.27",
     "python-dotenv>=1.0",
+    # DuckDB's Python client requires pytz to materialize TIMESTAMP WITH TIME
+    # ZONE results — common in parquet files; without it every such query fails.
+    "pytz>=2024.1",
     "keyring>=25.0",
     "python-multipart>=0.0.9",
     "ruamel.yaml>=0.18",

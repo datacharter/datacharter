@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-08-03
+
+### Fixed
+- **Querying parquet files with timezone-aware timestamp columns no longer
+  fails with "No module named pytz"** — DuckDB's Python client needs pytz to
+  materialize `TIMESTAMP WITH TIME ZONE` results, and it is now a declared
+  dependency.
+
 ## [0.19.0] - 2026-08-03
 
 ### Added

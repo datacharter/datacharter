@@ -298,3 +298,28 @@ def test_snowflake_source_requires_tables(tmp_path):
     src = Source(name="wh", type=SourceType.SNOWFLAKE, connection={"account": "x"})
     with pytest.raises(EngineError, match="requires an explicit tables"):
         Engine(tmp_path, [src]).start()
+
+
+def test_parquet_timestamptz_column_queries(tmp_path):
+    # Parquet files routinely carry TIMESTAMP WITH TIME ZONE columns; DuckDB's
+    # Python client needs pytz to materialize them — a clean install without it
+    # failed every such query (user-reported on 0.19.0).
+    import duckdb
+
+    from datacharter.engine.session import Engine
+    from datacharter.models import Source, SourceType
+
+    con = duckdb.connect()
+    con.execute(
+        f"COPY (SELECT TIMESTAMPTZ '2026-01-01 10:00:00+00' AS created_at, 42 AS amount) "
+        f"TO '{tmp_path}/events.parquet'"
+    )
+    con.close()
+    src = Source(name="events", type=SourceType.PARQUET, path="events.parquet")
+    engine = Engine(tmp_path, [src]).start()
+    try:
+        result = engine.query_sync("SELECT created_at, amount FROM events")
+        assert result.rows[0][1] == 42
+        assert "2026-01-01" in str(result.rows[0][0])
+    finally:
+        engine.close()
