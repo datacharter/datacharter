@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.23.5] - 2026-08-05
+
+### Fixed
+- **SQL autocomplete never shows a blank suggestion row.** A source that yields
+  an unnamed/blank column (or table) could render an icon-only row with no
+  text; those are now filtered out, and column names are coerced to strings
+  everywhere the completion list is built.
+
+
 ## [0.23.4] - 2026-08-04
 
 ### Fixed

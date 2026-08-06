@@ -69,7 +69,9 @@ export function registerCompletions(
           };
         }
         // Qualifier is a source/schema (`store.`): offer its tables.
-        const inSource = tables.filter((t) => t.source.toLowerCase() === qualifier);
+        const inSource = tables.filter(
+          (t) => t.source.toLowerCase() === qualifier && String(t.table).trim(),
+        );
         if (inSource.length) {
           return {
             suggestions: inSource.map((t) => ({
@@ -95,7 +97,8 @@ export function registerCompletions(
 
       const suggestions: monaco.languages.CompletionItem[] = [];
       for (const t of tables) {
-        const relation = relationOf(t);
+        const relation = String(relationOf(t)).trim();
+        if (!relation) continue; // never emit a blank-label row
         suggestions.push({
           label: relation,
           kind: m.languages.CompletionItemKind.Class,
@@ -108,13 +111,15 @@ export function registerCompletions(
       // Every column of every table (qualified in `detail`) — no cross-table
       // dedup, so a column shared by two tables still shows both.
       for (const t of tables) {
-        for (const col of t.columns) {
+        for (const col of t.columns ?? []) {
+          const name = String(col).trim();
+          if (!name) continue; // a source can yield an unnamed column — skip it
           suggestions.push({
-            label: col,
+            label: name,
             kind: m.languages.CompletionItemKind.Field,
-            insertText: col,
+            insertText: name,
             detail: relationOf(t),
-            sortText: `${colRank}_${col}`,
+            sortText: `${colRank}_${name}`,
             range,
           });
         }

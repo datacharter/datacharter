@@ -36,4 +36,13 @@ describe("columnsForQualifier", () => {
   it("returns null for an unknown qualifier (so the source-table fallback can run)", () => {
     expect(columnsForQualifier("nope", TABLES, "SELECT nope.")).toBeNull();
   });
+
+  it("drops unnamed/blank columns so the widget never shows a blank row", () => {
+    const withBlank = [
+      { source: "memory", schema: "main", table: "augment", columns: ["side", "", "  ", "region"] },
+    ] as unknown as TableInfo[];
+    expect(names(columnsForQualifier("augment", withBlank, "SELECT augment."))).toEqual([
+      "side", "region",
+    ]);
+  });
 });

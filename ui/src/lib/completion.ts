@@ -27,5 +27,8 @@ export function columnsForQualifier(
   const target = aliases.get(q) ?? q;
   const t = tables.find((tb) => relationOf(tb) === target || tb.table.toLowerCase() === target);
   if (!t) return null;
-  return t.columns.map((name) => ({ name, relation: relationOf(t) }));
+  return (t.columns ?? [])
+    .map((c) => String(c).trim())
+    .filter(Boolean) // a source can yield an unnamed column — never a blank row
+    .map((name) => ({ name, relation: relationOf(t) }));
 }
