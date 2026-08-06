@@ -11,6 +11,39 @@ self.MonacoEnvironment = {
 
 loader.config({ monaco });
 
+// Explicit suggest-widget colors. Monaco's default vs/vs-dark themes inject
+// these via a path that WebKit (the desktop app's WKWebView) renders wrong —
+// white label text on a light widget, i.e. invisible. Pinning concrete values
+// in a named theme sidesteps that. Use these themes instead of "vs"/"vs-dark".
+monaco.editor.defineTheme("dc-light", {
+  base: "vs",
+  inherit: true,
+  rules: [],
+  colors: {
+    "editorSuggestWidget.background": "#ffffff",
+    "editorSuggestWidget.foreground": "#1b2531",
+    "editorSuggestWidget.selectedBackground": "#e8f0fe",
+    "editorSuggestWidget.selectedForeground": "#1b2531",
+    "editorSuggestWidget.highlightForeground": "#0a66c2",
+    "editorSuggestWidget.focusHighlightForeground": "#0a66c2",
+    "editorSuggestWidget.border": "#d5dbe2",
+  },
+});
+monaco.editor.defineTheme("dc-dark", {
+  base: "vs-dark",
+  inherit: true,
+  rules: [],
+  colors: {
+    "editorSuggestWidget.background": "#1e2530",
+    "editorSuggestWidget.foreground": "#dce3ea",
+    "editorSuggestWidget.selectedBackground": "#2a3646",
+    "editorSuggestWidget.selectedForeground": "#ffffff",
+    "editorSuggestWidget.highlightForeground": "#6ca8ff",
+    "editorSuggestWidget.focusHighlightForeground": "#6ca8ff",
+    "editorSuggestWidget.border": "#33404f",
+  },
+});
+
 const KEYWORDS = [
   "SELECT", "FROM", "WHERE", "GROUP BY", "ORDER BY", "HAVING", "LIMIT", "OFFSET",
   "JOIN", "LEFT JOIN", "INNER JOIN", "FULL JOIN", "ON", "USING", "AS", "WITH",

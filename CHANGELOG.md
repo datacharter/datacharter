@@ -5,6 +5,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.23.6] - 2026-08-05
+
+### Fixed
+- **Autocomplete suggestions are readable in the desktop app.** In the desktop
+  app's WebKit engine, Monaco's default theme rendered the suggestion labels in
+  a color that was invisible against the popup background (white-on-light) — so
+  the list looked like empty, icon-only rows. The editor now uses explicit
+  light/dark themes with pinned suggest-widget colors, readable in both the
+  desktop app and the browser.
+
+
 ## [0.23.5] - 2026-08-05
 
 ### Fixed

@@ -610,7 +610,7 @@ export default function App() {
             </div>
             <MonacoEditor
               language="sql"
-              theme={dark ? "vs-dark" : "vs"}
+              theme={dark ? "dc-dark" : "dc-light"}
               value={sql}
               onChange={(v) => setSql(v ?? "")}
               onMount={(editor, monaco) => {
