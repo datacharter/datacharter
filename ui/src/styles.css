@@ -1214,3 +1214,20 @@ table.grid td.rownum, table.grid th.rownum {
 }
 [data-theme="dark"] .agent-refusal { background: #4a3b00; color: #ffe08a; border-color: #6b5600; }
 .agent-refusal pre { margin: 8px 0 0; white-space: pre-wrap; font-size: 12px; }
+
+/* Desktop app (WKWebView/WebKit) mis-sizes the Monaco suggest-widget rows: the
+   flex `.main` renders ~56px tall, pushing the label below the 20px clipped row
+   so completion text is invisible (icons still show). Force each row to a single
+   centered line. Harmless in Chromium, where the layout is already correct. */
+.monaco-editor .suggest-widget .monaco-list-row .contents,
+.monaco-editor .suggest-widget .monaco-list-row .main,
+.monaco-editor .suggest-widget .monaco-list-row .monaco-icon-label {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  height: 100% !important;
+}
+.monaco-editor .suggest-widget .monaco-list-row .monaco-icon-label::before {
+  height: auto !important;
+}

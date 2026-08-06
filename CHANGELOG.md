@@ -5,6 +5,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.23.7] - 2026-08-06
+
+### Fixed
+- **Autocomplete text is visible in the desktop app (the real fix).** WebKit
+  (the desktop app's engine) mis-sized the suggestion rows' inner flex
+  container to ~56px, pushing each label below the 20px clipped row — so the
+  popup showed icon-only rows with no text. The row layout is now pinned to a
+  single centered line; suggestions render correctly in the desktop app and the
+  browser. (0.23.5/0.23.6 addressed adjacent symptoms; this is the root cause.)
+
+
 ## [0.23.6] - 2026-08-05
 
 ### Fixed
