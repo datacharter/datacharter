@@ -995,6 +995,47 @@ def _cmd_canary(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_redteam(args: argparse.Namespace) -> int:
+    import asyncio
+
+    from datacharter.agent.factory import build_toolbox, detect_auto_pii
+    from datacharter.agent.redteam import render_report, run_gauntlet
+    from datacharter.audit import FlightRecorder
+    from datacharter.audit.canary import ensure_canaries
+    from datacharter.contracts import load_charter
+
+    ws = Path(args.directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+    charter = load_charter(ws)
+    engine = _open_engine(ws, charter.sources)
+    try:
+        # Force-plant sentinels even if the user's canary is off — the Gauntlet
+        # needs bait to prove masking holds (local.canaries stays hidden from
+        # list_tables regardless).
+        guard = ensure_canaries(ws, engine, charter.canary_mode or "log")
+        if guard is None:
+            print("Could not plant honeytokens for the Gauntlet.", file=sys.stderr)
+            return 1
+        recorder = FlightRecorder(ws, enabled=charter.audit_enabled)
+        recorder.start_session("redteam", question="the Gauntlet (governance self-attack)")
+        toolbox = build_toolbox(
+            engine, charter,
+            auto_pii=asyncio.run(detect_auto_pii(engine)),
+            recorder=recorder, canary=guard,
+        )
+        report = asyncio.run(
+            run_gauntlet(toolbox, guard, policies_active=bool(charter.policies))
+        )
+    finally:
+        engine.close()
+    print(render_report(report))
+    print("\nRecorded to the flight recorder. Re-run in CI: `datacharter redteam` "
+          "(exit 1 on any breach).")
+    return 0 if report.ok else 1
+
+
 def _cmd_eval(args: argparse.Namespace) -> int:
     import asyncio
 
@@ -1365,6 +1406,18 @@ def main(argv: list[str] | None = None) -> int:
         help="Optional workspace path and/or action (status, drill) in either order",
     )
     p_canary.set_defaults(func=_cmd_canary)
+
+    p_redteam = sub.add_parser(
+        "redteam",
+        help="The Gauntlet: attack this charter's own governance and score it",
+        description=(
+            "Fire a static, offline battery of attacks (PII exfil, read-only "
+            "bypass, policy evasion, honeytoken theft) through the real governed "
+            "tool path. Exits 1 on any breach — a CI gate proving governance holds."
+        ),
+    )
+    p_redteam.add_argument("directory", nargs="?", default=".")
+    p_redteam.set_defaults(func=_cmd_redteam)
 
     p_eval = sub.add_parser(
         "eval", help="Run agent eval suites (evals/*.yaml) and score answers"

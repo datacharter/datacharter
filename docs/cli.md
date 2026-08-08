@@ -148,6 +148,19 @@ Show [canary tripwire](audit.html#canary-tripwires) status — whether honeytoke
 planted and armed. `canary drill` deliberately trips one so you can see exactly
 what an alarm looks like in the audit chain.
 
+### `redteam [directory]`
+**The Gauntlet** — DataCharter attacks its own governance and hands you a report
+card. A static, offline battery of attacks (PII exfiltration through
+expression-wrapping and whole-row serialization, read-only bypass via writes /
+`COPY TO` / `ATTACH` / `PRAGMA` / filesystem functions, policy evasion, and
+honeytoken theft) is fired through the **real** governed tool path, so a green
+result is evidence about the code that actually runs — not a mock. The oracle
+uses the canary honeytokens as ground-truth secrets (planted for the run even if
+`canary:` is off), so pass/fail is deterministic and needs zero knowledge of
+your data. **Exits 1 on any breach** — drop `datacharter redteam` into CI to
+prove your charter's governance still holds on every change. The run is recorded
+to the flight recorder.
+
 ### `suggest [directory] [--apply]`
 Mine your workspace's query history for repeated habits your
 [guides](guides.html) don't mention yet, and propose guide lines with the

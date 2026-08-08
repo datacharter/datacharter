@@ -5,6 +5,29 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.24.2] - 2026-08-08
+
+### Added
+- **The Gauntlet — `datacharter redteam`.** DataCharter attacks its own
+  governance and prints a report card. A static, offline battery of attacks
+  (PII exfiltration via expression-wrapping / whole-row serialization / casts,
+  read-only bypass via writes / `COPY TO` / `ATTACH` / `INSTALL` / `PRAGMA` /
+  filesystem functions / casing-and-comment evasion, policy evasion, honeytoken
+  theft) runs through the **real** governed tool path, so a green result is
+  evidence about the code that actually runs. The oracle uses canary honeytokens
+  as ground-truth secrets (planted for the run even if `canary:` is off), so
+  pass/fail is deterministic and needs zero knowledge of your data. Exits 1 on
+  any breach — a CI gate proving governance holds. The run is recorded to the
+  flight recorder.
+
+### Fixed
+- **`PRAGMA` is now refused by the read-only guard.** DuckDB rewrites `PRAGMA`
+  to a SELECT statement type, so it slipped past the type allowlist — yet
+  `PRAGMA database_list` discloses host file paths and other PRAGMAs toggle
+  engine settings. Both the `PRAGMA …` statement form and the
+  `pragma_database_list` / `pragma_database_size` table functions are now
+  blocked. (Surfaced by the Gauntlet's first run.)
+
 ## [0.24.1] - 2026-08-08
 
 ### Added

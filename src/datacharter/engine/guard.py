@@ -37,6 +37,8 @@ _FORBIDDEN_FUNCTIONS = frozenset(
         "delta_scan", "postgres_scan", "postgres_scan_pushdown", "postgres_query",
         "postgres_execute", "mysql_scan", "mysql_query", "mysql_execute",
         "sqlite_scan", "sqlite_query",
+        # PRAGMA table-function variants that disclose host paths/config.
+        "pragma_database_list", "pragma_database_size",
     }
 )
 
@@ -54,6 +56,10 @@ _EXPLAIN_PREFIX = re.compile(r"^\s*explain\s+(?:analyze\s+)?", re.IGNORECASE)
 # is a read — the CREATE targets an internal temp and it cannot write.
 _PIVOT_LEADING = re.compile(r"^\s*(?:select|with|\(|pivot|unpivot)\b", re.IGNORECASE | re.DOTALL)
 _PIVOT_TOKEN = re.compile(r"\b(?:un)?pivot\b", re.IGNORECASE)
+# DuckDB rewrites `PRAGMA ...` to a SELECT statement type, so it slips past the
+# type allowlist — yet PRAGMAs can disclose host config (database_list leaks file
+# paths) or toggle settings. The agent surface has no need for any PRAGMA.
+_PRAGMA_LEADING = re.compile(r"^\s*pragma\b", re.IGNORECASE)
 
 
 def ensure_allowed(sql: str) -> str:
@@ -100,6 +106,11 @@ def _check(con: duckdb.DuckDBPyConnection, sql: str) -> str:
         raise QueryNotAllowed("Could not parse SQL; check for syntax errors.") from None
     if not statements:
         raise QueryNotAllowed("Empty statement.")
+    if _PRAGMA_LEADING.match(_LEADING_COMMENTS.sub("", sql)):
+        raise QueryNotAllowed(
+            "PRAGMA is not allowed; it can disclose host configuration or change "
+            "engine settings. The engine is read-only for queries only."
+        )
     if _is_pivot_expansion(statements, sql):
         # Token-scan (not just the tree) so a forbidden function inside the pivot
         # is caught even when the pivot serializes to an incomplete tree.

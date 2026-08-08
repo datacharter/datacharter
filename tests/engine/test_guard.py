@@ -52,6 +52,13 @@ def test_local_ddl_allowed(sql):
         "/* sneak */ DELETE FROM t",
         "-- sneak\nDROP TABLE t",
         "SELECT 1; DELETE FROM t",
+        # DuckDB rewrites PRAGMA to a SELECT type; it must still be refused
+        # (database_list discloses host file paths). Caught by the Gauntlet.
+        "PRAGMA database_list",
+        "PRAGMA version",
+        "  pragma  database_size ",
+        "/* c */ PRAGMA database_list",
+        "SELECT * FROM pragma_database_list()",
         "",
         "   ",
     ],
