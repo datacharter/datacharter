@@ -5,6 +5,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.24.4] - 2026-08-08
+
+### Fixed
+- **The live preview can no longer clobber an explicit Run's result.** Typing
+  then pressing Run within the 700 ms preview debounce could let the preview's
+  200-row (capped) response land *after* Run's full result and silently replace
+  it — the grid showed 200 rows and a bogus "truncated" note for the query you
+  just ran in full. A monotonic request epoch now drops any preview response
+  that a Run (or newer preview) has superseded, Run cancels the pending preview
+  timer, and previews are skipped while a Run is in flight or when the SQL is
+  unchanged from the last Run — also removing redundant re-execution on every
+  typing pause. Pure client-side; new `queryLifecycle` module with unit tests.
+
 ## [0.24.3] - 2026-08-08
 
 ### Added

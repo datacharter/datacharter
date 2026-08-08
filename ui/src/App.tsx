@@ -14,6 +14,7 @@ import HelpModal from "./components/HelpModal";
 import EmptyState from "./components/EmptyState";
 import Toast from "./components/Toast";
 import { uploadNotice } from "./lib/uploadNotice";
+import { makeEpoch, shouldPreview } from "./lib/queryLifecycle";
 import CommandPalette from "./components/CommandPalette";
 import HistoryPanel from "./components/HistoryPanel";
 import ProfileBars from "./components/ProfileBars";
@@ -97,6 +98,13 @@ export default function App() {
   tablesRef.current = tables;
   const resultRef = useRef(result);
   resultRef.current = result;
+  // Sequencing for the two result producers (live preview vs. explicit Run) so a
+  // late preview response can't clobber a full Run result. See queryLifecycle.
+  const epoch = useRef(makeEpoch()).current;
+  const previewTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const lastRunSqlRef = useRef<string | null>(null);
+  const runningRef = useRef(running);
+  runningRef.current = running;
 
   // When Agent view is on, run the current SQL through the governed tool
   // surface so the grid shows EXACTLY what the agent receives — including a
@@ -162,21 +170,28 @@ export default function App() {
 
   const run = useCallback(
     async (sqlText?: string) => {
+      const text = sqlText ?? sqlRef.current;
+      clearTimeout(previewTimer.current); // cancel any pending preview…
+      const token = epoch.next(); // …and invalidate any preview already in flight
+      lastRunSqlRef.current = text;
       setRunning(true);
       setError(null);
       setProfileResult(null);
       try {
-        setResult(await api.query(sqlText ?? sqlRef.current, 10000, true));
+        const res = await api.query(text, 10000, true);
+        if (!epoch.isCurrent(token)) return; // a newer run/preview superseded us
+        setResult(res);
         setTab("results");
         refreshCatalog();
       } catch (e) {
+        if (!epoch.isCurrent(token)) return;
         setResult(null);
         setError((e as Error).message);
       } finally {
         setRunning(false);
       }
     },
-    [refreshCatalog],
+    [refreshCatalog, epoch],
   );
 
   const loadAndRunExample = useCallback(() => {
@@ -197,23 +212,27 @@ export default function App() {
   }, [run, loadSql]);
 
   // Instant preview: a beat after you stop typing, auto-run the query (row-capped,
-  // silent on error) so results update live without pressing Run.
+  // silent on error) so results update live without pressing Run. Skipped while a
+  // Run is in flight or when the SQL matches what Run just executed, and each
+  // response is dropped unless it is still the newest request (see queryLifecycle).
   useEffect(() => {
     setEstimate(undefined); // a prior estimate no longer matches the edited query
-    const body = sql.replace(/--[^\n]*/g, "").trim();
-    if (!body) return;
+    if (!shouldPreview(sql, lastRunSqlRef.current, runningRef.current)) return;
     const timer = setTimeout(() => {
+      const token = epoch.next();
       api
         .query(sql, 200)
         .then((preview) => {
+          if (!epoch.isCurrent(token)) return; // a Run or newer preview won
           setResult(preview);
           setError(null);
           setPreviewError(null);
         })
-        .catch((e) => setPreviewError((e as Error).message));
+        .catch((e) => epoch.isCurrent(token) && setPreviewError((e as Error).message));
     }, 700);
+    previewTimer.current = timer;
     return () => clearTimeout(timer);
-  }, [sql]);
+  }, [sql, epoch]);
 
   const profile = useCallback(async () => {
     setTab("profile");
