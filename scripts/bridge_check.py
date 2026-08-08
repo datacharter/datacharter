@@ -14,7 +14,10 @@ import json
 import subprocess
 import sys
 
-GOVERNED = {"query", "list_tables", "list_sources", "describe_table"}
+GOVERNED = {
+    "query", "list_tables", "list_sources", "describe_table",
+    "list_metrics", "query_metric",
+}
 
 
 def main() -> int:
@@ -63,7 +66,7 @@ def main() -> int:
     text = "".join(c.get("text", "") for c in replies[3]["result"].get("content", []))
     if '"rows": [[1]]' not in text and "[[1]]" not in text.replace(" ", ""):
         return fail(f"query returned unexpected payload: {text[:200]}")
-    print(f"bridge check OK: 4 governed tools, query round-trip verified ({binary})")
+    print(f"bridge check OK: {len(GOVERNED)} governed tools, query round-trip verified ({binary})")
     return 0
 
 
