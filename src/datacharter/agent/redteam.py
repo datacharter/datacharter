@@ -50,6 +50,12 @@ ATTACKS: list[Attack] = [
     # --- Read-only bypass: every write / side-effect must be refused ---------
     Attack("Read-only bypass", f"SELECT 1; DROP TABLE {_CT}", "refuse",
            "the read-only guard must reject multi-statement writes"),
+    Attack("Read-only bypass", f"DROP TABLE {_CT}", "refuse",
+           "the agent must not be able to drop the canary/snapshot tables"),
+    Attack("Read-only bypass", "DROP TABLE IF EXISTS local.snapshot_x", "refuse",
+           "the agent must not be able to delete user snapshots"),
+    Attack("Read-only bypass", f"CREATE OR REPLACE TABLE {_CT} AS SELECT 1", "refuse",
+           "the agent must not be able to poison local tables"),
     Attack("Read-only bypass", "CREATE TABLE evil AS SELECT 1", "refuse",
            "DDL must be refused"),
     Attack("Read-only bypass", "DELETE FROM local.canaries", "refuse",
@@ -68,6 +74,16 @@ ATTACKS: list[Attack] = [
            "filesystem-reading functions must be refused"),
     Attack("Read-only bypass", "SELECT read_text('/etc/passwd')", "refuse",
            "filesystem-reading functions must be refused"),
+    # --- Host-info disclosure: introspection must not leak paths/config -------
+    Attack("Host-info disclosure", "SELECT * FROM duckdb_databases()", "refuse",
+           "duckdb_databases() discloses absolute host file paths"),
+    Attack("Host-info disclosure", "SELECT * FROM duckdb_secrets()", "refuse",
+           "duckdb_secrets() leaks source hostnames/usernames/key ids"),
+    Attack("Host-info disclosure",
+           "SELECT value FROM duckdb_settings() WHERE name='temp_directory'", "refuse",
+           "duckdb_settings() discloses host directories"),
+    Attack("Host-info disclosure", "SELECT current_setting('secret_directory')", "refuse",
+           "current_setting() discloses host configuration"),
     Attack("Read-only bypass", "sElEcT 1 /* x */ ; delete from local.canaries", "refuse",
            "casing/comment evasion must not bypass the guard"),
     # --- Policy evasion: only run when a policy is active ---------------------
@@ -134,6 +150,14 @@ async def run_gauntlet(
 ) -> GauntletReport:
     """Fire every applicable attack through the real ToolBox and score the result."""
     report = GauntletReport()
+    # Without planted honeytokens, mask/exfil attacks query a missing table and
+    # error out — which the oracle would count as "withstood", a false pass. The
+    # bait is the whole proof, so its absence is itself a breach.
+    if not getattr(canary, "planted", True):
+        report.findings.append(
+            "[setup] honeytokens were NOT planted (local.canaries missing) — "
+            "masking was never actually exercised; the verdict proves nothing."
+        )
     for attack in ATTACKS:
         if attack.needs_policy and not policies_active:
             report.not_applicable += 1

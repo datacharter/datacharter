@@ -567,13 +567,25 @@ def _git_show_charter(ws: Path, ref: str) -> str | None:
             f"{ws} is not inside a git repository — pass --old PATH to compare "
             f"against a specific charter file instead of a git version."
         )
+    # A bad/typo'd ref must error, not masquerade as "charter didn't exist yet"
+    # (which would silently report the whole surface as newly WIDENED).
+    verify = subprocess.run(
+        ["git", "-C", str(ws), "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"],
+        capture_output=True, text=True,
+    )
+    if verify.returncode != 0:
+        raise _GitError(
+            f"git ref {ref!r} could not be resolved. Use a valid ref "
+            f"(e.g. --against git:HEAD or git:main~1) or pass --old PATH."
+        )
     git_path = f"{prefix.stdout.strip()}charter.yaml"
     show = subprocess.run(
         ["git", "-C", str(ws), "show", f"{ref}:{git_path}"],
         capture_output=True, text=True,
     )
     if show.returncode != 0:
-        # File absent at that ref = a brand-new charter; treat old side as empty.
+        # Valid ref, but the file was absent there = a brand-new charter; treat
+        # the old side as empty (everything is WIDENED).
         return None
     return show.stdout
 

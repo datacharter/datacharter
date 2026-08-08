@@ -293,6 +293,15 @@ class ToolBox:
 
     async def _query(self, args: dict) -> str:
         sql = str(args.get("sql", ""))
+        # The agent surface is strictly read-only: reject CREATE/DROP of local.*
+        # snapshot tables (the human editor keeps that write path; an agent must
+        # not be able to drop the canary table or delete a user's snapshots).
+        from datacharter.engine.guard import QueryNotAllowed, ensure_allowed
+
+        try:
+            ensure_allowed(sql, allow_local_ddl=False)
+        except QueryNotAllowed as exc:
+            return f"Error: {exc}"
         k = None
         if self._policies:
             from datacharter.engine.policy_guard import PolicyRefusal, check_policies

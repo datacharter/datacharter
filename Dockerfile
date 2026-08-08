@@ -20,7 +20,7 @@ LABEL org.opencontainers.image.licenses="Apache-2.0"
 
 # Pin for reproducible builds from a tagged commit. Bump in the release ritual
 # (next to src/datacharter/__init__.py and server.json).
-RUN pip install --no-cache-dir datacharter==0.24.4
+RUN pip install --no-cache-dir datacharter==0.24.5
 
 # Non-root: create an unprivileged user and a writable HOME (DuckDB needs a
 # writable HOME for its state/cache) and workspace.

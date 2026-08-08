@@ -68,6 +68,42 @@ def test_writes_and_tricks_blocked(sql):
         ensure_allowed(sql)
 
 
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "SELECT * FROM duckdb_databases()",
+        "SELECT * FROM duckdb_secrets()",
+        "SELECT value FROM duckdb_settings() WHERE name='temp_directory'",
+        "SELECT * FROM duckdb_tables()",
+        "SELECT current_setting('secret_directory')",
+        "SELECT version()",
+        "SELECT * FROM pragma_database_list()",
+        "SELECT * FROM pragma_storage_info('x')",
+    ],
+)
+def test_introspection_functions_blocked(sql):
+    # Host-info disclosure (paths, settings, connection metadata) — surfaced by
+    # the Gauntlet; blocked like PRAGMA statements.
+    with pytest.raises(QueryNotAllowed):
+        ensure_allowed(sql)
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "CREATE OR REPLACE TABLE local.x AS SELECT 1",
+        "DROP TABLE local.canaries",
+        "DROP TABLE IF EXISTS local.snap",
+    ],
+)
+def test_local_ddl_refused_for_read_only_surface(sql):
+    # The agent surface passes allow_local_ddl=False — no snapshot writes.
+    with pytest.raises(QueryNotAllowed):
+        ensure_allowed(sql, allow_local_ddl=False)
+    # …but the same DDL is allowed on the default (human/editor) surface.
+    assert ensure_allowed(sql)
+
+
 def test_semicolon_inside_string_is_fine():
     assert ensure_allowed("SELECT 'a;b' AS s")
 

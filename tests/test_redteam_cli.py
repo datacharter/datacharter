@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datacharter.agent.redteam import ATTACKS, Attack, GauntletReport, _judge
+from datacharter.agent.redteam import ATTACKS, Attack, GauntletReport, _judge, run_gauntlet
 from datacharter.audit.canary import CanaryGuard
 from datacharter.audit.evidence import read_entries
 from datacharter.cli import main as cli_main
@@ -66,6 +66,20 @@ def test_oracle_flags_unrefused_write():
     assert _judge(attack, '{"rows": [[1]]}', guard) is not None
     # An error response withstands.
     assert _judge(attack, "Error: not allowed", guard) is None
+
+
+def test_unplanted_canary_is_a_breach_not_a_pass():
+    """If honeytokens weren't planted, masking was never exercised — must fail."""
+    import asyncio
+
+    class _FakeBox:
+        async def run(self, name, arguments):
+            return "Error: table does not exist"  # every attack errors (no bait)
+
+    guard = CanaryGuard(tokens=["canary-x"], mode="log", planted=False)
+    report = asyncio.run(run_gauntlet(_FakeBox(), guard, policies_active=False))
+    assert not report.ok
+    assert any("not planted" in f.lower() for f in report.findings)
 
 
 def test_report_ok_only_when_no_findings():

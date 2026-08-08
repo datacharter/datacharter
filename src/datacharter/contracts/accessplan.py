@@ -56,8 +56,11 @@ def effective_surface(charter: Charter) -> dict:
     sources: dict = {}
     for src in charter.sources:
         aa = src.agent_access or {}
-        # Union every table named anywhere in this source's governance.
-        table_names: set[str] = set(src.tables or [])
+        # Union every table named anywhere in this source's governance. Lowercase
+        # everything: DuckDB matches identifiers case-insensitively, so `Orders`
+        # and `orders` are one table — not lowercasing split them and swallowed a
+        # PII removal as a spurious "table removed".
+        table_names: set[str] = {t.lower() for t in (src.tables or [])}
         table_names |= {t.lower() for t in (src.pii or {})}
         table_names |= {t.lower() for t in (aa.get("tables") or {})}
         table_names |= {t.lower() for t in (src.row_filters or {})}
@@ -85,7 +88,15 @@ def effective_surface(charter: Charter) -> dict:
                 "columns": dict(sorted(col_overrides.get(tbl, {}).items())),
                 "row_filter": row_filters.get(tbl),
             }
+        # Source type + location (path, or the non-secret connection dict) are
+        # part of the surface: repointing a source at a different database swaps
+        # the whole dataset behind a governed name. max_rows caps connector
+        # extraction — raising it exposes more rows.
+        location = src.path or (dict(sorted(src.connection.items())) if src.connection else None)
         sources[src.name] = {
+            "type": src.type.value,
+            "location": location,
+            "max_rows": src.max_rows,
             "source_access": aa.get("source"),
             "tables": tables,
         }
@@ -147,19 +158,54 @@ def _diff_sources(old: dict, new: dict, out: list[Change]) -> None:
         o, n = old.get(name), new.get(name)
         if o is None:
             out.append(Change(WIDENED, name, f"source '{name}' added — agent can now query it"))
-            n2 = {"source_access": None, "tables": {}}
-            _diff_tables(name, n2["tables"], n["tables"], out)
+            _diff_tables(name, {}, n["tables"], n.get("type"), out)
             continue
         if n is None:
             out.append(Change(NARROWED, name, f"source '{name}' removed"))
             continue
+        _diff_source_meta(name, o, n, out)
         c = _access_change(o["source_access"], n["source_access"], name, f"source '{name}'")
         if c:
             out.append(c)
-        _diff_tables(name, o["tables"], n["tables"], out)
+        _diff_tables(name, o["tables"], n["tables"], n.get("type"), out)
 
 
-def _diff_tables(src: str, old: dict, new: dict, out: list[Change]) -> None:
+def _diff_source_meta(name: str, o: dict, n: dict, out: list[Change]) -> None:
+    if o.get("type") != n.get("type"):
+        out.append(Change(WIDENED, name,
+                          f"source '{name}' type changed {o.get('type')} → {n.get('type')}"))
+    if o.get("location") != n.get("location"):
+        # Repointing at a different database/file swaps the dataset — fail closed.
+        out.append(Change(WIDENED, name, f"source '{name}' repointed to a different location"))
+    om, nm = o.get("max_rows"), n.get("max_rows")
+    if om != nm:
+        widened = nm is None or (om is not None and nm > om)
+        kind = WIDENED if widened else NARROWED
+        out.append(Change(kind, name, f"source '{name}' max_rows {om} → {nm}"))
+
+
+def _table_protected(t: dict) -> bool:
+    """Does this table carry any masking/filter/deny that removal would lift?"""
+    return bool(
+        t.get("pii") or t.get("row_filter")
+        or t.get("table_access") is False
+        or any(v is False for v in (t.get("columns") or {}).values())
+    )
+
+
+# Source types whose tables stay queryable even when un-declared: the engine
+# ATTACHes the whole database, so dropping a table from the charter removes its
+# governance, not its reachability.
+def _is_attach_type(source_type) -> bool:
+    from datacharter.models import ATTACH_TYPES, SourceType
+
+    try:
+        return SourceType(source_type) in ATTACH_TYPES
+    except ValueError:
+        return False
+
+
+def _diff_tables(src: str, old: dict, new: dict, source_type, out: list[Change]) -> None:
     for tbl in sorted(set(old) | set(new)):
         path = f"{src}.{tbl}"
         o, n = old.get(tbl), new.get(tbl)
@@ -167,7 +213,17 @@ def _diff_tables(src: str, old: dict, new: dict, out: list[Change]) -> None:
             out.append(Change(WIDENED, path, f"table '{path}' added to the governed surface"))
             o = {"table_access": None, "pii": [], "columns": {}, "row_filter": None}
         if n is None:
-            out.append(Change(NARROWED, path, f"table '{path}' removed from the surface"))
+            # On an ATTACH source the table stays queryable after its governance
+            # is removed — so lifting masking/filters/deny is a WIDENING, not a
+            # narrowing. Fail closed for that case.
+            if _is_attach_type(source_type) and _table_protected(o):
+                out.append(Change(
+                    WIDENED, path,
+                    f"table '{path}' un-declared but still queryable — its masking/"
+                    f"filters no longer apply",
+                ))
+            else:
+                out.append(Change(NARROWED, path, f"table '{path}' removed from the surface"))
             continue
         c = _access_change(o["table_access"], n["table_access"], path, f"table '{path}'")
         if c:

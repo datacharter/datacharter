@@ -3,7 +3,42 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.24.5] - 2026-08-08
+
+Hardening pass driven by an adversarial audit of the 0.24.x features (the
+Gauntlet earned its keep — it surfaced several of these).
+
+### Security
+- **The agent query surface is now strictly read-only.** It previously
+  inherited the engine's `local.*` DDL write path, so an agent could
+  `DROP TABLE local.canaries` (disable the tripwire) or drop/replace a user's
+  snapshots. The agent tool now refuses all `CREATE`/`DROP`; snapshots are still
+  created by the human via the snapshot tool. (`ensure_allowed` gains
+  `allow_local_ddl`.)
+- **Host-info disclosure via introspection functions is blocked.** The 0.24.2
+  `PRAGMA` hardening is extended to the equivalent SQL functions —
+  `duckdb_databases()` / `duckdb_settings()` / `duckdb_secrets()` (which leak
+  absolute file paths and source hostnames/usernames/key ids), the whole
+  `duckdb_*` / `pragma_*` families, and `current_setting` / `which_secret` /
+  `version` / `getenv`.
+
+### Fixed
+- **`access diff`** — removing a table's governance from an ATTACH source (whole
+  database attached) is now **WIDENED**, not narrowed: the table stays queryable,
+  just unmasked and unfiltered. Table names are lowercased so a mixed-case
+  declaration no longer swallows a PII removal (or flags a case-only rename).
+  Source **type**, **location** (repointing at a different database), and
+  connector **max_rows** are now part of the compared surface. A dotless
+  `agent_access.columns` key (which silently protected nothing) is rejected at
+  load. A typo'd `--against` git ref now errors instead of reporting the whole
+  surface as newly added.
+- **The Gauntlet** now fails (not "Governance holds ✅") when honeytokens
+  couldn't be planted — masking was never exercised, so the verdict proves
+  nothing. Its corpus gained the single-statement `local.*` DDL and
+  host-info-disclosure attacks it previously missed.
+- **PII toast** — a `/api/upload` PII-detection *failure* (columns left
+  unmasked) now surfaces its warning in the UI instead of being silently
+  dropped.
 
 ### Packaging
 - **Docker MCP Catalog submission scaffolding** under

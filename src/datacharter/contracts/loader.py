@@ -310,6 +310,13 @@ def _validate_access_block(aa: Any, ctx: str) -> None:
             if not isinstance(value, dict):
                 raise CharterError(f"{ctx}.{key}: must be a mapping of name -> true/false.")
             for name, v in value.items():
+                # A column override must be `table.column` — a bare `column` key
+                # never matches at runtime, so it silently protects nothing.
+                if key == "columns" and "." not in str(name):
+                    raise CharterError(
+                        f"{ctx}.columns.{name}: must be qualified as 'table.column' "
+                        f"(a bare column name matches no relation and is ignored)."
+                    )
                 _require_bool(v, f"{key}.{name}")
         else:
             raise CharterError(

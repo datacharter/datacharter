@@ -50,8 +50,13 @@ def test_concurrent_reads_do_not_serialize(tmp_path):
 def test_cursor_read_is_correct_and_has_spill_pragma(tmp_path):
     eng = _engine(tmp_path)
     try:
-        res = asyncio.run(eng.query("SELECT current_setting('temp_directory') AS t"))
-        assert str(tmp_path) in str(res.rows[0][0])  # spill pragma applied on the cursor
+        # White-box: the spill pragma is a security invariant re-applied to every
+        # read cursor. current_setting() is now blocked on the GOVERNED query
+        # surface (host-info disclosure), so observe it on a raw cursor directly.
+        cur = eng._require_conn().cursor()
+        eng._apply_spill(cur)
+        temp_dir = cur.execute("SELECT current_setting('temp_directory')").fetchone()[0]
+        assert str(tmp_path) in str(temp_dir)
         prov = asyncio.run(eng.query("SELECT org FROM crm.accounts ORDER BY id"))
         assert [r[0] for r in prov.rows] == ["acme", "beta"]
         assert prov.provenance is not None

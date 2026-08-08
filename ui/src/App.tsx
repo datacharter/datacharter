@@ -334,6 +334,9 @@ export default function App() {
       }
       loadSql(`SELECT * FROM ${body.table} LIMIT 100;`);
       refreshCatalog();
+      // A detection FAILURE (columns left unmasked) must be loud — surface it as
+      // an error, not the friendly governance notice.
+      if (body.warning) setActionError(body.warning);
       const n = uploadNotice(body.table, body.pii ?? []);
       if (n) setNotice(n);
     },

@@ -37,10 +37,21 @@ _FORBIDDEN_FUNCTIONS = frozenset(
         "delta_scan", "postgres_scan", "postgres_scan_pushdown", "postgres_query",
         "postgres_execute", "mysql_scan", "mysql_query", "mysql_execute",
         "sqlite_scan", "sqlite_query",
-        # PRAGMA table-function variants that disclose host paths/config.
-        "pragma_database_list", "pragma_database_size",
     }
 )
+
+# Introspection/metadata functions that disclose host config, file paths, or
+# connection metadata (duckdb_secrets leaks source hostnames/usernames/key ids;
+# duckdb_databases leaks absolute file paths). Not needed for data exploration
+# and blocked like PRAGMA — the same disclosure class. Matched by prefix so the
+# whole duckdb_*/pragma_* families are covered, plus a few named settings peeks.
+_INTROSPECTION_PREFIXES = ("duckdb_", "pragma_")
+_INTROSPECTION_NAMES = frozenset({"current_setting", "which_secret", "version", "getenv"})
+
+
+def _is_introspection_fn(name: str) -> bool:
+    low = name.lower()
+    return low.startswith(_INTROSPECTION_PREFIXES) or low in _INTROSPECTION_NAMES
 
 # CREATE/DROP is the one write path, and only against the local catalog (D8).
 # Anchored at the statement start so the target — not some FROM clause — decides.
@@ -62,15 +73,17 @@ _PIVOT_TOKEN = re.compile(r"\b(?:un)?pivot\b", re.IGNORECASE)
 _PRAGMA_LEADING = re.compile(r"^\s*pragma\b", re.IGNORECASE)
 
 
-def ensure_allowed(sql: str) -> str:
+def ensure_allowed(sql: str, *, allow_local_ddl: bool = True) -> str:
     """Validate one read-only (or local-DDL) statement; return it stripped.
 
     Raises QueryNotAllowed for anything else. Uses an ephemeral in-memory
-    connection purely to parse — nothing from `sql` is executed.
+    connection purely to parse — nothing from `sql` is executed. Pass
+    `allow_local_ddl=False` for the agent surface, which must be strictly
+    read-only — no `CREATE`/`DROP` of local snapshot tables.
     """
     con = duckdb.connect()
     try:
-        return _check(con, sql)
+        return _check(con, sql, allow_local_ddl=allow_local_ddl)
     finally:
         con.close()
 
@@ -99,7 +112,7 @@ def _is_pivot_expansion(statements: list, sql: str) -> bool:
     return bool(_PIVOT_LEADING.match(stripped) and _PIVOT_TOKEN.search(stripped))
 
 
-def _check(con: duckdb.DuckDBPyConnection, sql: str) -> str:
+def _check(con: duckdb.DuckDBPyConnection, sql: str, *, allow_local_ddl: bool = True) -> str:
     try:
         statements = con.extract_statements(sql)
     except Exception:
@@ -133,6 +146,11 @@ def _check(con: duckdb.DuckDBPyConnection, sql: str) -> str:
         _reject_forbidden(con, inner)
         return sql.strip()
     if stype in ("CREATE", "DROP"):
+        if not allow_local_ddl:
+            raise QueryNotAllowed(
+                "This surface is read-only — CREATE/DROP is not allowed. "
+                "Snapshots are created through the snapshot tool, not agent SQL."
+            )
         if not _LOCAL_DDL_TARGET.match(_LEADING_COMMENTS.sub("", sql)):
             raise QueryNotAllowed(
                 "The engine is read-only; only local.* table DDL is an allowed write path."
@@ -209,7 +227,12 @@ def _file_tables(con: duckdb.DuckDBPyConnection, sql: str) -> set[str]:
 def _token_scan(sql: str) -> set[str]:
     """Conservative fallback when the tree is unavailable (e.g. CREATE-AS-SELECT)."""
     low = sql.lower()
-    return {fn for fn in _FORBIDDEN_FUNCTIONS if re.search(rf"\b{fn}\s*\(", low)}
+    found = {fn for fn in _FORBIDDEN_FUNCTIONS if re.search(rf"\b{fn}\s*\(", low)}
+    for m in re.finditer(
+        r"\b(duckdb_\w+|pragma_\w+|current_setting|which_secret|version|getenv)\s*\(", low
+    ):
+        found.add(m.group(1))
+    return found
 
 
 def _forbidden_functions(con: duckdb.DuckDBPyConnection, sql: str) -> set[str]:
@@ -226,7 +249,9 @@ def _forbidden_functions(con: duckdb.DuckDBPyConnection, sql: str) -> set[str]:
     def walk(node: object) -> None:
         if isinstance(node, dict):
             name = node.get("function_name")
-            if isinstance(name, str) and name.lower() in _FORBIDDEN_FUNCTIONS:
+            if isinstance(name, str) and (
+                name.lower() in _FORBIDDEN_FUNCTIONS or _is_introspection_fn(name)
+            ):
                 found.add(name.lower())
             for value in node.values():
                 walk(value)

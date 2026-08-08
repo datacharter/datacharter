@@ -35,6 +35,9 @@ actually means 👇
 - **Prove it happened.** A tamper-evident [flight recorder](https://datacharter.dev/audit.html) logs every agent access — dual attribution, masked columns, hash-chained — with `datacharter audit verify` and one-command evidence packs.
 - **Know the moment it fails.** Opt-in [canary tripwires](https://datacharter.dev/audit.html) plant masked honeytokens; if one ever escapes to agent output, you get a tamper-evident alarm — and block mode withholds the response.
 - **Clean-room math, one YAML line.** [Policies](https://datacharter.dev/policies.html) like `aggregates only` and `groups of at least 10` are enforced by query analysis — k-anonymity suppression and join limits, written in plain English.
+- **Answers from definitions, not guesswork.** Declare `metrics:` once and agents call `query_metric` — so "revenue" means the same governed SELECT every time, masking and policies still applied.
+- **Attack your own governance.** `datacharter redteam` — *the Gauntlet* — fires a battery of PII-exfiltration, read-only-bypass, and policy-evasion attacks through the real tool path and hands you a report card. Exits non-zero on any breach — a CI gate that proves your governance still holds.
+- **Code-review agent access itself.** `datacharter access diff` is *terraform plan for AI data access*: it diffs the effective agent-visible surface between two charter versions — a table granted, a PII column unmasked, a policy loosened — and `--fail-on widened` blocks the PR. Your governance is a file in git, so it can be reviewed like any other change.
 - Don't take our word for it: flip on **Agent view** and see, column by column, exactly what your agent gets back when it runs a query. *(Spoiler: the PII comes back `•••`.)*
 
 ## Wait, there's more!
@@ -110,8 +113,9 @@ datacharter serve --local      # qwen3:8b by default (--model to change)
   exploration environment travels as a repo; secrets and local state never do.
 
 DataCharter governs and audits your data, not just displays it. The full command
-set (`drift`, `scan`, `diff`, `metric`, `mcp`, and more) is in the
-[CLI reference](docs/cli.md); the security model is in [security](docs/security.md).
+set (`drift`, `scan`, `diff`, `metric`, `mcp`, `access diff`, `redteam`, and more)
+is in the [CLI reference](docs/cli.md); the security model is in
+[security](docs/security.md).
 
 ## Built on
 

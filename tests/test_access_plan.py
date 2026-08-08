@@ -186,6 +186,81 @@ def test_identical_charter_is_empty(tmp_path):
     assert _diff(tmp_path, BASE, BASE) == []
 
 
+def test_removing_protected_table_on_attach_source_is_widened(tmp_path):
+    # A sqlite (ATTACH) source: the table stays queryable after removal, so
+    # lifting its PII/row-filter is a WIDENING, not a narrowing.
+    old = """\
+version: 1
+sources:
+  store:
+    type: sqlite
+    path: store.db
+    tables: [customers, orders]
+    pii: {orders: [card_number]}
+    row_filters: {orders: "region = 'US'"}
+"""
+    new = """\
+version: 1
+sources:
+  store:
+    type: sqlite
+    path: store.db
+    tables: [customers]
+"""
+    changes = _diff(tmp_path, old, new)
+    assert any(c.kind == WIDENED and "still queryable" in c.detail for c in changes)
+
+
+def test_mixed_case_table_pii_removal_is_widened(tmp_path):
+    old = """\
+version: 1
+sources:
+  store:
+    type: sqlite
+    path: store.db
+    tables: [Orders]
+    pii: {orders: [card_number]}
+"""
+    new = old.replace("    pii: {orders: [card_number]}\n", "")
+    changes = _diff(tmp_path, old, new)
+    assert any(c.kind == WIDENED and "card_number" in c.detail for c in changes)
+
+
+def test_case_only_table_rename_is_not_widened(tmp_path):
+    old = "version: 1\nsources:\n  store:\n    type: sqlite\n    path: s.db\n    tables: [orders]\n"
+    new = old.replace("[orders]", "[Orders]")
+    assert _diff(tmp_path, old, new) == []
+
+
+def test_source_repoint_is_widened(tmp_path):
+    old = "version: 1\nsources:\n  store:\n    type: sqlite\n    path: dev.db\n    tables: [c]\n"
+    new = old.replace("dev.db", "prod.db")
+    changes = _diff(tmp_path, old, new)
+    assert any(c.kind == WIDENED and "repointed" in c.detail for c in changes)
+
+
+def test_max_rows_raised_is_widened(tmp_path):
+    old = "version: 1\nsources:\n  s:\n    type: snowflake\n    max_rows: 100\n    tables: [t]\n"
+    new = old.replace("100", "5000000")
+    changes = _diff(tmp_path, old, new)
+    assert any(c.kind == WIDENED and "max_rows" in c.detail for c in changes)
+
+
+def test_dotless_column_override_is_rejected_at_load(tmp_path):
+    from datacharter.contracts.loader import CharterError
+
+    bad = (
+        "version: 1\nsources:\n  s:\n    type: csv\n    path: d.csv\n"
+        "    agent_access:\n      columns: {email: false}\n"
+    )
+    (tmp_path / "charter.yaml").write_text(bad)
+    try:
+        load_charter(tmp_path, lenient_secrets=True)
+        raise AssertionError("expected CharterError for a dotless column key")
+    except CharterError as exc:
+        assert "table.column" in str(exc)
+
+
 def test_cosmetic_context_edit_is_no_change(tmp_path):
     new = BASE.replace(
         "    tables: [customers, orders]",
@@ -262,6 +337,22 @@ def test_cli_against_git_head(tmp_path, capsys):
     rc = cli_main(["access", "diff", str(tmp_path), "--fail-on", "widened"])
     assert rc == 2
     assert "WIDENED" in capsys.readouterr().out
+
+
+def test_cli_bad_git_ref_errors_not_silently_new(tmp_path, capsys):
+    """A typo'd ref must error — not masquerade as a brand-new charter."""
+    def git(*args):
+        subprocess.run(["git", "-C", str(tmp_path), *args], check=True, capture_output=True)
+
+    git("init")
+    git("config", "user.email", "t@t.co")
+    git("config", "user.name", "t")
+    (tmp_path / "charter.yaml").write_text(BASE)
+    git("add", "-A")
+    git("commit", "-m", "init")
+    rc = cli_main(["access", "diff", str(tmp_path), "--against", "git:nope-typo"])
+    assert rc == 1
+    assert "could not be resolved" in capsys.readouterr().err
 
 
 def test_cli_new_charter_absent_at_head_treats_old_empty(tmp_path, capsys):
