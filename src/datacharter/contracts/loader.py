@@ -46,8 +46,14 @@ class Charter(BaseModel):
     policies: dict = Field(default_factory=dict)
 
 
-def load_charter(workspace: Path | str, filename: str = CHARTER_FILE) -> Charter:
-    """Load, validate, and resolve a workspace charter."""
+def load_charter(
+    workspace: Path | str, filename: str = CHARTER_FILE, *, lenient_secrets: bool = False
+) -> Charter:
+    """Load, validate, and resolve a workspace charter.
+
+    `lenient_secrets` keeps unresolved `${NAME}` references as placeholders
+    instead of erroring — for `access diff`, which reviews the governance
+    surface (never secret values) and must run in CI without credentials."""
     workspace = Path(workspace).resolve()
     path = workspace / filename
     if not path.exists():
@@ -84,7 +90,7 @@ def load_charter(workspace: Path | str, filename: str = CHARTER_FILE) -> Charter
     # that is silently dropped looks enabled while enforcing nothing.
     _reject_unknown_keys(raw, _TOP_LEVEL_KEYS, filename)
 
-    resolver = SecretResolver(workspace)
+    resolver = SecretResolver(workspace, lenient=lenient_secrets)
     warnings: list[str] = []
     sources: list[Source] = []
     for name, body in sources_raw.items():

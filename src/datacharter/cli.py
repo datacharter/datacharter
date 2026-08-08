@@ -547,6 +547,140 @@ def _cmd_drift(args: argparse.Namespace) -> int:
     return 1
 
 
+class _GitError(Exception):
+    """git could not produce the requested charter version."""
+
+
+def _git_show_charter(ws: Path, ref: str) -> str | None:
+    """Return charter.yaml at a git ref, or None if it did not exist there.
+
+    Raises _GitError when `ws` is not in a git work tree (the caller should then
+    tell the user to pass --old explicitly)."""
+    import subprocess
+
+    prefix = subprocess.run(
+        ["git", "-C", str(ws), "rev-parse", "--show-prefix"],
+        capture_output=True, text=True,
+    )
+    if prefix.returncode != 0:
+        raise _GitError(
+            f"{ws} is not inside a git repository — pass --old PATH to compare "
+            f"against a specific charter file instead of a git version."
+        )
+    git_path = f"{prefix.stdout.strip()}charter.yaml"
+    show = subprocess.run(
+        ["git", "-C", str(ws), "show", f"{ref}:{git_path}"],
+        capture_output=True, text=True,
+    )
+    if show.returncode != 0:
+        # File absent at that ref = a brand-new charter; treat old side as empty.
+        return None
+    return show.stdout
+
+
+def _load_charter_text(text: str):
+    """Load a charter from raw YAML text (for the git-ref side of a diff)."""
+    import tempfile
+
+    from datacharter.contracts import load_charter
+
+    with tempfile.TemporaryDirectory() as tmp:
+        (Path(tmp) / "charter.yaml").write_text(text)
+        return load_charter(tmp, lenient_secrets=True)
+
+
+def _empty_charter():
+    from datacharter.contracts.loader import Charter
+
+    return Charter(version=1, sources=[], warnings=[])
+
+
+def _cmd_access(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from datacharter.contracts import load_charter
+    from datacharter.contracts.accessplan import (
+        WIDENED,
+        diff_surfaces,
+        effective_surface,
+        render_changes,
+        surface_hash,
+    )
+    from datacharter.contracts.loader import CharterError
+
+    if getattr(args, "access_action", None) != "diff":
+        print("usage: datacharter access diff [WORKSPACE] [options]", file=sys.stderr)
+        return 1
+
+    ws = Path(args.directory).resolve()
+    try:
+        new_path = Path(args.new).resolve() if args.new else ws / "charter.yaml"
+        if not new_path.exists():
+            print(f"No charter.yaml at {new_path}.", file=sys.stderr)
+            return 1
+        new_charter = load_charter(new_path.parent, new_path.name, lenient_secrets=True)
+
+        if args.old:
+            old_path = Path(args.old).resolve()
+            if not old_path.exists():
+                print(f"No file at {old_path} (--old).", file=sys.stderr)
+                return 1
+            old_charter = load_charter(old_path.parent, old_path.name, lenient_secrets=True)
+        else:
+            ref = args.against.split("git:", 1)[-1] if args.against else "HEAD"
+            old_text = _git_show_charter(ws, ref)
+            old_charter = _load_charter_text(old_text) if old_text is not None \
+                else _empty_charter()
+    except CharterError as exc:
+        print(f"Could not load a charter to diff: {exc}", file=sys.stderr)
+        return 1
+    except _GitError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+    old_s, new_s = effective_surface(old_charter), effective_surface(new_charter)
+    changes = diff_surfaces(old_s, new_s)
+    widened = [c for c in changes if c.kind == WIDENED]
+
+    if args.json:
+        print(_json.dumps({
+            "old_hash": surface_hash(old_s),
+            "new_hash": surface_hash(new_s),
+            "summary": {
+                "widened": len(widened),
+                "narrowed": sum(1 for c in changes if c.kind != WIDENED),
+                "total": len(changes),
+            },
+            "changes": [{"kind": c.kind, "path": c.path, "detail": c.detail} for c in changes],
+        }))
+    elif args.md:
+        print(_render_access_md(changes))
+    else:
+        print(render_changes(changes))
+
+    if args.fail_on == "widened" and widened:
+        if not args.json and not args.md:
+            print(
+                f"\n{len(widened)} change(s) widen the agent-visible surface — "
+                f"review required (--fail-on widened).",
+                file=sys.stderr,
+            )
+        return 2
+    return 0
+
+
+def _render_access_md(changes) -> str:
+    from datacharter.contracts.accessplan import WIDENED
+
+    if not changes:
+        return "**Access Plan:** no change to the agent-visible access surface. ✅"
+    widened = sum(1 for c in changes if c.kind == WIDENED)
+    head = f"**Access Plan:** {widened} widened, {len(changes) - widened} narrowed."
+    rows = ["", "| Change | Where | Detail |", "| --- | --- | --- |"]
+    rows += [f"| {c.kind} | `{c.path}` | {c.detail} |" for c in changes]
+    return head + "\n" + "\n".join(rows)
+
+
 def _cmd_explain(args: argparse.Namespace) -> int:
     import asyncio
 
@@ -1126,6 +1260,33 @@ def main(argv: list[str] | None = None) -> int:
         "--update", action="store_true", help="Record the current schema as the new baseline"
     )
     p_drift.set_defaults(func=_cmd_drift)
+
+    p_access = sub.add_parser(
+        "access", help="Review the agent-visible access surface (Access Plan)"
+    )
+    access_sub = p_access.add_subparsers(dest="access_action")
+    p_access_diff = access_sub.add_parser(
+        "diff",
+        help="Diff the effective agent access surface between two charter versions",
+    )
+    p_access_diff.add_argument("directory", nargs="?", default=".")
+    p_access_diff.add_argument(
+        "--against", default="git:HEAD",
+        help="Old side as a git ref (default: git:HEAD). Ignored when --old is given.",
+    )
+    p_access_diff.add_argument(
+        "--old", help="Old charter file to compare against (overrides --against)"
+    )
+    p_access_diff.add_argument("--new", help="New charter file (default: WORKSPACE/charter.yaml)")
+    p_access_diff.add_argument("--json", action="store_true", help="Emit the diff as JSON")
+    p_access_diff.add_argument(
+        "--md", action="store_true", help="Emit the diff as Markdown (for PR comments)"
+    )
+    p_access_diff.add_argument(
+        "--fail-on", choices=["widened"], dest="fail_on",
+        help="Exit 2 if any change widens the agent-visible surface (CI merge gate)",
+    )
+    p_access.set_defaults(func=_cmd_access, access_action=None)
 
     p_explain = sub.add_parser(
         "explain", help="Show a query's plan and row estimates without running it"

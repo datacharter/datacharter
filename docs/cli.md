@@ -84,6 +84,30 @@ declared under `metrics:` — resolved to one governed query. `--by` overrides t
 grouping dimensions; `--grain day|week|month|quarter|year` groups by a
 `date_trunc` of the metric's `time_column`.
 
+### `access diff [directory] [--against git:REF | --old PATH] [--new PATH] [--json | --md] [--fail-on widened]`
+An **Access Plan** — `terraform plan` for AI data access. Diffs the *effective
+agent-visible surface* between two charter versions and classifies every change
+as **WIDENED** (agent can now see more), **NARROWED** (more protection), or
+neutral: a table granted, a PII column unmasked, `min group size` lowered, a
+`no joins to` dropped, a row filter removed — all called out in plain English
+before it takes effect. It reads the *declared* governance only (no source
+connection), so it runs offline and needs no credentials in CI.
+
+By default the old side is `git:HEAD` (the committed charter); pass `--against
+git:main~1` for any ref, or `--old PATH` to compare two files directly. `--json`
+and `--md` emit machine- and PR-comment-friendly reports. **`--fail-on widened`
+exits `2` if any change widens the surface** — drop it into the GitHub Action to
+block a PR that quietly widens what an agent can see:
+
+```yaml
+# .github/workflows/access.yml — block PRs that widen agent data access
+- run: pipx run datacharter access diff --fail-on widened
+```
+
+Because the whole governance surface is a file in git, agent data access can be
+code-reviewed like any other change — something a runtime-state governance server
+structurally can't offer.
+
 ### `test [directory] [--select name]`
 Run the [data assertions](charter-yaml.html#tests) declared under `tests:` and
 **exit non-zero if any fail** — for CI. `--select` runs one test by name.

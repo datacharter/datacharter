@@ -31,11 +31,15 @@ class UnresolvedReference(Exception):
 class SecretResolver:
     """Resolves ${NAME} references against env, workspace .env, then OS keyring."""
 
-    def __init__(self, workspace: Path) -> None:
+    def __init__(self, workspace: Path, *, lenient: bool = False) -> None:
         env_file = workspace / ".env"
         self._dotenv: dict[str, str] = {
             k: v for k, v in dotenv_values(env_file).items() if v is not None
         }
+        # Lenient mode keeps unresolved ${NAME} refs as-is instead of raising —
+        # used by `access diff`, which reviews the governance surface (never the
+        # secret values) so CI can run it without any credentials configured.
+        self._lenient = lenient
 
     def resolve(self, name: str) -> str:
         value = os.environ.get(name)
@@ -46,6 +50,8 @@ class SecretResolver:
         value = self._keyring_get(name)
         if value is not None:
             return value
+        if self._lenient:
+            return f"${{{name}}}"
         tried = ["environment", ".env", self._keyring_status()]
         raise UnresolvedReference(name, tried)
 

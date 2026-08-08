@@ -5,6 +5,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.24.1] - 2026-08-08
+
+### Added
+- **Access Plan — `datacharter access diff` ("terraform plan for AI data
+  access").** Diffs the *effective agent-visible surface* between two charter
+  versions and classifies every change as WIDENED (the agent can now see more),
+  NARROWED (more protection), or neutral — a table granted, a PII column
+  unmasked, `min group size` lowered, a `no joins to` dropped, a row filter
+  removed, all in plain English. Reads declared governance only (no source
+  connection), so it runs offline and needs no credentials in CI. Defaults to
+  comparing the working tree against `git:HEAD`; `--old`/`--new` compare two
+  files; `--json` and `--md` emit machine- and PR-comment-friendly reports.
+  **`--fail-on widened` exits 2** so the GitHub Action can block a PR that
+  quietly widens what an agent can see. Any change that can't be classified is
+  reported WIDENED (fail closed). `load_charter(..., lenient_secrets=True)`
+  keeps `${NAME}` references as placeholders so CI review needs no secrets.
+
 ## [0.24.0] - 2026-08-08
 
 ### Added
