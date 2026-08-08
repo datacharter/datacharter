@@ -1,0 +1,89 @@
+{
+  "tools": [
+    {
+      "name": "list_sources",
+      "description": "List configured data sources with their types.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "list_tables",
+      "description": "List all queryable tables with their fully-qualified relation names.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "describe_table",
+      "description": "Show columns and types for one relation (e.g. 'crm.customers').",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "relation": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "relation"
+        ]
+      }
+    },
+    {
+      "name": "query",
+      "description": "Run a read-only SQL query and return rows. Use fully-qualified relation names. Prefer LIMIT for exploration.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sql": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sql"
+        ]
+      }
+    },
+    {
+      "name": "list_metrics",
+      "description": "List certified metrics \u2014 name, what each computes, its dimensions, and whether it supports a time grain. Prefer query_metric over writing SQL when a metric matches the question.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "query_metric",
+      "description": "Run a certified metric by name and return its governed result. Optionally group by dimensions (`by`) and/or a time grain.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "by": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "grain": {
+            "type": "string",
+            "enum": [
+              "day",
+              "week",
+              "month",
+              "quarter",
+              "year"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ]
+      }
+    }
+  ]
+}

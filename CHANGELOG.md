@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Packaging
+- **Docker MCP Catalog submission scaffolding** under
+  `packaging/docker-mcp-registry/` — `server.yaml`, a generated `tools.json`
+  (all six governed tools), and a submission checklist for
+  `docker/mcp-registry`. The repo-root `Dockerfile` is hardened: pinned
+  `datacharter` version, non-root user, and OCI image labels.
+
 ## [0.24.4] - 2026-08-08
 
 ### Fixed

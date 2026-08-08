@@ -1,0 +1,38 @@
+name: datacharter
+image: mcp/datacharter
+type: server
+meta:
+  category: database
+  tags:
+    - database
+    - sql
+    - governance
+    - duckdb
+    - data-contracts
+about:
+  title: DataCharter
+  description: >-
+    Local-first, contract-governed data explorer. Read-only, PII-masked SQL
+    over CSV/Parquet/JSON/Excel, Postgres, MySQL, SQLite, Snowflake, BigQuery
+    and more — governed by charter.yaml, with certified metrics, plain-English
+    policies (aggregate-only / k-anonymity), and a tamper-evident audit trail.
+  icon: https://datacharter.dev/brand/mark.svg
+source:
+  project: https://github.com/datacharter/datacharter
+  # Set to the SHA of the pinned release commit before opening the PR (the tag
+  # commit whose Dockerfile pins the matching datacharter version).
+  commit: REPLACE_WITH_RELEASE_COMMIT_SHA
+run:
+  volumes:
+    - "{{datacharter.workspace|volume-target}}:/workspace"
+config:
+  description: >-
+    Your DataCharter workspace directory (charter.yaml + data). Leave unset to
+    explore the built-in demo dataset — the server starts and answers with zero
+    configuration and no network access.
+  parameters:
+    type: object
+    properties:
+      workspace:
+        type: string
+        description: Absolute path to a DataCharter workspace to mount at /workspace.
