@@ -54,4 +54,5 @@ def build_toolbox(
         recorder=recorder,
         canary=canary,
         policies=charter.policies,
+        metrics=charter.metrics,
     )

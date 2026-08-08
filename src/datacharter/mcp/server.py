@@ -33,6 +33,8 @@ _ANNOTATIONS: dict[str, dict[str, Any]] = {
     "list_tables": {"title": "List tables"},
     "describe_table": {"title": "Describe table"},
     "query": {"title": "Run read-only SQL query"},
+    "list_metrics": {"title": "List certified metrics"},
+    "query_metric": {"title": "Run a certified metric"},
 }
 _READ_ONLY = {"readOnlyHint": True, "idempotentHint": True, "openWorldHint": False}
 

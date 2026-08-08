@@ -24,6 +24,8 @@ GOVERNED = [
     "mcp__datacharter__list_tables",
     "mcp__datacharter__list_sources",
     "mcp__datacharter__describe_table",
+    "mcp__datacharter__list_metrics",
+    "mcp__datacharter__query_metric",
 ]
 
 CONTRACT_VIOLATION = 64

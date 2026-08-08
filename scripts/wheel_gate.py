@@ -91,7 +91,10 @@ def main() -> int:
             continue
         if msg.get("id") == 2:
             tools = [t["name"] for t in msg["result"]["tools"]]
-    mcp_ok = set(tools) == {"list_sources", "list_tables", "describe_table", "query"}
+    mcp_ok = set(tools) == {
+        "list_sources", "list_tables", "describe_table", "query",
+        "list_metrics", "query_metric",
+    }
     print(f"  {'✓' if mcp_ok else '✗'} mcp-stdio: tools={tools}")
 
     ok = ok and mcp_ok

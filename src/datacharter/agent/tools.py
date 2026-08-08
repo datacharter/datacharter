@@ -58,6 +58,40 @@ TOOL_SPECS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_metrics",
+            "description": (
+                "List certified metrics — name, what each computes, its dimensions, "
+                "and whether it supports a time grain. Prefer query_metric over "
+                "writing SQL when a metric matches the question."
+            ),
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "query_metric",
+            "description": (
+                "Run a certified metric by name and return its governed result. "
+                "Optionally group by dimensions (`by`) and/or a time grain."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "by": {"type": "array", "items": {"type": "string"}},
+                    "grain": {
+                        "type": "string",
+                        "enum": ["day", "week", "month", "quarter", "year"],
+                    },
+                },
+                "required": ["name"],
+            },
+        },
+    },
 ]
 
 MASKED = "•••"
@@ -79,6 +113,7 @@ class ToolBox:
         recorder=None,
         canary=None,
         policies: dict | None = None,
+        metrics: list | None = None,
         timeout_s: float = _DEFAULT_TIMEOUT_S,
     ) -> None:
         self._engine = engine
@@ -90,6 +125,9 @@ class ToolBox:
         self.canary = canary
         #: Plain-english policies (relation -> Policy) enforced on query().
         self._policies = policies or {}
+        #: Certified metrics (charter `metrics:`), keyed case-insensitively —
+        #: resolved to governed SQL for the agent via query_metric.
+        self._metrics = {m.name.lower(): m for m in (metrics or [])}
         # Column names flagged PII in any source's contract, matched case-insensitively.
         self._pii: set[str] = set()
         for src in sources:
@@ -147,6 +185,8 @@ class ToolBox:
             "list_tables": self._list_tables,
             "describe_table": self._describe_table,
             "query": self._query,
+            "list_metrics": self._list_metrics,
+            "query_metric": self._query_metric,
         }.get(name)
         if handler is None:
             return f"Error: unknown tool '{name}'."
@@ -158,6 +198,42 @@ class ToolBox:
     async def _list_sources(self, _args: dict) -> str:
         rows = [{"name": s.name, "type": s.type.value} for s in self._engine.sources]
         return json.dumps(rows)
+
+    async def _list_metrics(self, _args: dict) -> str:
+        if not self._metrics:
+            return (
+                "No certified metrics declared. Metrics are defined in "
+                "charter.yaml under 'metrics:'."
+            )
+        rows = [
+            {
+                "name": m.name,
+                "relation": m.relation,
+                "computes": m.expression,
+                "dimensions": list(m.dimensions),
+                "has_time": bool(m.time_column),
+            }
+            for m in self._metrics.values()
+        ]
+        return json.dumps(rows)
+
+    async def _query_metric(self, args: dict) -> str:
+        from datacharter.contracts.metrics import MetricError, metric_sql
+
+        name = str(args.get("name", "")).strip()
+        metric = self._metrics.get(name.lower())
+        if metric is None:
+            avail = ", ".join(sorted(self._metrics)) or "(none declared)"
+            return f"Error: unknown metric '{name}'. Available metrics: {avail}."
+        try:
+            sql = metric_sql(metric, by=args.get("by"), grain=args.get("grain"))
+        except MetricError as exc:
+            return f"Error: {exc}"
+        # Delegate to query so the metric inherits the read-only guard, policies,
+        # row filters, PII masking, canary scan, and row cap. Prefix the resolved
+        # SQL so the answer stays reproducible (same trust affordance as the chip).
+        result = await self._query({"sql": sql})
+        return f"metric {metric.name} — SQL: {sql}\n{result}"
 
     async def _list_tables(self, _args: dict) -> str:
         result = await self._engine.query("SHOW ALL TABLES", timeout_s=30)

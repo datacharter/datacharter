@@ -22,6 +22,8 @@ GOVERNED_TOOLS = [
     "mcp__datacharter__list_tables",
     "mcp__datacharter__list_sources",
     "mcp__datacharter__describe_table",
+    "mcp__datacharter__list_metrics",
+    "mcp__datacharter__query_metric",
 ]
 
 # Best-effort removal of built-ins. The connect-time assertion is the real guarantee;
@@ -313,8 +315,9 @@ list_tables, describe_table, and query (read-only SQL). Do not search for \
 files, do not read paths, do not suggest opening anything on disk — the data \
 is reachable only through those tools. If unsure of the schema, start with \
 list_tables or describe_table, then run SQL with query and answer concisely \
-from the results. PII columns come back masked as ••• — never guess at \
-masked values."""
+from the results. When a certified metric matches the question, call \
+query_metric instead of writing SQL (see list_metrics). PII columns come back \
+masked as ••• — never guess at masked values."""
 
 
 def system_context(guides: str | None) -> str:

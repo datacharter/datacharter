@@ -46,7 +46,9 @@ def ws(tmp_path):
         "who,contact\nada,ada@example.com\ngrace,grace@example.com\nedsger,e@example.com\n"
     )
     (tmp_path / "charter.yaml").write_text(
-        "version: 1\nsources:\n  people:\n    type: csv\n    path: people.csv\n"
+        "version: 1\n"
+        "sources:\n  people:\n    type: csv\n    path: people.csv\n"
+        "metrics:\n  headcount:\n    relation: people\n    expression: count(*)\n"
     )
     yield tmp_path
     keyring.set_keyring(prev)
@@ -65,6 +67,7 @@ async def test_sdk_initialize_and_list_tools(ws):
         tools = (await session.list_tools()).tools
         assert {t.name for t in tools} == {
             "query", "list_tables", "list_sources", "describe_table",
+            "list_metrics", "query_metric",
         }
         for t in tools:
             # Schemas must be valid enough for a client to build calls from.
@@ -80,6 +83,8 @@ async def test_sdk_every_tool_call_round_trips(ws):
             ("list_tables", {}),
             ("describe_table", {"relation": "people"}),
             ("query", {"sql": "SELECT count(*) AS n FROM people"}),
+            ("list_metrics", {}),
+            ("query_metric", {"name": "headcount"}),
         ]:
             result = await session.call_tool(name, args)
             assert result.content, name

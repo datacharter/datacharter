@@ -12,7 +12,7 @@ One word, four doors — "agent" on this page means the **built-in chat panel**
 (in any of the three modes below). Claude Code connects *as* that chat's
 backend (Mode 3), while external MCP clients — Claude Desktop, Cursor, Cline —
 connect through [the MCP server](mcp.html) instead. Every door leads to the
-same four governed tools; nothing reaches your data any other way.
+same governed tools; nothing reaches your data any other way.
 
 ## The product is fully usable without any LLM
 
@@ -72,7 +72,7 @@ key and no per-token billing. In the chat panel, click **Connect Claude Code**
 
 - Requires the `claude` CLI on your `PATH` and an active Claude subscription.
 - DataCharter drives Claude Code headlessly, one turn per question. Claude reaches
-  your data **only** through the same four read-only, access-governed tools below —
+  your data **only** through the same read-only, access-governed tools below —
   never your raw files or connections. To be equally plain about what *does*
   leave: your questions and the (PII-masked) tool results are sent to Anthropic
   under your Claude subscription — "local" here means local execution and local
@@ -107,6 +107,16 @@ The agent runs a short tool loop over a small set of **read-only** tools:
 | `list_tables` | List queryable tables with their relation names. |
 | `describe_table` | Show columns and types for one relation. |
 | `query` | Run a read-only SQL query and return rows. |
+| `list_metrics` | List certified metrics — name, what each computes, dimensions, time support. |
+| `query_metric` | Run a certified metric by name (optional `by` dimensions and time `grain`). |
+
+**Certified metrics.** Declare a metric once in `charter.yaml` under
+[`metrics:`](charter-yaml.html#metrics) and the agent gets the *definition of
+right*, not a chance to reinvent it. When a question matches a metric, the agent
+calls `query_metric` instead of writing the aggregate SQL itself — so "revenue"
+means the same thing every time, and `query_metric` runs through the exact same
+governed `query` chokepoint (read-only guard, PII masking, row filters,
+policies, canary scan, audit).
 
 - **Access is governed and PII-safe.** By default the agent sees masked values
   (`•••`) for any column that is declared PII in `charter.yaml` *or* auto-detected

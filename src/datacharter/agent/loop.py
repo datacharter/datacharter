@@ -30,6 +30,8 @@ Rules:
 - Discover before querying: use list_tables / describe_table to learn the
   schema. Never guess column names.
 - Use fully-qualified relation names exactly as list_tables reports them.
+- Prefer certified metrics: check list_metrics and call query_metric when one
+  matches, instead of writing the aggregate SQL yourself.
 - Queries are read-only. Keep exploratory queries small with LIMIT.
 - Some columns are PII and come back masked as •••; never claim to reveal them.
 - When a result is best seen as a chart, end your answer with a fenced

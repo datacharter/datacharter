@@ -5,6 +5,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-08-08
+
+### Added
+- **Certified metrics as governed agent tools.** Declare a metric once in
+  `charter.yaml` under `metrics:` and the agent gains two new tools —
+  `list_metrics` (name, expression, dimensions, time support) and
+  `query_metric` (run a metric by name, with optional `by` dimensions and a
+  time `grain`). When a question matches a metric the agent runs the certified
+  definition instead of writing the aggregate SQL itself, so a term like
+  "revenue" resolves to one governed SELECT every time. `query_metric` runs
+  through the same `query` chokepoint, inheriting the read-only guard, PII
+  masking, row filters, policies, canary scan, and audit. Exposed over the chat
+  agent, Claude Code bridge, and the MCP server (surface is now six tools).
+
 ## [0.23.7] - 2026-08-06
 
 ### Fixed

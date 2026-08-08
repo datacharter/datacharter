@@ -34,7 +34,14 @@ def _call(id_, name, **arguments):
 def test_tool_defs_are_mcp_shaped():
     defs = mcp_tool_defs()
     names = {d["name"] for d in defs}
-    assert names == {"list_sources", "list_tables", "describe_table", "query"}
+    assert names == {
+        "list_sources",
+        "list_tables",
+        "describe_table",
+        "query",
+        "list_metrics",
+        "query_metric",
+    }
     for d in defs:
         assert set(d) >= {"name", "description", "inputSchema", "title", "annotations"}
         assert d["inputSchema"]["type"] == "object"
@@ -72,6 +79,8 @@ async def test_tools_list(toolbox):
         "list_tables",
         "describe_table",
         "query",
+        "list_metrics",
+        "query_metric",
     }
 
 

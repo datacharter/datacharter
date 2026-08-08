@@ -54,6 +54,13 @@ owners' context into the model automatically; `describe_table` includes a
 | `list_tables` | — | queryable relations with column names |
 | `describe_table` | `relation` | columns and types for one relation |
 | `query` | `sql` | rows from a read-only SQL query (PII masked) |
+| `list_metrics` | — | certified metrics: name, expression, dimensions, time support |
+| `query_metric` | `name`, `by?`, `grain?` | a certified metric's governed result |
+
+Certified metrics are defined once in `charter.yaml` under
+[`metrics:`](charter-yaml.html#metrics); `query_metric` resolves a metric to a
+single governed SELECT and runs it through the same `query` chokepoint, so
+masking, row filters, and policies all apply.
 
 ## Wire it into an MCP client
 
