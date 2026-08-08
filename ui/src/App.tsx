@@ -13,6 +13,7 @@ import GuidesEditor from "./components/GuidesEditor";
 import HelpModal from "./components/HelpModal";
 import EmptyState from "./components/EmptyState";
 import Toast from "./components/Toast";
+import { uploadNotice } from "./lib/uploadNotice";
 import CommandPalette from "./components/CommandPalette";
 import HistoryPanel from "./components/HistoryPanel";
 import ProfileBars from "./components/ProfileBars";
@@ -38,6 +39,7 @@ export default function App() {
   const [profileResult, setProfileResult] = useState<QueryResult | null>(null);
   const [error, setError] = useState<string | null>(null); // query errors: replace the grid
   const [actionError, setActionError] = useState<string | null>(null); // background actions: toast
+  const [notice, setNotice] = useState<string | null>(null); // governance notices: info toast
   // Degraded-but-running states (unencrypted state DB, dead recorder, unplanted
   // canary) — each shipped as a SILENT failure once; now they get a banner.
   const [degraded, setDegraded] = useState<string[]>([]);
@@ -313,6 +315,8 @@ export default function App() {
       }
       loadSql(`SELECT * FROM ${body.table} LIMIT 100;`);
       refreshCatalog();
+      const n = uploadNotice(body.table, body.pii ?? []);
+      if (n) setNotice(n);
     },
     [refreshCatalog],
   );
@@ -441,6 +445,14 @@ export default function App() {
         <HistoryPanel onPick={(s) => loadSql(s)} onClose={() => setShowHistory(false)} />
       )}
       {actionError && <Toast message={actionError} onClose={() => setActionError(null)} />}
+      {notice && (
+        <Toast
+          message={notice}
+          onClose={() => setNotice(null)}
+          timeoutMs={9000}
+          variant="info"
+        />
+      )}
       {paletteOpen && (
         <CommandPalette commands={commands} onClose={() => setPaletteOpen(false)} />
       )}

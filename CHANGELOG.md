@@ -5,6 +5,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.24.3] - 2026-08-08
+
+### Added
+- **"Caught it before the agent saw it" — PII toast on file drop.** When a
+  dropped CSV/Parquet/JSON has columns auto-detected as PII, a toast now names
+  them: *"PII detected in `people`: email, phone — auto-masked from agents
+  (•••). Flip Agent view to see it; override in Sources."* Detection already
+  ran on every upload and masked silently; now the product's core promise —
+  governed agent access — is visible in the first 30 seconds, on the user's own
+  file, with zero configuration. `/api/upload` returns the new table's flagged
+  columns as `pii`; the failure-path warning still wins when detection throws.
+
 ## [0.24.2] - 2026-08-08
 
 ### Added

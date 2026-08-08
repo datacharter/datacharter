@@ -6,17 +6,19 @@ export default function Toast({
   message,
   onClose,
   timeoutMs = 6000,
+  variant = "error",
 }: {
   message: string;
   onClose: () => void;
   timeoutMs?: number;
+  variant?: "error" | "info";
 }) {
   useEffect(() => {
     const t = setTimeout(onClose, timeoutMs);
     return () => clearTimeout(t);
   }, [onClose, timeoutMs]);
   return (
-    <div className="toast" role="alert">
+    <div className={`toast toast--${variant}`} role="alert">
       <span className="toast-msg">{message}</span>
       <button className="toast-close" aria-label="Dismiss" onClick={onClose}>
         ×

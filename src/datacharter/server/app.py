@@ -924,10 +924,14 @@ def create_app(
         # an email column must not reach the agent unmasked. Re-detect and
         # rebuild the toolbox so the default-masked rule holds for uploads too.
         upload_warning: str | None = None
+        new_pii: list[str] = []
         try:
             from datacharter.contracts.pii import detect_pii
 
             detected = await detect_pii(app.state.engine)
+            # Uploads register as memory-db views keyed by the bare stem, so this
+            # is the columns just auto-masked on the file the user dropped.
+            new_pii = sorted(detected.get(stem, []))
             app.state.auto_pii |= {c.lower() for cols in detected.values() for c in cols}
         except Exception as exc:  # detection must never break the upload itself…
             # …but silent failure means an email column reaches agents unmasked
@@ -939,7 +943,7 @@ def create_app(
             )
             print(f"warning: {upload_warning}", file=sys.stderr)
         _refresh_charter()
-        out = {"table": stem}
+        out = {"table": stem, "pii": new_pii}
         if upload_warning:
             out["warning"] = upload_warning
         return out

@@ -187,10 +187,21 @@ def test_upload_csv_becomes_table(client, tmp_path):
     with open(csv, "rb") as fh:
         resp = client.post("/api/upload", files={"file": ("My Data-2026.csv", fh, "text/csv")})
     assert resp.status_code == 200
-    table = resp.json()["table"]
+    body = resp.json()
+    table = body["table"]
     assert table == "my_data_2026"
+    assert body["pii"] == []  # no PII columns in this file
     q = client.post("/api/query", json={"sql": f"SELECT count(*) FROM {table}"})
     assert q.json()["rows"] == [[2]]
+
+
+def test_upload_reports_detected_pii(client, tmp_path):
+    csv = tmp_path / "people.csv"
+    csv.write_text("name,email\nada,ada@example.com\ngrace,grace@example.com\n")
+    with open(csv, "rb") as fh:
+        resp = client.post("/api/upload", files={"file": ("people.csv", fh, "text/csv")})
+    assert resp.status_code == 200
+    assert "email" in resp.json()["pii"]
 
 
 def test_upload_rejects_unknown_type(client):

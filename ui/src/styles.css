@@ -399,6 +399,10 @@ table.grid tr:hover td {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
   max-width: 420px;
 }
+/* Governance notices (e.g. auto-masked PII on upload) are good news, not errors. */
+.toast--info {
+  background: var(--ok);
+}
 .toast-close {
   background: none;
   border: none;
