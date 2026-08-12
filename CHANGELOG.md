@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.29.0] - 2026-08-12
+
+### Added
+- **Standalone, zero-dependency receipt verifier** at `tools/verify_receipt.py`.
+  A relying party can verify an answer-provenance receipt without installing (or
+  trusting) DataCharter: it is Python 3.8+ standard library only, with Ed25519
+  verification (RFC 8032) implemented in the file itself. Its accept/reject
+  behavior is cross-checked against the reference `cryptography` library in CI.
+  This makes the receipt a portable artifact — verifiable by anyone, in any
+  language that re-implements the small documented algorithm.
+
 ## [0.28.0] - 2026-08-12
 
 ### Added

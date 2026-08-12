@@ -102,6 +102,25 @@ requires the private key; splicing a valid signature onto different facts fails
 step 3. `datacharter provenance verify` performs steps 1–4 always and step 5 with
 `--flight`.
 
+## Verify without installing DataCharter
+
+A relying party — an auditor, a regulator, a counterparty — should be able to
+check a receipt without trusting or installing the issuer's software. A single,
+**zero-dependency** verifier lives at
+[`tools/verify_receipt.py`](https://raw.githubusercontent.com/datacharter/datacharter/main/tools/verify_receipt.py):
+Python 3.8+ standard library only, with Ed25519 verification (RFC 8032)
+implemented in the file itself, so the check rests on nothing but the stdlib.
+
+```bash
+curl -O https://raw.githubusercontent.com/datacharter/datacharter/main/tools/verify_receipt.py
+python3 verify_receipt.py receipt.json --pubkey <hex-you-trust>
+```
+
+It performs steps 1–4 and exits 0 (verified) or 1 (not verified). Its results are
+cross-checked against the reference `cryptography` library on every release. The
+algorithm above is small on purpose — re-implement it in any language you like;
+the receipt is meant to outlive any one tool.
+
 ## Keys
 
 `datacharter provenance keygen` creates one Ed25519 keypair per workspace under
