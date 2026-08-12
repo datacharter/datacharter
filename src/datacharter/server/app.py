@@ -591,12 +591,13 @@ def create_app(
         except ContractWriteError as exc:
             return _error(400, "write_error", str(exc))
         _refresh_charter()
-        # Only a TIGHTENING change (masking a column the model may already have
-        # seen) needs to drop the Claude Code conversation, so a now-masked value
-        # can't be echoed back from context. Unmasking is safe to keep — a
-        # follow-up question should not lose the whole chat over an access toggle.
-        if body.value is False:
-            app.state.cc_session = {}
+        # ANY access change invalidates the agent's cached view, so drop the
+        # Claude Code session: after a mask the model must not echo a now-hidden
+        # value it saw earlier; after an unmask it must RE-QUERY to see the
+        # newly-visible values, not answer from the stale masked result it already
+        # pulled. Resuming would leave that stale context and the change wouldn't
+        # take effect in the chat.
+        app.state.cc_session = {}
         return {"ok": True}
 
     @app.post("/api/tool")

@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.24.7] - 2026-08-11
+
+### Fixed
+- **Unmasking a column now takes effect in the Claude Code chat.** 0.24.6 kept
+  the chat session alive on an unmask to preserve context — but that left the
+  agent holding the *stale masked* result it had already pulled, so it answered
+  "every email is masked" and never re-queried. Any access change (mask or
+  unmask) now resets the session, so the agent re-queries with the new
+  permissions and the change is reflected immediately. This is deterministic:
+  the toolbox returns the new values regardless of whether the model chooses to
+  re-query. Trade-off: changing access starts a fresh agent context (the chat
+  loses prior context at the moment of a toggle) — but between toggles the
+  conversation still persists.
+
 ## [0.24.6] - 2026-08-11
 
 ### Fixed

@@ -114,27 +114,17 @@ def test_claude_code_reuses_session_across_turns(client, monkeypatch):
     assert received == [None, "sess-123"]
 
 
-def test_unmasking_keeps_claude_session(client, monkeypatch):
+@pytest.mark.parametrize("value", [True, False])
+def test_access_change_resets_claude_session(client, monkeypatch, value):
+    # ANY access change (mask OR unmask) must drop the session so the agent
+    # re-queries with the new permissions instead of answering from a stale
+    # cached result. Keeping it on unmask left the agent reporting "still masked".
     c, _ = client
     _connect_cc(c, monkeypatch)
-    c.app.state.cc_session = {"id": "keep-me"}
+    c.app.state.cc_session = {"id": "stale"}
     r = c.post(
         "/api/agent-access",
-        json={"source": "store", "table": "customers", "column": "email", "value": True},
+        json={"source": "store", "table": "customers", "column": "email", "value": value},
     )
     assert r.status_code == 200
-    # Loosening access must NOT wipe the conversation.
-    assert c.app.state.cc_session == {"id": "keep-me"}
-
-
-def test_masking_resets_claude_session(client, monkeypatch):
-    c, _ = client
-    _connect_cc(c, monkeypatch)
-    c.app.state.cc_session = {"id": "drop-me"}
-    r = c.post(
-        "/api/agent-access",
-        json={"source": "store", "table": "customers", "column": "email", "value": False},
-    )
-    assert r.status_code == 200
-    # Tightening access drops the session so a now-masked value can't be echoed.
     assert c.app.state.cc_session == {}
