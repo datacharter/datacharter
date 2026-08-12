@@ -591,7 +591,12 @@ def create_app(
         except ContractWriteError as exc:
             return _error(400, "write_error", str(exc))
         _refresh_charter()
-        app.state.cc_session = {}  # a governance change starts a fresh Claude Code turn
+        # Only a TIGHTENING change (masking a column the model may already have
+        # seen) needs to drop the Claude Code conversation, so a now-masked value
+        # can't be echoed back from context. Unmasking is safe to keep — a
+        # follow-up question should not lose the whole chat over an access toggle.
+        if body.value is False:
+            app.state.cc_session = {}
         return {"ok": True}
 
     @app.post("/api/tool")
@@ -1061,6 +1066,10 @@ def create_app(
             async def cc_events() -> AsyncIterator[str]:
                 got_text = False
                 sid = app.state.cc_session.get("id")
+                # Server-log only (stderr, never the SSE stream): shows whether a
+                # turn resumes the prior session — the fastest way to tell a memory
+                # complaint is a lost resume vs. the model dropping context.
+                print(f"[claude-code] turn: resume={sid or 'none'}", file=sys.stderr)
                 async for ev in cc.run_turn(
                     body.question, serve_url, sid,
                     deny=app.state.cc_deny,
@@ -1082,6 +1091,10 @@ def create_app(
                             yield _sse("error", {"detail": ev.get("text") or "Claude Code error"})
                         elif not got_text and ev.get("text"):
                             yield _sse("text", {"text": ev["text"]})
+                print(
+                    f"[claude-code] turn done: session={app.state.cc_session.get('id') or 'none'}",
+                    file=sys.stderr,
+                )
 
             return StreamingResponse(cc_events(), media_type="text/event-stream")
 

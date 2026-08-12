@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.24.6] - 2026-08-11
+
+### Fixed
+- **The Claude Code chat no longer forgets the conversation when you toggle a
+  mask.** Changing a column's agent-access used to wipe the whole Claude Code
+  session, so the next question cold-started (re-running `list_tables`, losing
+  what "their" referred to). Now only a *tightening* change (masking a column
+  the model may already have seen) drops the session — unmasking keeps the
+  conversation, so a follow-up question retains its context. Adds the
+  multi-turn session-resume regression test that was missing, plus a
+  server-log-only (stderr, never shown in the UI) line per turn recording
+  whether it resumed the prior session.
+
 ## [0.24.5] - 2026-08-08
 
 Hardening pass driven by an adversarial audit of the 0.24.x features (the

@@ -82,3 +82,59 @@ def test_switch_backend_back_to_llm(client):
     r = c.post("/api/agent/backend", json={"backend": "llm"})
     assert r.status_code == 200 and agent_backend.get_backend(ws) == "llm"
     assert c.post("/api/agent/backend", json={"backend": "bogus"}).status_code == 400
+
+
+def _connect_cc(c, monkeypatch):
+    async def _ok(serve_url, dc_bin=None, initial_deny=None):
+        return ["Bash"]
+
+    monkeypatch.setattr(cc, "claude_available", lambda: True)
+    monkeypatch.setattr(cc, "assert_tool_surface", _ok)
+    assert c.post("/api/agent/claude-code/connect").status_code == 200
+
+
+def test_claude_code_reuses_session_across_turns(client, monkeypatch):
+    c, _ = client
+    _connect_cc(c, monkeypatch)
+
+    received: list[str | None] = []
+
+    async def fake_run_turn(
+        question, serve_url, session_id=None, dc_bin=None, deny=None, context=None
+    ):
+        received.append(session_id)
+        yield {"kind": "session", "session_id": "sess-123", "tools": []}
+        yield {"kind": "text", "text": "ok"}
+        yield {"kind": "result", "session_id": "sess-123", "text": "ok", "is_error": False}
+
+    monkeypatch.setattr(cc, "run_turn", fake_run_turn)
+    assert c.post("/api/agent/ask", json={"question": "how many customers?"}).status_code == 200
+    assert c.post("/api/agent/ask", json={"question": "what are their emails?"}).status_code == 200
+    # Turn 2 must resume turn 1's session — otherwise every turn is a cold start.
+    assert received == [None, "sess-123"]
+
+
+def test_unmasking_keeps_claude_session(client, monkeypatch):
+    c, _ = client
+    _connect_cc(c, monkeypatch)
+    c.app.state.cc_session = {"id": "keep-me"}
+    r = c.post(
+        "/api/agent-access",
+        json={"source": "store", "table": "customers", "column": "email", "value": True},
+    )
+    assert r.status_code == 200
+    # Loosening access must NOT wipe the conversation.
+    assert c.app.state.cc_session == {"id": "keep-me"}
+
+
+def test_masking_resets_claude_session(client, monkeypatch):
+    c, _ = client
+    _connect_cc(c, monkeypatch)
+    c.app.state.cc_session = {"id": "drop-me"}
+    r = c.post(
+        "/api/agent-access",
+        json={"source": "store", "table": "customers", "column": "email", "value": False},
+    )
+    assert r.status_code == 200
+    # Tightening access drops the session so a now-masked value can't be echoed.
+    assert c.app.state.cc_session == {}
