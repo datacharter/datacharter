@@ -55,8 +55,11 @@ which of the rest apply depends on the source type (see the
 ### `type` (required)
 
 One of: `postgres`, `mysql`, `sqlite`, `duckdb`, `bigquery`, `mssql`, `snowflake`,
-`motherduck`, `csv`, `parquet`, `json`, `excel`, `iceberg`, `delta`. An unknown
-value produces an error listing the valid types.
+`motherduck`, `iceberg_rest`, `csv`, `parquet`, `json`, `excel`, `iceberg`,
+`delta`. An unknown value produces an error listing the valid types.
+
+(`iceberg` reads a single Iceberg table from a `path`; `iceberg_rest` attaches a
+whole Iceberg REST **catalog** and exposes its tables.)
 
 ### `connection`
 
@@ -71,6 +74,7 @@ integers. What each type reads:
 | `bigquery` | `project` (or `project_id`, required), `dataset` (or `dataset_id`) |
 | `snowflake` | `account`, `user`, `database`, `schema` (default `PUBLIC`), `warehouse` |
 | `motherduck` | `database` (the MotherDuck database name), `schema` (default `main`) |
+| `iceberg_rest` | `warehouse` (required), `endpoint` (REST URL) **or** `endpoint_type` (`GLUE`/`S3_TABLES`), `namespace` (default `default`), `oauth2_server_uri` (optional) |
 | `sqlite`, file types | none (use `path`) |
 
 Credential-shaped keys are rejected here. If a `connection` key name looks like
@@ -92,6 +96,7 @@ What each type reads from `credentials`:
 | `postgres`, `mysql`, `mssql` | `password` |
 | `snowflake` | `password` or `private_key` |
 | `motherduck` | `token` (a MotherDuck access token; required — set `${MOTHERDUCK_TOKEN}`) |
+| `iceberg_rest` | `token` (a bearer token) **or** `client_id` + `client_secret` (OAuth2) **or** `key_id` + `secret` + `region` (Glue / S3 Tables) |
 | file types on `s3://` paths | `key_id`, `secret`, `region`, `endpoint` |
 
 ```yaml
@@ -380,6 +385,22 @@ sources:
       password: ${SNOWFLAKE_PASSWORD}
     tables: [invoices]
     max_rows: 500000
+
+  # An Iceberg REST catalog (Polaris / Nessie / Lakekeeper / Unity), read-only.
+  # Tables resolve as lake.<namespace>.<table>. Auth here is a bearer token;
+  # swap in client_id/client_secret for OAuth2, or key_id/secret/region + an
+  # endpoint_type of GLUE/S3_TABLES for AWS.
+  lake:
+    type: iceberg_rest
+    connection:
+      warehouse: my_warehouse
+      endpoint: https://catalog.example/iceberg
+      namespace: analytics
+    credentials:
+      token: ${ICEBERG_TOKEN}
+    tables: [customers, orders]
+    pii:
+      customers: [email]
 
   # A file in object storage. S3 settings live under credentials as references.
   logs:

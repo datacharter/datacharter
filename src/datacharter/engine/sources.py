@@ -109,10 +109,59 @@ def _motherduck_registration(source: Source) -> list[str]:
     ]
 
 
+def _iceberg_rest_registration(source: Source) -> list[str]:
+    """An Iceberg REST catalog (Polaris / Nessie / Lakekeeper / Unity / Glue /
+    S3 Tables), attached read-only via the core `iceberg` extension. Auth rides a
+    DuckDB secret (a static `token`, an OAuth2 `client_id`/`client_secret`, or AWS
+    keys for Glue/S3 Tables) — never the ATTACH string."""
+    conn, creds = source.connection, source.credentials
+    warehouse = str(conn.get("warehouse", "")).strip()
+    endpoint = conn.get("endpoint")
+    endpoint_type = conn.get("endpoint_type")
+    if not warehouse:
+        raise SourceConfigError(
+            f"Source '{source.name}' (iceberg_rest) needs connection.warehouse."
+        )
+    if not endpoint and not endpoint_type:
+        raise SourceConfigError(
+            f"Source '{source.name}' (iceberg_rest) needs connection.endpoint "
+            "(or connection.endpoint_type GLUE/S3_TABLES)."
+        )
+    secret_params: list[str] = []
+    for key, kw in (("token", "TOKEN"), ("client_id", "CLIENT_ID"),
+                    ("client_secret", "CLIENT_SECRET"), ("key_id", "KEY_ID"),
+                    ("secret", "SECRET"), ("region", "REGION")):
+        if creds.get(key):
+            secret_params.append(f"{kw} {_q(creds[key])}")
+    if conn.get("oauth2_server_uri"):
+        secret_params.append(f"OAUTH2_SERVER_URI {_q(conn['oauth2_server_uri'])}")
+
+    stmts = ["INSTALL iceberg", "LOAD iceberg"]
+    if secret_params:
+        stmts.append(
+            f"CREATE OR REPLACE TEMPORARY SECRET {source.name}_ice "
+            f"(TYPE iceberg, {', '.join(secret_params)})"
+        )
+    opts = ["TYPE iceberg"]
+    if endpoint:
+        opts.append(f"ENDPOINT {_q(endpoint)}")
+    if endpoint_type:
+        opts.append(f"ENDPOINT_TYPE {_q(endpoint_type)}")
+    # DuckDB defaults to oauth2 and rejects an unauthenticated attach; a dev/local
+    # catalog needs an explicit authorization_type: none.
+    if conn.get("authorization_type"):
+        opts.append(f"AUTHORIZATION_TYPE {_q(conn['authorization_type'])}")
+    opts.append("READ_ONLY")
+    stmts.append(f"ATTACH {_q(warehouse)} AS {source.name} ({', '.join(opts)})")
+    return stmts
+
+
 def registration_sql(source: Source, workspace: Path) -> list[str]:
     """Statements that register a source on a session (secrets + attach/view)."""
     if source.type == SourceType.MOTHERDUCK:
         return _motherduck_registration(source)
+    if source.type == SourceType.ICEBERG_REST:
+        return _iceberg_rest_registration(source)
     if source.type == SourceType.SQLITE:
         path = _resolve_path(source, workspace)
         return [f"ATTACH {_q(path)} AS {source.name} (TYPE sqlite, READ_ONLY)"]
@@ -153,6 +202,8 @@ def qualified_name(source: Source, table: str) -> str:
         return f"{name}.main.{table}"
     if st == SourceType.MOTHERDUCK:
         return f"{name}.{conn.get('schema', 'main')}.{table}"
+    if st == SourceType.ICEBERG_REST:  # Iceberg namespace == schema
+        return f"{name}.{conn.get('namespace', 'default')}.{table}"
     if st == SourceType.MSSQL:
         return f"{name}.{conn.get('schema', 'dbo')}.{table}"
     return f"{name}.{table}"

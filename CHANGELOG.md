@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.24.14] - 2026-08-12
+
+### Added
+- **Iceberg REST catalogs as a governed source** (`type: iceberg_rest`). Point
+  DataCharter at a whole catalog — Polaris, Nessie, Lakekeeper, Unity, AWS Glue, or
+  S3 Tables — and its tables become `<source>.<namespace>.<table>` with the same
+  read-only, PII-masked, per-identity-governed agent access as any other source. The
+  `iceberg` core extension is auto-installed, the catalog is attached `READ_ONLY`,
+  and catalog auth (a bearer `token`, OAuth2 `client_id`/`client_secret`, or AWS
+  keys for Glue/S3 Tables) rides a DuckDB secret — never the ATTACH string. A
+  no-auth dev catalog is supported via `connection.authorization_type: none`.
+  Verified end-to-end against a live REST catalog (attach + query real rows).
+
 ## [0.24.13] - 2026-08-12
 
 ### Added

@@ -51,6 +51,7 @@ DataCharter writes the source into `charter.yaml` and registers it live.
 | `delta` | file-view | `delta` core extension | Column projection + partition pruning |
 | `snowflake` | connector-extract | `datacharter[snowflake]` extra | Connector pushdown planner + aggregation pushdown; **materialized, capped by `max_rows`** |
 | `motherduck` | ATTACH (`md:`) | `motherduck` (signed, auto-installed) | Native DuckDB filter + projection over your MotherDuck cloud database, read-only |
+| `iceberg_rest` | ATTACH (REST catalog) | `iceberg` core extension | Native DuckDB filter + projection over an Iceberg REST catalog (Polaris / Nessie / Lakekeeper / Unity / Glue / S3 Tables), read-only |
 
 ## Pushdown, honestly
 
@@ -130,5 +131,28 @@ sources:
 ```
 
 Every field, per type, is in the [charter.yaml reference](charter-yaml.html).
+
+## Iceberg REST catalogs, and where the data lives
+
+An `iceberg_rest` source attaches a whole catalog — Polaris, Nessie, Lakekeeper,
+Unity, AWS Glue, or S3 Tables — and exposes its tables as
+`<source>.<namespace>.<table>`. Two kinds of credential are in play, and they are
+not the same thing:
+
+- **Catalog auth** — how DataCharter talks to the REST catalog. A bearer `token`,
+  an OAuth2 `client_id`/`client_secret`, or (for Glue / S3 Tables) AWS
+  `key_id`/`secret`/`region`. This is what your `credentials` block sets. A
+  dev/local catalog with no auth needs `connection.authorization_type: none`.
+- **Storage access** — how the query engine reads the underlying data files. Most
+  managed catalogs (Polaris, Unity, Lakekeeper, Glue) **vend** short-lived
+  storage credentials, so nothing more is needed. For a catalog that does *not*
+  vend, DataCharter reads the files with the standard cloud credentials from your
+  environment (the S3/GCS/Azure credential chain); a custom object store (MinIO
+  or another non-AWS endpoint) additionally needs that endpoint configured for
+  DuckDB. This split is inherent to Iceberg REST, not specific to DataCharter.
+
+Governance is unchanged either way: the catalog is attached `READ_ONLY`, and PII
+you declare on its tables is masked on the agent surface exactly as for any other
+source.
 
 Next: [Connect an agent →](agent.html)

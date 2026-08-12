@@ -24,6 +24,7 @@ class SourceType(StrEnum):
     MSSQL = "mssql"
     SNOWFLAKE = "snowflake"
     MOTHERDUCK = "motherduck"
+    ICEBERG_REST = "iceberg_rest"
 
 
 #: Source types registered via DuckDB ATTACH (one catalog per source).
@@ -35,6 +36,7 @@ ATTACH_TYPES = {
     SourceType.BIGQUERY,
     SourceType.MSSQL,
     SourceType.MOTHERDUCK,
+    SourceType.ICEBERG_REST,
 }
 
 #: ATTACH types that ship as DuckDB community extensions (auto-installed).
