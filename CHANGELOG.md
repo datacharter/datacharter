@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.24.8] - 2026-08-11
+
+### Fixed
+- **Unmasking a column takes effect in the Claude Code chat *without* dropping
+  the conversation.** The previous two attempts were a trade-off — keep the
+  session (0.24.6) and the agent answered from its stale masked pull; reset it
+  (0.24.7) and the change took effect but the chat lost its context. Now the two
+  directions are handled per their actual need: **unmasking keeps the session**
+  but marks it stale, so the next turn carries a directive that forces the agent
+  to re-run the query (it sees the newly-visible values *and* keeps context);
+  **masking still resets** the session so a value the model already saw can't be
+  echoed after it is hidden.
+
 ## [0.24.7] - 2026-08-11
 
 ### Fixed

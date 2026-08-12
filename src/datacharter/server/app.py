@@ -591,13 +591,15 @@ def create_app(
         except ContractWriteError as exc:
             return _error(400, "write_error", str(exc))
         _refresh_charter()
-        # ANY access change invalidates the agent's cached view, so drop the
-        # Claude Code session: after a mask the model must not echo a now-hidden
-        # value it saw earlier; after an unmask it must RE-QUERY to see the
-        # newly-visible values, not answer from the stale masked result it already
-        # pulled. Resuming would leave that stale context and the change wouldn't
-        # take effect in the chat.
-        app.state.cc_session = {}
+        if body.value is False:
+            # Masking (tighten): drop the session so a real value the model
+            # already saw can't be echoed after it is hidden.
+            app.state.cc_session = {}
+        else:
+            # Unmasking (loosen): keep the conversation, but mark it stale so the
+            # next turn is told to RE-QUERY — otherwise the agent answers from the
+            # masked result it already pulled and the change looks like a no-op.
+            app.state.cc_session["stale"] = True
         return {"ok": True}
 
     @app.post("/api/tool")
@@ -1067,14 +1069,20 @@ def create_app(
             async def cc_events() -> AsyncIterator[str]:
                 got_text = False
                 sid = app.state.cc_session.get("id")
+                access_changed = bool(app.state.cc_session.pop("stale", False))
                 # Server-log only (stderr, never the SSE stream): shows whether a
                 # turn resumes the prior session — the fastest way to tell a memory
                 # complaint is a lost resume vs. the model dropping context.
-                print(f"[claude-code] turn: resume={sid or 'none'}", file=sys.stderr)
+                print(
+                    f"[claude-code] turn: resume={sid or 'none'} access_changed={access_changed}",
+                    file=sys.stderr,
+                )
                 async for ev in cc.run_turn(
                     body.question, serve_url, sid,
                     deny=app.state.cc_deny,
-                    context=cc.system_context(app.state.charter.guides),
+                    context=cc.system_context(
+                        app.state.charter.guides, access_changed=access_changed
+                    ),
                 ):
                     if ev["kind"] in ("session", "result") and ev.get("session_id"):
                         app.state.cc_session["id"] = ev["session_id"]

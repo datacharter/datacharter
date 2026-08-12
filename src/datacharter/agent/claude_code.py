@@ -320,11 +320,21 @@ query_metric instead of writing SQL (see list_metrics). PII columns come back \
 masked as ••• — never guess at masked values."""
 
 
-def system_context(guides: str | None) -> str:
-    """The full --append-system-prompt: agent framing plus workspace guides."""
-    if guides:
-        return AGENT_FRAMING + "\n\n# Workspace guides\n" + guides
-    return AGENT_FRAMING
+_ACCESS_CHANGED_NOTE = (
+    "\n\nIMPORTANT — data-access permissions changed since your previous tool "
+    "calls in this conversation. Earlier query results are now STALE and may show "
+    "masked (•••) values that are now visible (or the reverse). Before "
+    "answering, you MUST re-run the relevant query with your tools; do NOT reuse, "
+    "cite, or trust any earlier tool output."
+)
+
+
+def system_context(guides: str | None, access_changed: bool = False) -> str:
+    """The full --append-system-prompt: agent framing plus workspace guides. When
+    `access_changed`, append a directive that forces a re-query, so a governance
+    change made mid-conversation takes effect without dropping the chat context."""
+    base = AGENT_FRAMING + "\n\n# Workspace guides\n" + guides if guides else AGENT_FRAMING
+    return base + _ACCESS_CHANGED_NOTE if access_changed else base
 
 
 async def run_turn(

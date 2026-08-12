@@ -114,17 +114,50 @@ def test_claude_code_reuses_session_across_turns(client, monkeypatch):
     assert received == [None, "sess-123"]
 
 
-@pytest.mark.parametrize("value", [True, False])
-def test_access_change_resets_claude_session(client, monkeypatch, value):
-    # ANY access change (mask OR unmask) must drop the session so the agent
-    # re-queries with the new permissions instead of answering from a stale
-    # cached result. Keeping it on unmask left the agent reporting "still masked".
-    c, _ = client
-    _connect_cc(c, monkeypatch)
-    c.app.state.cc_session = {"id": "stale"}
-    r = c.post(
+def _access(c, value):
+    return c.post(
         "/api/agent-access",
         json={"source": "store", "table": "customers", "column": "email", "value": value},
     )
-    assert r.status_code == 200
+
+
+def test_masking_resets_claude_session(client, monkeypatch):
+    # Tightening purges the session so a real value the model already saw can't
+    # be echoed after it is hidden.
+    c, _ = client
+    _connect_cc(c, monkeypatch)
+    c.app.state.cc_session = {"id": "abc"}
+    assert _access(c, False).status_code == 200
     assert c.app.state.cc_session == {}
+
+
+def test_unmasking_keeps_session_but_flags_stale(client, monkeypatch):
+    # Loosening keeps the conversation but marks it stale so the next turn is
+    # forced to re-query — otherwise the agent answers from its masked pull.
+    c, _ = client
+    _connect_cc(c, monkeypatch)
+    c.app.state.cc_session = {"id": "abc"}
+    assert _access(c, True).status_code == 200
+    assert c.app.state.cc_session == {"id": "abc", "stale": True}
+
+
+def test_stale_flag_forces_requery_directive_then_clears(client, monkeypatch):
+    c, _ = client
+    _connect_cc(c, monkeypatch)
+    c.app.state.cc_session = {"id": "abc", "stale": True}
+
+    seen: dict = {}
+
+    async def fake_run_turn(
+        question, serve_url, session_id=None, dc_bin=None, deny=None, context=None
+    ):
+        seen["session_id"] = session_id
+        seen["context"] = context
+        yield {"kind": "session", "session_id": "abc", "tools": []}
+        yield {"kind": "result", "session_id": "abc", "text": "ok", "is_error": False}
+
+    monkeypatch.setattr(cc, "run_turn", fake_run_turn)
+    assert c.post("/api/agent/ask", json={"question": "what are their emails?"}).status_code == 200
+    assert seen["session_id"] == "abc"  # conversation preserved (resumed)
+    assert "re-run the relevant query" in seen["context"]  # forced re-query
+    assert "stale" not in c.app.state.cc_session  # flag consumed, won't re-fire
