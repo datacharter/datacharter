@@ -15,6 +15,14 @@ Scaffold a workspace: `charter.yaml`, `queries/`, `.env.example`, `.gitignore`.
 `--demo` includes a generated demo dataset; `--force` overwrites an existing
 `charter.yaml`.
 
+### `demo [directory]`
+A zero-config, narrated walkthrough of the governance — no server, no account.
+Scaffolds a throwaway demo workspace (or uses one you point it at) and shows what
+an AI agent actually sees through the governed tools: **PII masked** (with the raw
+value shown alongside so the difference is visible), **writes refused**, the
+**contract in control**. Ends by pointing you at `serve` / `mcp` to keep exploring.
+Try it in one command: `uvx datacharter demo`.
+
 ### `serve [directory]`
 Start the local web app (API + UI) on `http://127.0.0.1:8321`.
 
@@ -29,6 +37,12 @@ Start the local web app (API + UI) on `http://127.0.0.1:8321`.
 
 In the UI, flip **Agent view** on any result to preview it with PII columns
 masked — exactly what the agent and the [MCP server](mcp.html) see.
+
+**Resource limits (any engine command).** `DATACHARTER_DUCKDB_MEMORY_LIMIT`
+(e.g. `2GB`) caps DuckDB's memory so a heavy query spills or errors within budget
+instead of OOM-killing a container; unset, it derives ~80% of a detected container
+memory limit, else leaves DuckDB's own default. `DATACHARTER_DUCKDB_THREADS` pins
+the thread count.
 
 ### `secrets set|list|rm <name>`
 Manage `${NAME}` secrets in the OS keyring. `set` prompts without echo (or pass

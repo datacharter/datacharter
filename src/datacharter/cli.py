@@ -1048,6 +1048,12 @@ def _cmd_redteam(args: argparse.Namespace) -> int:
     return 0 if report.ok else 1
 
 
+def _cmd_demo(args: argparse.Namespace) -> int:
+    from datacharter.agent import demo
+
+    return demo.run(args.directory)
+
+
 def _cmd_eval(args: argparse.Namespace) -> int:
     import asyncio
 
@@ -1275,6 +1281,15 @@ def main(argv: list[str] | None = None) -> int:
     sec_sub.add_parser("rm", help="Remove a secret").add_argument("name")
     sec_sub.add_parser("list", help="List secret names stored via datacharter")
     p_secrets.set_defaults(func=_cmd_secrets)
+
+    p_demo = sub.add_parser(
+        "demo", help="Narrated governance walkthrough, out of the box (masking, read-only)"
+    )
+    p_demo.add_argument(
+        "directory", nargs="?", default=None,
+        help="Workspace to demo (default: scaffold a throwaway demo dataset)",
+    )
+    p_demo.set_defaults(func=_cmd_demo)
 
     p_mcp = sub.add_parser(
         "mcp", help="Run an MCP server over stdio exposing the governed query tools"

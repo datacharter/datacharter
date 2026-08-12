@@ -2,6 +2,8 @@
 
 > **Query all your data locally — then hand your AI agents exactly the data you choose, and not one column more.**
 
+_**The governed data plane for AI agents**: a local SQL workspace over every file and database you have, federated by DuckDB and governed by a `charter.yaml` contract — so agents get read-only, PII-masked access to exactly what the contract grants._
+
 <!-- mcp-name: io.github.datacharter/datacharter -->
 
 [![PyPI](https://img.shields.io/pypi/v/datacharter)](https://pypi.org/project/datacharter/)

@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.24.10] - 2026-08-12
+
+### Added
+- **`datacharter demo`** — a zero-config, narrated walkthrough of the governance.
+  Scaffolds a throwaway demo workspace (or uses one you point it at) and shows what
+  an AI agent actually sees through the governed tools: PII masked (with the raw
+  value shown alongside so the difference is visible), writes refused by the
+  read-only guard, the contract in control. `uvx datacharter demo`.
+
+### Changed
+- **DuckDB memory is now bounded** so a heavy query spills or errors within budget
+  instead of OOM-killing a container. `DATACHARTER_DUCKDB_MEMORY_LIMIT` (e.g. `2GB`)
+  sets it explicitly; unset, the engine derives ~80% of a detected container memory
+  limit (cgroup v2/v1), else leaves DuckDB's default. `DATACHARTER_DUCKDB_THREADS`
+  pins the thread count.
+
 ## [0.24.9] - 2026-08-12
 
 ### Added

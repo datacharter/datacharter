@@ -6,6 +6,7 @@ import asyncio
 import contextlib
 import datetime
 import json
+import os
 import re
 import shutil
 import sys
@@ -47,6 +48,42 @@ class EngineError(Exception):
 
 class QueryTimeout(EngineError):
     """Query exceeded its timeout and was interrupted."""
+
+
+def _cgroup_memory_bytes() -> int | None:
+    """The container's memory limit in bytes (cgroup v2 then v1), or None when
+    unlimited / not containerized."""
+    for path in (
+        "/sys/fs/cgroup/memory.max",  # cgroup v2
+        "/sys/fs/cgroup/memory/memory.limit_in_bytes",  # cgroup v1
+    ):
+        try:
+            raw = Path(path).read_text().strip()
+        except OSError:
+            continue
+        if raw == "max":
+            return None
+        try:
+            limit = int(raw)
+        except ValueError:
+            continue
+        # cgroup v1 "unlimited" is a near-2^63 sentinel; ignore implausible values.
+        if 0 < limit < (1 << 62):
+            return limit
+    return None
+
+
+def _duckdb_memory_limit() -> str | None:
+    """The DuckDB `memory_limit` to apply: an explicit env override, else ~80% of a
+    detected container memory limit, else None (leave DuckDB's own default). Keeps a
+    heavy query spilling/erroring within budget instead of OOM-killing the container."""
+    override = os.environ.get("DATACHARTER_DUCKDB_MEMORY_LIMIT")
+    if override:
+        return override
+    limit = _cgroup_memory_bytes()
+    if limit is None:
+        return None
+    return f"{max(64, int(limit * 0.8) // (1024 * 1024))}MB"
 
 
 def _valid_relation(relation: str) -> bool:
@@ -123,6 +160,7 @@ class Engine:
         tmp.mkdir(parents=True, exist_ok=True)
 
         self._conn = duckdb.connect()
+        self._apply_limits(self._conn)
         self._apply_spill(self._conn)
         self._attach_local(state)
         for src in self.sources:
@@ -658,6 +696,20 @@ class Engine:
         conn = self._require_conn()
         try:
             conn.execute(stmt)
+        except duckdb.Error as exc:
+            raise self._wrap(exc) from None
+
+    def _apply_limits(self, target) -> None:
+        """Bound DuckDB's memory (and optionally threads) so a heavy query spills or
+        errors within budget rather than OOM-killing the container. These are global
+        DuckDB settings, so applying once on the main connection is sufficient."""
+        mem = _duckdb_memory_limit()
+        threads = os.environ.get("DATACHARTER_DUCKDB_THREADS")
+        try:
+            if mem:
+                target.execute(f"SET memory_limit = {self._quoted(mem)}")
+            if threads and threads.isdigit():
+                target.execute(f"SET threads = {int(threads)}")
         except duckdb.Error as exc:
             raise self._wrap(exc) from None
 
