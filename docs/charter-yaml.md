@@ -54,9 +54,9 @@ which of the rest apply depends on the source type (see the
 
 ### `type` (required)
 
-One of: `postgres`, `mysql`, `sqlite`, `bigquery`, `mssql`, `snowflake`,
-`csv`, `parquet`, `json`, `iceberg`, `delta`. An unknown value produces an
-error listing the valid types.
+One of: `postgres`, `mysql`, `sqlite`, `duckdb`, `bigquery`, `mssql`, `snowflake`,
+`motherduck`, `csv`, `parquet`, `json`, `excel`, `iceberg`, `delta`. An unknown
+value produces an error listing the valid types.
 
 ### `connection`
 
@@ -70,6 +70,7 @@ integers. What each type reads:
 | `mssql` | `host`, `port`, `database` (required), `user`, `schema` (default `dbo`) |
 | `bigquery` | `project` (or `project_id`, required), `dataset` (or `dataset_id`) |
 | `snowflake` | `account`, `user`, `database`, `schema` (default `PUBLIC`), `warehouse` |
+| `motherduck` | `database` (the MotherDuck database name), `schema` (default `main`) |
 | `sqlite`, file types | none (use `path`) |
 
 Credential-shaped keys are rejected here. If a `connection` key name looks like
@@ -90,6 +91,7 @@ What each type reads from `credentials`:
 | --- | --- |
 | `postgres`, `mysql`, `mssql` | `password` |
 | `snowflake` | `password` or `private_key` |
+| `motherduck` | `token` (a MotherDuck access token; required — set `${MOTHERDUCK_TOKEN}`) |
 | file types on `s3://` paths | `key_id`, `secret`, `region`, `endpoint` |
 
 ```yaml

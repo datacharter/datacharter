@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.24.12] - 2026-08-12
+
+### Added
+- **MotherDuck as a governed source** (`type: motherduck`). Point DataCharter at a
+  MotherDuck cloud database and agents get the same read-only, PII-masked, audited,
+  per-identity-governed access as any other source — the extension is auto-installed,
+  the surface is attached `READ_ONLY`, and the token (`credentials.token:
+  ${MOTHERDUCK_TOKEN}`) is set out-of-band, never in the ATTACH string. A token is
+  required so the server never falls back to interactive browser SSO.
+
 ## [0.24.11] - 2026-08-12
 
 ### Added

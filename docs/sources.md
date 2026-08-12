@@ -50,6 +50,7 @@ DataCharter writes the source into `charter.yaml` and registers it live.
 | `iceberg` | file-view | `iceberg` core extension | Column projection + partition pruning |
 | `delta` | file-view | `delta` core extension | Column projection + partition pruning |
 | `snowflake` | connector-extract | `datacharter[snowflake]` extra | Connector pushdown planner + aggregation pushdown; **materialized, capped by `max_rows`** |
+| `motherduck` | ATTACH (`md:`) | `motherduck` (signed, auto-installed) | Native DuckDB filter + projection over your MotherDuck cloud database, read-only |
 
 ## Pushdown, honestly
 

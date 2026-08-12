@@ -87,8 +87,32 @@ def _bigquery_registration(source: Source) -> list[str]:
     return [f"ATTACH {_q(conn)} AS {source.name} (TYPE bigquery, READ_ONLY)"]
 
 
+def _motherduck_registration(source: Source) -> list[str]:
+    """MotherDuck = DuckDB-in-the-cloud, attached via the signed `motherduck`
+    extension and the `md:` scheme. The token is set with `SET motherduck_token`
+    (kept out of the ATTACH string) — a token is required so the extension never
+    falls back to the interactive browser SSO flow, which would hang a server. The
+    surface is attached READ_ONLY."""
+    token = source.credentials.get("token") or source.connection.get("token")
+    if not token:
+        raise SourceConfigError(
+            f"Source '{source.name}' (motherduck) needs a token — set "
+            "credentials.token: ${MOTHERDUCK_TOKEN}."
+        )
+    database = str(source.connection.get("database", "")).strip()
+    target = f"md:{database}" if database else "md:"
+    return [
+        "INSTALL motherduck",
+        "LOAD motherduck",
+        f"SET motherduck_token = {_q(token)}",
+        f"ATTACH {_q(target)} AS {source.name} (TYPE motherduck, READ_ONLY)",
+    ]
+
+
 def registration_sql(source: Source, workspace: Path) -> list[str]:
     """Statements that register a source on a session (secrets + attach/view)."""
+    if source.type == SourceType.MOTHERDUCK:
+        return _motherduck_registration(source)
     if source.type == SourceType.SQLITE:
         path = _resolve_path(source, workspace)
         return [f"ATTACH {_q(path)} AS {source.name} (TYPE sqlite, READ_ONLY)"]
@@ -127,6 +151,8 @@ def qualified_name(source: Source, table: str) -> str:
         return f"{name}.{ds}.{table}" if ds else f"{name}.{table}"
     if st in (SourceType.SQLITE, SourceType.DUCKDB):
         return f"{name}.main.{table}"
+    if st == SourceType.MOTHERDUCK:
+        return f"{name}.{conn.get('schema', 'main')}.{table}"
     if st == SourceType.MSSQL:
         return f"{name}.{conn.get('schema', 'dbo')}.{table}"
     return f"{name}.{table}"
