@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.24.15] - 2026-08-12
+
+### Added
+- **`datacharter openlineage`** — emit the governed catalog as an OpenLineage
+  `COMPLETE` RunEvent so a data catalog can show not just what data exists but how
+  DataCharter governs the agent's view of it. Every governed relation becomes an
+  input dataset with a schema facet (columns + types) and a custom governance facet
+  recording PII columns, which are masked on the agent surface, and the read-only
+  guarantee. `--url` posts to any receiver (Marquez, DataHub, OpenMetadata) at
+  `<url>/api/v1/lineage`; `-o` writes the JSON; with neither it prints the event.
+  Built on the stdlib — no OpenLineage client dependency. Verified end-to-end
+  against a live Marquez (schema + governance facet round-tripped).
+
 ## [0.24.14] - 2026-08-12
 
 ### Added

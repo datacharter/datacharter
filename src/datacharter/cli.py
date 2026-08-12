@@ -1253,6 +1253,14 @@ def _eval_history(ws: Path) -> int:
     return 0
 
 
+def _cmd_openlineage(args: argparse.Namespace) -> int:
+    from datacharter import openlineage
+
+    return openlineage.emit(
+        args.directory, args.url, namespace=args.namespace, job=args.job, out=args.out
+    )
+
+
 def _cmd_lineage(args: argparse.Namespace) -> int:
     import json as _json
 
@@ -1545,6 +1553,17 @@ def main(argv: list[str] | None = None) -> int:
     p_lineage.add_argument("--relation", help="Filter to one relation")
     p_lineage.add_argument("--json", action="store_true", help="Emit the graph as JSON")
     p_lineage.set_defaults(func=_cmd_lineage)
+
+    p_ol = sub.add_parser(
+        "openlineage",
+        help="Emit the governed catalog as an OpenLineage event (Marquez/DataHub/OpenMetadata)",
+    )
+    p_ol.add_argument("directory", nargs="?", default=".")
+    p_ol.add_argument("--url", help="OpenLineage receiver base URL (posts to <url>/api/v1/lineage)")
+    p_ol.add_argument("--namespace", default="datacharter", help="OpenLineage namespace")
+    p_ol.add_argument("--job", help="Job name (default govern.<workspace>)")
+    p_ol.add_argument("-o", "--out", help="Write the event JSON to a file instead of posting")
+    p_ol.set_defaults(func=_cmd_openlineage)
 
     p_snap = sub.add_parser("snapshot", help="Save a query result as local.<name> plus its SQL")
     p_snap.add_argument("name")

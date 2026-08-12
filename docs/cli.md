@@ -150,6 +150,16 @@ relations get read together, and which output columns derive from which inputs.
 `--relation` filters to one relation; `--json` emits the graph for tooling.
 History is recorded as you run queries in the app.
 
+### `openlineage [directory] [--url URL] [--namespace NS] [--job NAME] [-o file]`
+Emit the governed catalog as an OpenLineage `COMPLETE` RunEvent — one event whose
+inputs are every governed relation, each with a schema facet (columns + types) and
+a custom governance facet recording which columns are PII, which are masked on the
+agent surface, and the read-only guarantee. `--url` posts to any OpenLineage
+receiver (Marquez, DataHub, OpenMetadata) at `<url>/api/v1/lineage`; `-o` writes
+the event JSON to a file; with neither it prints the event to stdout. Reads live
+schemas, so sources must be reachable. Built on the stdlib — no OpenLineage client
+dependency. Verified end-to-end against Marquez.
+
 ### `snapshot <name> <sql> [directory]`
 Save a query's result as `local.<name>` along with its SQL.
 
