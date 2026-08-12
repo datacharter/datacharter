@@ -23,6 +23,15 @@ value shown alongside so the difference is visible), **writes refused**, the
 **contract in control**. Ends by pointing you at `serve` / `mcp` to keep exploring.
 Try it in one command: `uvx datacharter demo`.
 
+### `import dbt <manifest.json> [-o path] [--force]`
+Generate a `charter.yaml` from a dbt project's `target/manifest.json`. The
+warehouse type comes from the dbt adapter; models + sources become tables grouped
+by database/schema; columns flagged PII in dbt (`meta: {pii: true}` or a
+`pii`/`sensitive`/`phi` **tag**, BigQuery policy tags) become masked columns; and
+model/source descriptions become per-table agent context. Connection host and
+credentials aren't in the manifest, so they're written as `${ENV}` placeholders to
+fill in. Turns a whole dbt project into a governed contract in one command.
+
 ### `serve [directory]`
 Start the local web app (API + UI) on `http://127.0.0.1:8321`.
 

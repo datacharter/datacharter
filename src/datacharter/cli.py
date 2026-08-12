@@ -1054,6 +1054,48 @@ def _cmd_demo(args: argparse.Namespace) -> int:
     return demo.run(args.directory)
 
 
+def _cmd_import_dbt(args: argparse.Namespace) -> int:
+    from datacharter.contracts import load_charter
+    from datacharter.contracts.dbt_import import import_manifest
+
+    manifest = Path(args.manifest)
+    if not manifest.exists():
+        print(f"No such manifest: {manifest}", file=sys.stderr)
+        return 1
+    try:
+        text, summary = import_manifest(str(manifest))
+    except (ValueError, KeyError, TypeError) as exc:
+        print(f"Could not parse dbt manifest {manifest}: {exc}", file=sys.stderr)
+        return 1
+    if summary["sources"] == 0:
+        print("No models or sources found in the manifest — nothing to import.", file=sys.stderr)
+        return 1
+
+    out = Path(args.out) if args.out else Path.cwd() / "charter.yaml"
+    if out.exists() and not args.force:
+        print(f"{out} exists; use --force to overwrite or -o to write elsewhere.", file=sys.stderr)
+        return 1
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(text)
+
+    warn = ""
+    try:  # a scaffold that won't load is a bug worth catching here, not at serve time
+        load_charter(out.parent, out.name, lenient_secrets=True)
+    except Exception as exc:  # noqa: BLE001
+        warn = f"\n  ⚠ the generated charter did not validate: {exc}"
+
+    unmapped = "  (unmapped adapter — verify the type)" if summary["unmapped_adapter"] else ""
+    print(f"Wrote {out}")
+    print(f"  adapter {summary['adapter'] or 'unknown'} → type {summary['source_type']}{unmapped}")
+    print(f"  {summary['sources']} source(s) · {summary['tables']} table(s) · "
+          f"{summary['pii_columns']} PII column(s) detected")
+    print("  Next: fill in each source's connection + ${ENV} credentials, then "
+          "`datacharter scan` / `datacharter serve`.")
+    if warn:
+        print(warn, file=sys.stderr)
+    return 0
+
+
 def _cmd_eval(args: argparse.Namespace) -> int:
     import asyncio
 
@@ -1290,6 +1332,14 @@ def main(argv: list[str] | None = None) -> int:
         help="Workspace to demo (default: scaffold a throwaway demo dataset)",
     )
     p_demo.set_defaults(func=_cmd_demo)
+
+    p_import = sub.add_parser("import", help="Generate a charter from another tool's metadata")
+    import_sub = p_import.add_subparsers(dest="importer", required=True)
+    p_dbt = import_sub.add_parser("dbt", help="Build a charter.yaml from a dbt manifest.json")
+    p_dbt.add_argument("manifest", help="Path to target/manifest.json")
+    p_dbt.add_argument("-o", "--out", default=None, help="Output path (default: ./charter.yaml)")
+    p_dbt.add_argument("--force", action="store_true", help="Overwrite an existing charter.yaml")
+    p_dbt.set_defaults(func=_cmd_import_dbt)
 
     p_mcp = sub.add_parser(
         "mcp", help="Run an MCP server over stdio exposing the governed query tools"

@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.24.11] - 2026-08-12
+
+### Added
+- **`datacharter import dbt <manifest.json>`** — turn any dbt project into a
+  governed contract in one command. The warehouse type comes from the dbt adapter,
+  models + sources become tables grouped by database/schema, columns flagged PII in
+  dbt (`meta: {pii: true}` or a `pii`/`sensitive`/`phi` tag, BigQuery policy tags)
+  become masked columns, and model/source descriptions become per-table agent
+  context. Connection host and credentials (not in the manifest) are written as
+  `${ENV}` placeholders to fill in; the generated `charter.yaml` is validated before
+  it's written.
+
 ## [0.24.10] - 2026-08-12
 
 ### Added
