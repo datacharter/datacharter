@@ -32,9 +32,12 @@ jobs:
           uv venv
           uv pip install -e .
       - name: Audit for known vulnerabilities (pip-audit)
+        # No --strict: pip-audit still fails on any known vulnerability, but a
+        # local editable package that isn't published to PyPI is only a warning,
+        # so an unreleased in-dev version never turns the audit red on its own.
         run: |
           uv pip install pip-audit
-          .venv/bin/pip-audit --strict --desc
+          .venv/bin/pip-audit --desc
       - name: Generate SBOM (CycloneDX)
         if: always()
         run: uvx cyclonedx-py environment .venv -o sbom.cdx.json
