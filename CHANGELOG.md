@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.24.13] - 2026-08-12
+
+### Added
+- **`datacharter connect`** — print the ready-to-paste MCP-server config for popular
+  clients (Claude Desktop, Claude Code, Cursor, VS Code, Cline, Windsurf, LM Studio),
+  the file it goes in, and a **one-click install deeplink** where the client supports
+  one — so you don't hand-edit JSON. Handles the per-client quirks (VS Code's `servers`
+  key vs everyone else's `mcpServers`; Cursor/LM Studio base64 vs VS Code URL-encoded
+  deeplinks) and uses an absolute binary path so a GUI-launched client's minimal `PATH`
+  still finds it. `--serve-url` emits HTTP config for a running `datacharter serve`.
+
 ## [0.24.12] - 2026-08-12
 
 ### Added

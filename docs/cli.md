@@ -23,6 +23,15 @@ value shown alongside so the difference is visible), **writes refused**, the
 **contract in control**. Ends by pointing you at `serve` / `mcp` to keep exploring.
 Try it in one command: `uvx datacharter demo`.
 
+### `connect [directory] [--client NAME] [--serve-url URL]`
+Print the ready-to-paste MCP-server config for popular clients — the file it goes
+in, and a **one-click install deeplink** where the client supports one — so you
+don't hand-edit JSON. Clients: `claude-desktop`, `claude-code`, `cursor`, `vscode`
+(uses the `servers` key, not `mcpServers`), `cline`, `windsurf`, `lmstudio` (or
+`all`, the default). Uses an absolute binary path so a GUI-launched client's minimal
+`PATH` still finds it. With `--serve-url`, emits HTTP config for a running
+`datacharter serve` instead of the local stdio server.
+
 ### `import dbt <manifest.json> [-o path] [--force]`
 Generate a `charter.yaml` from a dbt project's `target/manifest.json`. The
 warehouse type comes from the dbt adapter; models + sources become tables grouped

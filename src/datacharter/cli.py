@@ -1054,6 +1054,12 @@ def _cmd_demo(args: argparse.Namespace) -> int:
     return demo.run(args.directory)
 
 
+def _cmd_connect(args: argparse.Namespace) -> int:
+    from datacharter.agent import connect
+
+    return connect.run(args.directory, args.client, args.serve_url)
+
+
 def _cmd_import_dbt(args: argparse.Namespace) -> int:
     from datacharter.contracts import load_charter
     from datacharter.contracts.dbt_import import import_manifest
@@ -1332,6 +1338,19 @@ def main(argv: list[str] | None = None) -> int:
         help="Workspace to demo (default: scaffold a throwaway demo dataset)",
     )
     p_demo.set_defaults(func=_cmd_demo)
+
+    from datacharter.agent.connect import CLIENTS
+
+    p_connect = sub.add_parser(
+        "connect", help="Print MCP-client config (+ deeplinks) to connect an agent to a workspace"
+    )
+    p_connect.add_argument("directory", nargs="?", default=".", help="Workspace (default: .)")
+    p_connect.add_argument("--client", choices=[*CLIENTS, "all"], default="all")
+    p_connect.add_argument(
+        "--serve-url", default=None,
+        help="Emit HTTP config for a running `datacharter serve` instead of the local stdio server",
+    )
+    p_connect.set_defaults(func=_cmd_connect)
 
     p_import = sub.add_parser("import", help="Generate a charter from another tool's metadata")
     import_sub = p_import.add_subparsers(dest="importer", required=True)
