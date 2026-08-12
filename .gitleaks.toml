@@ -1,0 +1,19 @@
+# Gitleaks configuration: run the full default rule set, and allowlist a small,
+# explicit set of deliberate non-secrets (test fixtures, example placeholders,
+# and integration-seed credentials). Keep this list precise — never allowlist a
+# whole tree, so a real secret cannot hide behind a broad exclusion.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Deliberate non-secrets: test fixtures, examples, seed credentials"
+paths = [
+  '''\.env\.example$''',
+  '''tests/integration/seed/.*''',
+]
+regexes = [
+  '''wrong-key-456''',
+  '''charter_test_pw''',
+  '''root_test_pw''',
+]

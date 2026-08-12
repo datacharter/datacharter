@@ -1,0 +1,47 @@
+name: security
+
+# Supply-chain hygiene: scan history for leaked secrets, audit dependencies for
+# known vulnerabilities, and publish a CycloneDX SBOM of the runtime tree.
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '17 6 * * 1'
+
+jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Scan for leaked secrets (gitleaks)
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.18.4 \
+            detect --source /repo --config /repo/.gitleaks.toml \
+            --redact --no-banner --exit-code 1
+
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+      - name: Install runtime dependencies
+        run: |
+          uv venv
+          uv pip install -e .
+      - name: Audit for known vulnerabilities (pip-audit)
+        run: |
+          uv pip install pip-audit
+          .venv/bin/pip-audit --strict --desc
+      - name: Generate SBOM (CycloneDX)
+        if: always()
+        run: uvx cyclonedx-py environment .venv -o sbom.cdx.json
+      - name: Upload SBOM
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-cyclonedx
+          path: sbom.cdx.json
+          if-no-files-found: warn

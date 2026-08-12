@@ -77,10 +77,13 @@ jobs:
       name: pypi
       url: https://pypi.org/project/datacharter/
     permissions:
-      id-token: write # OIDC token for PyPI Trusted Publishing
+      id-token: write # OIDC token for PyPI Trusted Publishing + PEP 740 attestations
     steps:
       - uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # Sign each artifact and upload PEP 740 provenance attestations (Sigstore).
+          attestations: true

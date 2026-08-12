@@ -1,0 +1,32 @@
+name: codeql
+
+# Static analysis for the shipped code paths: the Python engine/agent/server and
+# the TypeScript UI. Runs on every push/PR plus a weekly baseline so a rule
+# update surfaces even without new commits.
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '23 5 * * 1'
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-and-quality
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:${{ matrix.language }}
