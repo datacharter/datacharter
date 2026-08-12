@@ -30,6 +30,7 @@ sources:
 | `policies` | no | Plain-English agent policies ([policies](policies.html)). |
 | `local_access` | no | Agent-access overrides for `local.*` snapshots ([below](#local_access)). |
 | `audit` / `canary` | no | Flight recorder (default on) and canary tripwires ([audit](audit.html)). |
+| `quarantine` | no | Quarantine prompt-injection payloads in result cells (default on; `quarantine: off` disables) ([security](security.html#prompt-injection-quarantine)). |
 
 Everything else — `pii`, `tables`, `agent_access`, `row_filters`, `context` —
 is **source-level**: it lives inside a `sources.<name>:` block. Placing one at

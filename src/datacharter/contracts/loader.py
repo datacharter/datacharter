@@ -40,6 +40,9 @@ class Charter(BaseModel):
     guides: str = ""
     #: Flight-recorder audit of agent access; on by default (`audit: off` disables).
     audit_enabled: bool = True
+    #: Quarantine prompt-injection payloads in result cells; on by default
+    #: (`quarantine: off` disables).
+    quarantine_enabled: bool = True
     #: Canary tripwires: None = off (default), "block" or "log" when enabled.
     canary_mode: str | None = None
     #: Plain-english policies per relation (aggregate_only / k-anonymity / joins).
@@ -119,6 +122,14 @@ def load_charter(
     else:
         raise CharterError(f"{filename}: 'audit' must be on/off (got {audit_raw!r}).")
 
+    quarantine_raw = raw.get("quarantine", True)
+    if quarantine_raw in (False, "off"):
+        quarantine_enabled = False
+    elif quarantine_raw in (True, "on"):
+        quarantine_enabled = True
+    else:
+        raise CharterError(f"{filename}: 'quarantine' must be on/off (got {quarantine_raw!r}).")
+
     canary_raw = raw.get("canary")
     if canary_raw in (None, False, "off"):
         canary_mode: str | None = None
@@ -138,7 +149,8 @@ def load_charter(
     return Charter(
         version=version, sources=sources, warnings=warnings, metrics=metrics,
         tests=tests, local_access=local_access, guides=load_guides(workspace),
-        audit_enabled=audit_enabled, canary_mode=canary_mode, policies=policies,
+        audit_enabled=audit_enabled, quarantine_enabled=quarantine_enabled,
+        canary_mode=canary_mode, policies=policies,
     )
 
 
@@ -192,7 +204,7 @@ def _build_test(name: str, body: Any, filename: str) -> DataTest:
 
 _TOP_LEVEL_KEYS = {
     "version", "sources", "metrics", "tests", "local_access",
-    "audit", "canary", "policies",
+    "audit", "quarantine", "canary", "policies",
 }
 _SOURCE_KEYS = {
     "type", "connection", "credentials", "path", "tables", "pii",

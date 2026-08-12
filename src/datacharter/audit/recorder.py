@@ -97,6 +97,16 @@ class FlightRecorder:
             "tool": tool, "sql": args.get("sql"), "token": token,
         })
 
+    def record_quarantine(self, hits: list) -> None:
+        """Prompt-injection payloads found in result cells were quarantined."""
+        if not self._enabled:
+            return
+        self._append({
+            "type": "quarantine", "session": self._session,
+            "count": len(hits),
+            "cells": [{"row": r, "column": str(c)} for r, c in hits],
+        })
+
     def record_access(self, tool: str, arguments: str, result: str) -> None:
         if not self._enabled:
             return

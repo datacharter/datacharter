@@ -55,4 +55,5 @@ def build_toolbox(
         canary=canary,
         policies=charter.policies,
         metrics=charter.metrics,
+        quarantine=charter.quarantine_enabled,
     )
