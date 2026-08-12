@@ -1,6 +1,12 @@
 import pytest
 
-from datacharter.agent.eval_runner import run_case, run_suite, score_case
+from datacharter.agent.eval_runner import (
+    run_case,
+    run_case_cc,
+    run_suite,
+    run_suite_cc,
+    score_case,
+)
 from datacharter.agent.llm import Delta, ToolCall
 from datacharter.agent.loop import Agent, AgentConfig
 from datacharter.agent.tools import ToolBox
@@ -185,3 +191,147 @@ async def test_judge_skipped_without_expected_answer(demo):
     out = rec.cases[0].with_guides
     assert out.passed is True
     assert not any(a.type == "judge" for a in out.assertions)
+
+
+# --- Claude Code backend -----------------------------------------------------
+# The subprocess boundary (`run_turn`/`grade`) is mocked: a nested `claude`
+# refuses to launch inside a Claude Code session, so these fakes stand in for it.
+
+
+def _fake_run_turn(events_for):
+    """Build a `run_turn` stand-in. `events_for(context) -> list[event]` lets a
+    test vary the stream by whether the guides are present in the system prompt."""
+
+    async def fake(question, serve_url, session_id=None, deny=None,
+                   context=None, model=None, **_kw):
+        for ev in events_for(context):
+            yield ev
+
+    return fake
+
+
+async def test_run_case_cc_captures_answer_and_sql(monkeypatch):
+    events = [
+        {"kind": "tool_call", "tool": "query", "sql": "SELECT count(*) FROM store.orders"},
+        {"kind": "text", "text": "There are 90 orders."},
+        {"kind": "result", "session_id": "s1", "text": "There are 90 orders.", "is_error": False},
+    ]
+    monkeypatch.setattr(
+        "datacharter.agent.claude_code.run_turn", _fake_run_turn(lambda _c: events)
+    )
+    answer, sqls, scalar, error = await run_case_cc(
+        "how many orders?", "http://x", deny=None, guides="G", with_guides=True, model="sonnet"
+    )
+    assert answer == "There are 90 orders."
+    assert sqls == ["SELECT count(*) FROM store.orders"]
+    assert scalar is None  # CC surfaces no result rows
+    assert error is None
+
+
+async def test_run_case_cc_answer_from_result_when_no_text_deltas(monkeypatch):
+    events = [{"kind": "result", "session_id": "s1", "text": "42 orders.", "is_error": False}]
+    monkeypatch.setattr(
+        "datacharter.agent.claude_code.run_turn", _fake_run_turn(lambda _c: events)
+    )
+    answer, _sqls, _scalar, error = await run_case_cc(
+        "q", "http://x", deny=None, guides=None, with_guides=False, model="sonnet"
+    )
+    assert answer == "42 orders."
+    assert error is None
+
+
+async def test_run_case_cc_surfaces_error_event(monkeypatch):
+    events = [{"kind": "error", "detail": "Claude Code exited with code 1."}]
+    monkeypatch.setattr(
+        "datacharter.agent.claude_code.run_turn", _fake_run_turn(lambda _c: events)
+    )
+    answer, _sqls, _scalar, error = await run_case_cc(
+        "q", "http://x", deny=None, guides=None, with_guides=True, model="sonnet"
+    )
+    assert answer == ""
+    assert error == "Claude Code exited with code 1."
+
+
+async def test_run_suite_cc_guide_lift(monkeypatch):
+    # With guides the agent answers "90"; without them it doesn't — a real lift.
+    def events_for(context):
+        good = context is not None and "# Workspace guides" in context
+        text = "90 orders" if good else "I am not sure."
+        return [{"kind": "result", "session_id": "s", "text": text, "is_error": False}]
+
+    monkeypatch.setattr(
+        "datacharter.agent.claude_code.run_turn", _fake_run_turn(events_for)
+    )
+    suite = EvalSuite(
+        name="s",
+        cases=[EvalCase(
+            question="how many orders?",
+            expect=[EvalAssertion(type="answer_contains", value="90")],
+        )],
+    )
+    rec = await run_suite_cc(
+        suite, serve_url="http://x", deny=None, guides="Count from store.orders.",
+        compare=True, samples=1, agent_model="sonnet",
+    )
+    assert rec.mode == "compare-guides"
+    assert rec.overall["with_guides"] == 1.0
+    assert rec.overall["without_guides"] == 0.0
+    assert rec.overall["lift"] == 1.0
+
+
+async def test_run_suite_cc_result_scalar_is_errored_not_failed(monkeypatch):
+    # The CC backend surfaces no result rows; a result_scalar case must be reported
+    # as unscorable (errored), never a misleading ✗ on a possibly-correct answer.
+    called = {"n": 0}
+
+    async def boom(*a, **k):
+        called["n"] += 1
+        yield {"kind": "result", "text": "42", "is_error": False}
+
+    monkeypatch.setattr("datacharter.agent.claude_code.run_turn", boom)
+    suite = EvalSuite(
+        name="s",
+        cases=[EvalCase(
+            question="how many orders?",
+            expect=[EvalAssertion(type="result_scalar", equals=90)],
+        )],
+    )
+    rec = await run_suite_cc(
+        suite, serve_url="http://x", deny=None, guides="G", agent_model="sonnet"
+    )
+    out = rec.cases[0].with_guides
+    assert out.passed is False
+    assert out.error is not None and "result_scalar" in out.error
+    assert rec.overall.get("errored") == 1
+    assert called["n"] == 0  # the agent run was skipped — no wasted claude turn
+
+
+async def test_run_suite_cc_judge_uses_separate_model(monkeypatch):
+    events = [{"kind": "result", "session_id": "s", "text": "There are 90 orders.",
+               "is_error": False}]
+    monkeypatch.setattr(
+        "datacharter.agent.claude_code.run_turn", _fake_run_turn(lambda _c: events)
+    )
+    seen = {}
+
+    async def fake_grade(prompt, model=None, system=None):
+        seen["model"] = model
+        return "PASS"
+
+    monkeypatch.setattr("datacharter.agent.claude_code.grade", fake_grade)
+    suite = EvalSuite(
+        name="s",
+        cases=[EvalCase(
+            question="how many orders?",
+            expect=[EvalAssertion(type="answer_contains", value="90")],
+            expected_answer="There are 90 orders.",
+        )],
+    )
+    rec = await run_suite_cc(
+        suite, serve_url="http://x", deny=None, guides="G", judge=True,
+        agent_model="sonnet", judge_model="opus",
+    )
+    out = rec.cases[0].with_guides
+    assert out.passed is True
+    assert any(a.type == "judge" and a.passed for a in out.assertions)
+    assert seen["model"] == "opus"  # judge ran on the distinct, stronger model

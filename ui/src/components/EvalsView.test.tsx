@@ -61,4 +61,29 @@ describe("EvalsView", () => {
     await waitFor(() => expect(screen.getByText(/orders_not_empty/)).toBeInTheDocument());
     expect(screen.getByText(/3 failing row/)).toBeInTheDocument();
   });
+
+  it("surfaces the server error when a run fails instead of doing nothing", async () => {
+    // Regression for "hit Run, nothing happens": a 400 JSON error was parsed as
+    // an empty SSE stream and silently swallowed. Now it must reach the user.
+    const base = globalThis.fetch as unknown as (url: string) => Promise<Response>;
+    globalThis.fetch = vi.fn((url: string) => {
+      if (url.endsWith("/api/evals/run"))
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              error: { type: "no_llm", message: "Connect an LLM — or the Claude Code backend — to run evals." },
+            }),
+            { status: 400 },
+          ),
+        );
+      return base(url);
+    }) as unknown as typeof fetch;
+
+    render(<EvalsView />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Run" })).toBeEnabled());
+    screen.getByRole("button", { name: "Run" }).click();
+    await waitFor(() =>
+      expect(screen.getByText(/Claude Code backend/)).toBeInTheDocument(),
+    );
+  });
 });

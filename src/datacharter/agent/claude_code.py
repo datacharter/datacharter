@@ -40,6 +40,7 @@ _DENY = [
 
 _PROBE_TIMEOUT_S = 60.0  # a locked-down probe should return init.tools quickly
 _TURN_IDLE_TIMEOUT_S = 120.0  # abort a turn that produces no output for this long
+_JUDGE_TIMEOUT_S = 120.0  # a text-only grading call should finish well within this
 _STDERR_TAIL = 2000  # chars of stderr to surface when a subprocess fails
 
 
@@ -344,10 +345,13 @@ async def run_turn(
     dc_bin: str | None = None,
     deny: list[str] | None = None,
     context: str | None = None,
+    model: str | None = None,
 ) -> AsyncIterator[dict]:
     """Run one chat turn; yield parsed stream events. Resumes `session_id` for context.
     `deny` is the effective deny-list from the connect-time assertion; `context` is
-    workspace-guide text appended to the system prompt."""
+    workspace-guide text appended to the system prompt. `model` pins the model (an
+    alias like `sonnet`/`opus` or a full id) — used by the eval runner to fix the
+    agent-under-test; chat leaves it None to use the account default."""
     dc_bin = dc_bin or _dc_bin()
     with tempfile.TemporaryDirectory(prefix="dc-claude-") as td:
         settings, mcp = build_configs(serve_url, dc_bin, Path(td), deny)
@@ -356,6 +360,8 @@ async def run_turn(
             "--verbose", "--include-partial-messages",
             *_base_flags(settings, mcp),
         ]
+        if model:
+            args += ["--model", model]
         if context:
             args += ["--append-system-prompt", context]
         if session_id:
@@ -406,3 +412,48 @@ async def run_turn(
             if proc.returncode is None:
                 proc.kill()
             await proc.wait()
+
+
+def _judge_configs(tmpdir: Path) -> tuple[Path, Path]:
+    """Locked-down config for a text-only grader: no MCP servers, all built-ins
+    denied. The judge grades supplied text — it must reach neither data nor disk."""
+    settings = tmpdir / "settings.json"
+    mcp = tmpdir / "mcp.json"
+    settings.write_text(
+        json.dumps({"defaultMode": "dontAsk", "permissions": {"allow": [], "deny": _DENY}})
+    )
+    mcp.write_text(json.dumps({"mcpServers": {}}))
+    return settings, mcp
+
+
+async def grade(prompt: str, model: str | None = None, system: str | None = None) -> str:
+    """One-shot Claude with NO data tools — returns the final result text.
+
+    Used as the eval judge: a separate, stronger model than the agent-under-test,
+    graded purely on the text handed to it. Locked down like the probe so the
+    grader can't touch the filesystem or the governed data plane."""
+    with tempfile.TemporaryDirectory(prefix="dc-judge-") as td:
+        settings, mcp = _judge_configs(Path(td))
+        args = [
+            find_claude() or "claude", "-p", prompt,
+            "--output-format", "stream-json", "--verbose",
+            *_base_flags(settings, mcp),
+        ]
+        if model:
+            args += ["--model", model]
+        if system:
+            args += ["--append-system-prompt", system]
+        proc = await asyncio.create_subprocess_exec(
+            *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=_env()
+        )
+        try:
+            out, _ = await asyncio.wait_for(proc.communicate(), timeout=_JUDGE_TIMEOUT_S)
+        except TimeoutError:
+            proc.kill()
+            await proc.wait()
+            return ""
+        text = ""
+        for ev in parse_stream(out.decode().splitlines()):
+            if ev["kind"] == "result" and not ev.get("is_error"):
+                text = ev.get("text", "")
+        return text

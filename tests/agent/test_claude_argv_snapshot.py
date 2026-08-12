@@ -78,6 +78,62 @@ def test_turn_argv_snapshot(monkeypatch, tmp_path):
     ]
 
 
+def test_turn_argv_includes_model_when_pinned(monkeypatch):
+    monkeypatch.setattr(cc, "find_claude", lambda: "/bin/claude")
+    argv = asyncio.run(_capture_argv(model="sonnet"))
+    assert argv[argv.index("--model") + 1] == "sonnet"
+
+
+class _GradeProc:
+    """A one-shot proc for `grade`, which uses communicate() not a readline loop."""
+
+    stderr = None
+    returncode = 0
+
+    def __init__(self, stdout: bytes) -> None:
+        self._stdout = stdout
+
+    async def communicate(self):
+        return self._stdout, b""
+
+    def kill(self):
+        self.returncode = -9
+
+    async def wait(self):
+        return self.returncode
+
+
+def test_grade_pins_model_and_locks_the_sandbox(monkeypatch):
+    """The judge is a distinct model with NO data tools and no MCP servers."""
+    monkeypatch.setattr(cc, "find_claude", lambda: "/bin/claude")
+    captured: dict = {}
+    result_line = json.dumps(
+        {"type": "result", "session_id": "j", "result": "PASS", "is_error": False}
+    ).encode()
+
+    async def fake_exec(*args, **_kw):
+        argv = list(args)
+        settings = json.loads(Path(argv[argv.index("--settings") + 1]).read_text())
+        mcp = json.loads(Path(argv[argv.index("--mcp-config") + 1]).read_text())
+        captured.update(argv=argv, settings=settings, mcp=mcp)
+        return _GradeProc(result_line)
+
+    real_exec = asyncio.create_subprocess_exec
+    asyncio.create_subprocess_exec = fake_exec
+    try:
+        text = asyncio.run(cc.grade("grade this", model="opus", system="be a judge"))
+    finally:
+        asyncio.create_subprocess_exec = real_exec
+
+    assert text == "PASS"
+    argv = captured["argv"]
+    assert argv[argv.index("--model") + 1] == "opus"
+    assert "--strict-mcp-config" in argv  # judge can't reach the user's MCP servers
+    assert captured["mcp"]["mcpServers"] == {}  # ...and has no data plane at all
+    assert captured["settings"]["permissions"]["allow"] == []  # no tools granted
+    assert "Bash" in captured["settings"]["permissions"]["deny"]  # built-ins denied
+
+
 def test_turn_configs_lock_the_sandbox(monkeypatch):
     monkeypatch.setattr(cc, "find_claude", lambda: "/bin/claude")
     captured: dict = {}

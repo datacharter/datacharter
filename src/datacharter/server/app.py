@@ -135,6 +135,10 @@ class EvalRunRequest(BaseModel):
     compare_guides: bool = False
     samples: int = 1
     judge: bool = False
+    #: Claude Code backend only: pin the agent-under-test and the (stronger)
+    #: judge to specific models. None falls back to env / built-in defaults.
+    agent_model: str | None = None
+    judge_model: str | None = None
 
 
 _QUERY_NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_\-]{0,62}$")
@@ -505,15 +509,24 @@ def create_app(
 
     @app.post("/api/evals/run")
     async def run_evals(body: EvalRunRequest):
-        if app.state.llm is None:
-            return _error(400, "no_llm", "Connect an LLM to run evals.")
         import dataclasses
 
-        from datacharter.agent.eval_runner import run_suite
         from datacharter.agent.eval_store import save_run
         from datacharter.contracts.evals import load_suites
 
         suites = [s for s in load_suites(workspace) if not body.suite or s.name == body.suite]
+        backend = agent_backend.get_backend(workspace)
+
+        if backend == "claude-code":
+            return await _run_evals_cc(body, suites)
+
+        if app.state.llm is None:
+            return _error(
+                400, "no_llm",
+                "Connect an LLM — or the Claude Code backend — to run evals.",
+            )
+        from datacharter.agent.eval_runner import run_suite
+
         box = app.state.toolbox
         # The guides-off arm differs ONLY in guides — same policies, canary,
         # masking, and audit as the real surface (F-9: it used to run ungoverned).
@@ -532,6 +545,50 @@ def create_app(
                 record = await run_suite(
                     suite, box, llm=app.state.llm, toolbox_off=box_off,
                     samples=body.samples, judge=body.judge,
+                )
+                save_run(workspace, record)
+                yield _sse("result", dataclasses.asdict(record))
+            yield _sse("done", {})
+
+        return StreamingResponse(events(), media_type="text/event-stream")
+
+    async def _run_evals_cc(body: EvalRunRequest, suites: list):
+        """Eval path for the Claude Code backend: the agent-under-test IS Claude
+        Code (pinned model) driving the governed server; a separate stronger model
+        judges. Same governed surface — guides on/off is the system-prompt, not a
+        toolbox swap — so there's no ungoverned arm."""
+        import dataclasses
+        import os
+
+        from datacharter.agent import claude_code as cc
+        from datacharter.agent.eval_runner import run_suite_cc
+        from datacharter.agent.eval_store import save_run
+
+        serve_url = f"http://127.0.0.1:{app.state.port}"
+        if app.state.cc_deny is None:  # lost to a restart — re-verify the sandbox
+            try:
+                app.state.cc_deny = await cc.assert_tool_surface(
+                    serve_url, initial_deny=cc.load_deny(workspace)
+                )
+                cc.save_deny(workspace, app.state.cc_deny)
+            except cc.ClaudeGovernanceError as exc:
+                return _error(400, "cc_governance", str(exc))
+
+        agent_model = body.agent_model or os.environ.get(
+            "DATACHARTER_EVAL_AGENT_MODEL", "sonnet"
+        )
+        judge_model = body.judge_model or os.environ.get(
+            "DATACHARTER_EVAL_JUDGE_MODEL", "opus"
+        )
+
+        async def events() -> AsyncIterator[str]:
+            for suite in suites:
+                yield _sse("progress", {"suite": suite.name})
+                record = await run_suite_cc(
+                    suite, serve_url=serve_url, deny=app.state.cc_deny,
+                    guides=app.state.charter.guides, compare=body.compare_guides,
+                    samples=body.samples, judge=body.judge,
+                    agent_model=agent_model, judge_model=judge_model,
                 )
                 save_run(workspace, record)
                 yield _sse("result", dataclasses.asdict(record))

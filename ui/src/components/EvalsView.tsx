@@ -126,10 +126,21 @@ export default function EvalsView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ compare_guides: compare, samples: 1 }),
       });
+      // A non-OK response is a JSON error, not an SSE stream — surface it
+      // instead of parsing it as empty frames and silently doing nothing.
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        setError(body?.error?.message ?? `Eval run failed (HTTP ${res.status}).`);
+        return;
+      }
       const reader = res.body?.getReader();
-      if (!reader) return;
+      if (!reader) {
+        setError("Eval run returned no stream.");
+        return;
+      }
       const dec = new TextDecoder();
       let buf = "";
+      let gotResult = false;
       for (;;) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -140,9 +151,13 @@ export default function EvalsView() {
           const line = f.split("\n").find((l) => l.startsWith("data:"));
           if (!line) continue;
           const ev = JSON.parse(line.slice(5));
-          if (ev.overall) setLatest(ev as EvalRun);
+          if (ev.overall) {
+            setLatest(ev as EvalRun);
+            gotResult = true;
+          }
         }
       }
+      if (!gotResult) setError("No eval suites to run — create a suite first.");
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Eval run failed.");

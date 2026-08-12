@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.24.9] - 2026-08-12
+
+### Added
+- **Evals run against the Claude Code backend.** Until now "Run" on the Evals
+  view required a built-in LLM, so with Claude Code connected it did nothing.
+  The agent-under-test is now Claude Code itself, pinned to a fixed model
+  (`sonnet` by default; override per-run or via `DATACHARTER_EVAL_AGENT_MODEL`)
+  driving the same governed MCP surface; the judge is a **separate, stronger
+  model** (`opus` by default; `DATACHARTER_EVAL_JUDGE_MODEL`) run with no data
+  tools at all — it only grades text. `result_scalar` assertions, which need
+  query result rows the Claude Code backend does not expose, are reported as
+  errored (with the reason) rather than a misleading failure.
+
+### Fixed
+- **"Run" on the Evals view no longer fails silently.** A non-OK response
+  (e.g. no agent connected) was parsed as an empty result stream and swallowed,
+  so the button appeared to do nothing. The server's reason is now shown, along
+  with a note when there are no suites to run.
+
 ## [0.24.8] - 2026-08-11
 
 ### Fixed
