@@ -90,4 +90,4 @@ datacharter canary drill      # deliberately trip the alarm path, end to end
 - Concurrent surfaces (serve + mcp on one workspace) serialize through a lock,
   so the chain stays linear.
 
-Next: [Measure agent accuracy — evals →](evals.html)
+Next: [Prove an answer — verifiable provenance →](provenance.html)

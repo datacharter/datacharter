@@ -160,6 +160,18 @@ the event JSON to a file; with neither it prints the event to stdout. Reads live
 schemas, so sources must be reachable. Built on the stdlib — no OpenLineage client
 dependency. Verified end-to-end against Marquez.
 
+### `provenance keygen|pubkey|seal|verify`
+Signed, independently-verifiable **answer-provenance receipts** — the AI answer you
+can take to a regulator or an auditor. `keygen` creates the workspace's Ed25519
+signing key; `pubkey` prints the public key to publish. `seal <sql>` runs the query
+through the governed surface and emits a signed receipt sealing the query, the
+relations read, the masked columns, the row count, a result hash, the governance
+`surface_hash`, and the audit-chain head. `verify <receipt>` checks it offline —
+recompute the hash, verify the signature, and (`--pubkey`) pin the key; `--flight
+<dir>` also confirms the Merkle link into the audit chain. See
+[Verifiable answer provenance](provenance.html) for the receipt format and
+verification algorithm.
+
 ### `snapshot <name> <sql> [directory]`
 Save a query's result as `local.<name>` along with its SQL.
 

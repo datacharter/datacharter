@@ -1261,6 +1261,71 @@ def _cmd_openlineage(args: argparse.Namespace) -> int:
     )
 
 
+def _cmd_provenance(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from datacharter.provenance import keys, receipt, seal_query
+
+    action = args.prov_action
+    if action == "keygen":
+        try:
+            signer = keys.generate(args.directory, force=args.force)
+        except keys.ProvenanceKeyError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(f"Signing key created — key_id {signer.key_id}")
+        print(f"  public key: {signer.public_hex}")
+        print("  Publish this public key so anyone can verify your receipts offline.")
+        return 0
+
+    if action == "pubkey":
+        pub = keys.load_public(args.directory)
+        if pub is None:
+            print("No signing key yet. Run `datacharter provenance keygen`.", file=sys.stderr)
+            return 1
+        print(pub.hex())
+        return 0
+
+    if action == "seal":
+        try:
+            r = seal_query(args.directory, args.sql, model=args.model)
+        except (keys.ProvenanceKeyError, ValueError, FileNotFoundError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        text = _json.dumps(r, indent=2)
+        if args.out:
+            Path(args.out).write_text(text)
+            print(f"Wrote {args.out} — receipt {r['content_hash'][:12]} "
+                  f"signed by key {r['signature']['key_id']}")
+        else:
+            print(text)
+        return 0
+
+    if action == "verify":
+        try:
+            r = _json.loads(Path(args.receipt).read_text())
+        except (OSError, ValueError) as exc:
+            print(f"Could not read receipt: {exc}", file=sys.stderr)
+            return 1
+        v = receipt.verify(r, expected_pubkey=args.pubkey)
+        for name, ok in v["checks"].items():
+            print(f"  {'PASS' if ok else 'FAIL'}  {name}")
+        overall = v["ok"]
+        if args.flight:
+            link = receipt.verify_audit_link(r, args.flight)
+            link_ok = link["chain_ok"] and link["head_in_chain"]
+            print(f"  {'PASS' if link_ok else 'FAIL'}  audit_link  ({link['detail']})")
+            overall = overall and link_ok
+        body = r.get("body") or {}
+        q = str(body.get("question") or "")
+        print(f"\n  key_id {v['key_id']}  ·  model {body.get('model')}  ·  {q[:60]}")
+        print("VERIFIED" if overall else "NOT VERIFIED")
+        return 0 if overall else 1
+
+    print("Usage: datacharter provenance [keygen|pubkey|seal|verify]", file=sys.stderr)
+    return 1
+
+
 def _cmd_lineage(args: argparse.Namespace) -> int:
     import json as _json
 
@@ -1564,6 +1629,29 @@ def main(argv: list[str] | None = None) -> int:
     p_ol.add_argument("--job", help="Job name (default govern.<workspace>)")
     p_ol.add_argument("-o", "--out", help="Write the event JSON to a file instead of posting")
     p_ol.set_defaults(func=_cmd_openlineage)
+
+    p_prov = sub.add_parser(
+        "provenance",
+        help="Signed, independently-verifiable answer-provenance receipts",
+    )
+    prov_sub = p_prov.add_subparsers(dest="prov_action")
+    p_kg = prov_sub.add_parser("keygen", help="Create the workspace signing key")
+    p_kg.add_argument("directory", nargs="?", default=".")
+    p_kg.add_argument("--force", action="store_true", help="Replace an existing key")
+    p_pk = prov_sub.add_parser("pubkey", help="Print the public key (publish it for verifiers)")
+    p_pk.add_argument("directory", nargs="?", default=".")
+    p_seal = prov_sub.add_parser(
+        "seal", help="Run a query through the governed surface and emit a signed receipt"
+    )
+    p_seal.add_argument("sql")
+    p_seal.add_argument("directory", nargs="?", default=".")
+    p_seal.add_argument("-o", "--out", help="Write the receipt JSON to a file (default stdout)")
+    p_seal.add_argument("--model", help="Record the model that produced the answer")
+    p_verify = prov_sub.add_parser("verify", help="Verify a receipt offline")
+    p_verify.add_argument("receipt")
+    p_verify.add_argument("--pubkey", help="Pin the expected public key (hex) you trust")
+    p_verify.add_argument("--flight", help="Workspace dir — also check the audit-chain link")
+    p_prov.set_defaults(func=_cmd_provenance, prov_action=None)
 
     p_snap = sub.add_parser("snapshot", help="Save a query result as local.<name> plus its SQL")
     p_snap.add_argument("name")

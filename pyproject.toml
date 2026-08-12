@@ -35,6 +35,9 @@ dependencies = [
     "keyring>=25.0",
     "python-multipart>=0.0.9",
     "ruamel.yaml>=0.18",
+    # Ed25519 signing/verification for portable, operator-independent answer
+    # provenance receipts; stdlib has no asymmetric signature primitive.
+    "cryptography>=42.0",
 ]
 
 [project.optional-dependencies]

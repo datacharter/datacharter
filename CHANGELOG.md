@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.25.0] - 2026-08-12
+
+### Added
+- **Verifiable answer provenance** (`datacharter provenance`) — turn a governed
+  answer into a signed, portable **receipt** that anyone can verify offline,
+  without trusting the operator. `keygen` creates a per-workspace Ed25519 key;
+  `pubkey` prints the public key to publish; `seal <sql>` runs a query through the
+  governed surface and emits a receipt sealing the query, the relations read, the
+  masked columns, the row count, a result hash, the governance `surface_hash`, the
+  model, the principal, and the head of the tamper-evident audit chain; `verify
+  <receipt>` recomputes the hash, checks the Ed25519 signature, pins the key
+  (`--pubkey`), and (`--flight`) confirms the Merkle link into the audit chain.
+  The receipt carries only hashes and metadata — never raw rows. Any change to a
+  sealed fact, or a forged/spliced signature, fails verification. New spec:
+  [docs/provenance.md](https://datacharter.dev/provenance.html). Adds a dependency
+  on `cryptography` (stdlib has no asymmetric signature primitive).
+
 ## [0.24.15] - 2026-08-12
 
 ### Added

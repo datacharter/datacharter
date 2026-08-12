@@ -1,0 +1,14 @@
+version: 0.25.0
+date: 2026-08-12
+who: release_gate.sh (automated; run on the release machine)
+wheel-gate: pass
+journey: pass
+claude-code-round: pass
+notes: |
+    ✓ claude-binary: 2.1.228 (Claude Code)
+    ✓ tool-surface: governed surface asserted (37 denied)
+    ✓ data-question: tools=['list_tables', 'query'] answer="I'll find the table first.3"
+    ✓ pii-masked: raw emails absent from every event
+    ✓ follow-up-memory: answer='3'
+    ✓ local-llm: skipped — no local runtime running
+  claude live check: 6/6 passed
