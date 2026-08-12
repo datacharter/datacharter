@@ -115,11 +115,14 @@ class ToolBox:
         policies: dict | None = None,
         metrics: list | None = None,
         quarantine: bool = True,
+        injection_classifier=None,
         timeout_s: float = _DEFAULT_TIMEOUT_S,
     ) -> None:
         self._engine = engine
         #: Scan result cells for prompt-injection payloads and replace them.
         self._quarantine = quarantine
+        #: Optional second-tier injection detector behind the heuristic (BYO LLM).
+        self._injection_classifier = injection_classifier
         #: Workspace guides (guides/*.md) — read by the agent loop and the MCP server.
         self.guides = guides
         #: Flight recorder (audit) — every run() call is recorded when set.
@@ -164,6 +167,17 @@ class ToolBox:
 
     async def run(self, name: str, arguments: str) -> str:
         out = await self._dispatch(name, arguments)
+        if self._quarantine and arguments:
+            # Tripwire on the agent's own tool inputs: an argument carrying an
+            # injection signature suggests the agent was manipulated upstream. The
+            # call still runs (the argument is the agent's action, not data), but
+            # the anomaly is recorded.
+            from datacharter.agent.quarantine import detect
+
+            if detect(arguments, self._injection_classifier):
+                rec_i = getattr(self.recorder, "record_injection", None)
+                if rec_i is not None:
+                    rec_i(name, arguments)
         if self.canary is not None:
             hit = self.canary.scan(out)
             if hit is not None:
@@ -449,7 +463,7 @@ class ToolBox:
         if self._quarantine:
             from datacharter.agent.quarantine import scan_rows
 
-            rows, hits = scan_rows(result.columns, rows)
+            rows, hits = scan_rows(result.columns, rows, self._injection_classifier)
             if hits:
                 cols = sorted({str(c) for _r, c in hits})
                 warnings.append(

@@ -71,6 +71,14 @@ This is a heuristic defense-in-depth layer, not a guarantee — it raises the co
 of a data-borne injection and makes one visible, alongside the read-only guard,
 masking, and canary tripwires.
 
+Two extensions harden it further. A **second-tier classifier** can be plugged in
+behind the fast heuristic: supply a callable (an LLM or an API detector) and it is
+consulted for cells the heuristic passes, so novel payloads without a known
+signature are still caught — its own failures never count as a detection. And the
+same detection runs on **tool-call arguments**: if the agent's own input to a tool
+carries an injection signature — a sign it was manipulated upstream — the call
+still proceeds, but the anomaly is recorded to the audit trail as a tripwire.
+
 ## Credentials never touch disk in the clear
 
 - `charter.yaml` may only reference secrets as `${NAME}`; literal secret values

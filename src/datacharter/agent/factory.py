@@ -39,6 +39,7 @@ def build_toolbox(
     auto_pii: set[str],
     recorder: Any = None,
     canary: Any = None,
+    injection_classifier: Any = None,
     guides_override: str | None = None,
 ) -> ToolBox:
     """Every governance input is explicit and non-defaultable where it matters:
@@ -56,4 +57,5 @@ def build_toolbox(
         policies=charter.policies,
         metrics=charter.metrics,
         quarantine=charter.quarantine_enabled,
+        injection_classifier=injection_classifier,
     )

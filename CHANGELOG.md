@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.30.0] - 2026-08-12
+
+### Added
+- **Quarantine v2: a pluggable classifier tier and tool-argument tripwire.** The
+  prompt-injection quarantine now takes an optional second-tier classifier behind
+  the fast heuristic — supply a callable (an LLM or an API detector) via
+  `build_toolbox(injection_classifier=...)` and it is consulted for cells the
+  heuristic passes, so novel payloads without a known signature are still caught
+  (a classifier failure never counts as a detection). The same detection also runs
+  on **tool-call arguments**: if the agent's own input to a tool carries an
+  injection signature — a sign it was manipulated upstream — the call still runs
+  but the anomaly is recorded to the audit trail as a tripwire (`type: injection`).
+
 ## [0.29.0] - 2026-08-12
 
 ### Added

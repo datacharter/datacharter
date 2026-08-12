@@ -107,6 +107,20 @@ class FlightRecorder:
             "cells": [{"row": r, "column": str(c)} for r, c in hits],
         })
 
+    def record_injection(self, tool: str, arguments: str) -> None:
+        """A tool-call argument carried an injection signature — an input tripwire
+        suggesting the agent was manipulated upstream."""
+        if not self._enabled:
+            return
+        try:
+            args = json.loads(arguments or "{}")
+        except ValueError:
+            args = {}
+        self._append({
+            "type": "injection", "session": self._session,
+            "tool": tool, "sql": args.get("sql"),
+        })
+
     def record_access(self, tool: str, arguments: str, result: str) -> None:
         if not self._enabled:
             return
