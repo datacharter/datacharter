@@ -148,6 +148,45 @@ def test_seal_refuses_failed_query(tmp_path):
         seal_query(ws, "SELECT * FROM does_not_exist")
 
 
+def test_seal_answer_window_captures_cross_session_queries(tmp_path):
+    """A backend that records its queries under a different session — as Claude
+    Code does via /mcp — is still sealed. The turn is a window of the audit log,
+    not one session id, and a prior turn's query is excluded."""
+    import asyncio
+    import json as _json
+
+    from datacharter.agent.factory import build_toolbox, detect_auto_pii
+    from datacharter.audit.evidence import read_entries
+    from datacharter.audit.recorder import FlightRecorder
+    from datacharter.cli import _open_engine
+    from datacharter.contracts import load_charter
+    from datacharter.provenance import seal_answer
+
+    ws = _workspace(tmp_path)
+    keys.generate(ws)
+    charter = load_charter(ws)
+    engine = _open_engine(ws, charter.sources)
+    rec = FlightRecorder(ws, enabled=True)
+    try:
+        box = build_toolbox(engine, charter, auto_pii=asyncio.run(detect_auto_pii(engine)),
+                            recorder=rec)
+        rec.start_session("chat", question="old")  # a PRIOR turn — must be excluded
+        asyncio.run(box.run("query", _json.dumps({"sql": "SELECT count(*) AS n FROM people"})))
+        since = len(read_entries(ws))              # the new turn's window starts here
+        turn = rec.start_session("claude-code", question="who are they?")
+        rec.start_session("mcp")                   # the out-of-process tool session
+        asyncio.run(box.run("query", _json.dumps({"sql": "SELECT id, email FROM people"})))
+    finally:
+        engine.close()
+
+    r = seal_answer(ws, question="who are they?", answer="Two.", session=turn,
+                    since=since, model="claude-code")
+    assert receipt.verify(r)["ok"] is True
+    q = r["body"]["queries"]
+    assert len(q) == 1  # only the turn's query, not the prior turn's count
+    assert "SELECT id, email" in q[0]["sql"] and "email" in q[0]["masked_columns"]
+
+
 def test_seal_answer_seals_a_whole_turn(tmp_path):
     """Simulate an agent turn — a recorded session with two governed queries —
     then seal the NL answer over them."""

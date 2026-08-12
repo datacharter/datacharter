@@ -24,3 +24,38 @@ describe("agent transcript query chip", () => {
     expect(queryByText("Open in editor")).toBeNull();
   });
 });
+
+describe("verifiable-answer receipt", () => {
+  const withReceipt = {
+    role: "assistant" as const,
+    text: "3 customers.",
+    tools: [],
+    receipt: { content_hash: "deadbeefcafe0000", signature: { key_id: "k1" }, body: {} },
+  };
+
+  it("shows the receipt affordance only when a receipt is present", () => {
+    const { getByText } = render(<Message msg={withReceipt} />);
+    expect(getByText("🔏 Verifiable answer")).toBeTruthy();
+    expect(getByText("Download receipt")).toBeTruthy();
+  });
+
+  it("has no affordance without a receipt", () => {
+    const { queryByText } = render(
+      <Message msg={{ role: "assistant", text: "3 customers.", tools: [] }} />,
+    );
+    expect(queryByText("Download receipt")).toBeNull();
+  });
+
+  it("downloads the receipt JSON on click", () => {
+    const createURL = vi.fn(() => "blob:x");
+    const revokeURL = vi.fn();
+    (URL as unknown as { createObjectURL: unknown }).createObjectURL = createURL;
+    (URL as unknown as { revokeObjectURL: unknown }).revokeObjectURL = revokeURL;
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    const { getByText } = render(<Message msg={withReceipt} />);
+    fireEvent.click(getByText("Download receipt"));
+    expect(createURL).toHaveBeenCalled();
+    expect(click).toHaveBeenCalled();
+    click.mockRestore();
+  });
+});

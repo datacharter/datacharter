@@ -34,14 +34,18 @@ def seal_answer(
     session: str,
     model: str | None = None,
     surface_hash: str | None = None,
+    since: int = 0,
     signer: keys.Signer | None = None,
 ) -> dict:
     """Seal a whole agent turn: the natural-language `answer` plus every governed
-    query the turn ran, read straight back from the recorder session so the
-    receipt commits to exactly what the audit chain recorded.
+    query the turn ran, read straight back from the audit chain so the receipt
+    commits to exactly what was recorded.
 
-    `surface_hash` may be supplied by a caller that already holds the charter;
-    otherwise it is computed from the workspace's charter in force."""
+    `since` is the number of audit entries that existed before the turn began;
+    every access entry appended after it is one of the turn's queries. A window,
+    not the session id, is used because an out-of-process backend (Claude Code)
+    records its tool calls under a separate `mcp` session than the chat turn.
+    `surface_hash` may be supplied by a caller that already holds the charter."""
     from datacharter.audit.evidence import read_entries
     from datacharter.contracts import load_charter
     from datacharter.contracts.accessplan import effective_surface
@@ -52,7 +56,7 @@ def seal_answer(
         surface_hash = _surface_hash(effective_surface(load_charter(ws)))
     signer = signer or keys.load_signer(ws)
 
-    entries = [e for e in read_entries(ws) if e.get("session") == session]
+    window = read_entries(ws)[since:]
     queries = [
         {
             "sql": e.get("sql"),
@@ -61,12 +65,12 @@ def seal_answer(
             "row_count": e.get("row_count"),
             "result_sha256": e.get("result_sha256"),
         }
-        for e in entries
+        for e in window
         if e.get("type") == "access" and e.get("sql")
     ]
     audit = (
-        {"session": session, "head": entries[-1]["hash"], "entries": len(entries)}
-        if entries
+        {"session": session, "head": window[-1]["hash"], "entries": len(window)}
+        if window
         else None
     )
     body = receipt.build_body(

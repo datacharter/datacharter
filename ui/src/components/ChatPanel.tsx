@@ -11,10 +11,33 @@ interface ToolRun {
   sql: string;
 }
 
+/** A signed answer-provenance receipt (see /provenance). Only the fields the UI
+ * reads are typed; the object is downloaded whole. */
+interface Receipt {
+  content_hash?: string;
+  signature?: { key_id?: string };
+  body?: { question?: string; answer_sha256?: string; queries?: unknown[] };
+}
+
 interface Msg {
   role: "user" | "assistant";
   text: string;
   tools: ToolRun[];
+  receipt?: Receipt;
+}
+
+/** Download a receipt as JSON so the user can verify it independently
+ * (`datacharter provenance verify <file>`). */
+function downloadReceipt(receipt: Receipt) {
+  const blob = new Blob([JSON.stringify(receipt, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `datacharter-receipt-${(receipt.content_hash ?? "receipt").slice(0, 12)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 /** Streams agent answers over SSE; renders any ```vega-lite block inline. */
@@ -109,6 +132,7 @@ export default function ChatPanel({
               patch((m) => ({ ...m, tools: [...m.tools, { tool: data.tool, sql: data.sql ?? "" }] }));
             else if (event === "error")
               patch((m) => ({ ...m, text: m.text + `\n\n⚠ ${data.detail}` }));
+            else if (event === "receipt") patch((m) => ({ ...m, receipt: data.receipt }));
           }
         }
       }
@@ -268,6 +292,23 @@ export function Message({
         </div>
       )}
       {spec && <VegaBlock spec={spec} dark={dark} />}
+      {msg.receipt && (
+        <div className="chat-receipt">
+          <span
+            className="chat-receipt-badge"
+            title={
+              "This answer is sealed to the exact governed query, the rows read, the " +
+              "masked columns, and the policy version — then signed. Download the receipt " +
+              "to verify it independently: datacharter provenance verify <file>."
+            }
+          >
+            🔏 Verifiable answer
+          </span>
+          <button className="chat-receipt-download" onClick={() => downloadReceipt(msg.receipt!)}>
+            Download receipt
+          </button>
+        </div>
+      )}
     </div>
   );
 }

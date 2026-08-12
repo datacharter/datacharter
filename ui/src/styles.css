@@ -619,6 +619,30 @@ pre.plan {
 }
 .chat-query-open:hover { border-color: #3b82c4; }
 
+.chat-receipt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 11px;
+}
+.chat-receipt-badge {
+  color: var(--text-dim);
+  cursor: help;
+  white-space: nowrap;
+}
+.chat-receipt-download {
+  flex: 0 0 auto;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 2px 8px;
+  background: var(--bg-panel);
+  color: inherit;
+  cursor: pointer;
+}
+.chat-receipt-download:hover { border-color: #3b82c4; }
+
 .chat-chart {
   background: var(--bg-raised);
   border-radius: 8px;

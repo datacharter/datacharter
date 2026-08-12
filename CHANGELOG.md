@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.27.0] - 2026-08-12
+
+### Added
+- **One-click "Download receipt" in the chat.** When an answer is sealed, the web
+  UI now shows a "🔏 Verifiable answer · Download receipt" affordance under it that
+  saves the signed receipt as JSON — ready to verify with `datacharter provenance
+  verify <file>`.
+
+### Fixed
+- **Claude Code answer receipts now seal the queries.** The Claude Code backend
+  runs out-of-process and records its tool calls under a separate `mcp` audit
+  session than the chat turn, so a turn sealed by session id captured no queries.
+  Sealing now uses a window of the audit log (every entry appended during the
+  turn), so both the built-in and Claude Code backends seal the full query set —
+  masking and all. `provenance.seal_answer` gained a `since` parameter.
+
 ## [0.26.0] - 2026-08-12
 
 ### Added

@@ -1132,6 +1132,7 @@ def create_app(
 
                     return StreamingResponse(refuse(), media_type="text/event-stream")
 
+            cc_since = _flight_len(workspace)
             cc_session = app.state.recorder.start_session(
                 "claude-code", question=body.question
             )
@@ -1178,7 +1179,8 @@ def create_app(
                     file=sys.stderr,
                 )
                 r = _seal_answer(
-                    workspace, body.question, "".join(answer), cc_session, "claude-code"
+                    workspace, body.question, "".join(answer), cc_session,
+                    "claude-code", cc_since,
                 )
                 if r is not None:
                     yield _sse("receipt", {"receipt": r})
@@ -1193,6 +1195,7 @@ def create_app(
         )
         agent = Agent(app.state.toolbox, AgentConfig(llm=app.state.llm, cache=cache))
         model = getattr(app.state.llm, "model", None)
+        since = _flight_len(workspace)
         session = app.state.recorder.start_session("chat", model=model, question=body.question)
 
         async def events() -> AsyncIterator[str]:
@@ -1204,7 +1207,7 @@ def create_app(
                     ev.kind,
                     {"text": ev.text, "tool": ev.tool, "detail": ev.detail, "sql": ev.sql},
                 )
-            r = _seal_answer(workspace, body.question, "".join(answer), session, model)
+            r = _seal_answer(workspace, body.question, "".join(answer), session, model, since)
             if r is not None:
                 yield _sse("receipt", {"receipt": r})
 
@@ -1217,8 +1220,19 @@ def create_app(
     return app
 
 
+def _flight_len(workspace: Path) -> int:
+    """Number of audit entries now — captured before a turn so sealing knows the
+    window of entries the turn produced."""
+    from datacharter.audit.evidence import read_entries
+
+    try:
+        return len(read_entries(workspace))
+    except Exception:  # noqa: BLE001
+        return 0
+
+
 def _seal_answer(
-    workspace: Path, question: str, answer: str, session: str, model: str | None
+    workspace: Path, question: str, answer: str, session: str, model: str | None, since: int
 ) -> dict | None:
     """Sign a provenance receipt for a completed turn, if the workspace has a
     signing key. Failure-safe: sealing must never break the chat response."""
@@ -1228,7 +1242,8 @@ def _seal_answer(
         if keys.load_public(workspace) is None:
             return None
         return seal_answer(
-            workspace, question=question, answer=answer, session=session, model=model
+            workspace, question=question, answer=answer, session=session,
+            model=model, since=since,
         )
     except Exception as exc:  # noqa: BLE001 — a failed seal must not break the answer
         print(f"[provenance] failed to seal answer: {exc}", file=sys.stderr)
