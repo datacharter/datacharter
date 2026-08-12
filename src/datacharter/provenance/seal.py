@@ -16,7 +16,7 @@ from pathlib import Path
 
 from datacharter.provenance import keys, receipt
 
-__all__ = ["seal_query"]
+__all__ = ["seal_query", "seal_answer"]
 
 
 def _principal() -> str:
@@ -24,6 +24,62 @@ def _principal() -> str:
         return getpass.getuser()
     except Exception:  # noqa: BLE001
         return "unknown"
+
+
+def seal_answer(
+    workspace: Path | str,
+    *,
+    question: str,
+    answer: str,
+    session: str,
+    model: str | None = None,
+    surface_hash: str | None = None,
+    signer: keys.Signer | None = None,
+) -> dict:
+    """Seal a whole agent turn: the natural-language `answer` plus every governed
+    query the turn ran, read straight back from the recorder session so the
+    receipt commits to exactly what the audit chain recorded.
+
+    `surface_hash` may be supplied by a caller that already holds the charter;
+    otherwise it is computed from the workspace's charter in force."""
+    from datacharter.audit.evidence import read_entries
+    from datacharter.contracts import load_charter
+    from datacharter.contracts.accessplan import effective_surface
+    from datacharter.contracts.accessplan import surface_hash as _surface_hash
+
+    ws = Path(workspace).resolve()
+    if surface_hash is None:
+        surface_hash = _surface_hash(effective_surface(load_charter(ws)))
+    signer = signer or keys.load_signer(ws)
+
+    entries = [e for e in read_entries(ws) if e.get("session") == session]
+    queries = [
+        {
+            "sql": e.get("sql"),
+            "relations": e.get("relations") or [],
+            "masked_columns": e.get("masked_columns") or [],
+            "row_count": e.get("row_count"),
+            "result_sha256": e.get("result_sha256"),
+        }
+        for e in entries
+        if e.get("type") == "access" and e.get("sql")
+    ]
+    audit = (
+        {"session": session, "head": entries[-1]["hash"], "entries": len(entries)}
+        if entries
+        else None
+    )
+    body = receipt.build_body(
+        workspace=ws.name,
+        surface_hash=surface_hash,
+        principal=_principal(),
+        model=model,
+        question=question,
+        queries=queries,
+        answer=answer,
+        audit=audit,
+    )
+    return receipt.sign(body, signer)
 
 
 def seal_query(

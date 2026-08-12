@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.26.0] - 2026-08-12
+
+### Added
+- **Verifiable provenance for whole answers.** The built-in chat now seals each
+  completed turn — the agent's natural-language answer plus **every** governed
+  query behind it — into one signed receipt, streamed as a final `receipt` event
+  on `POST /api/agent/ask` (when the workspace has a signing key; sealing is
+  opt-in and never blocks an answer). The receipt's queries are read straight
+  from the audit chain, so it commits to exactly what the agent saw. New
+  `GET /api/provenance/pubkey` returns the verifying key so a client can pin it
+  and verify offline. New public helper `provenance.seal_answer`.
+
 ## [0.25.0] - 2026-08-12
 
 ### Added

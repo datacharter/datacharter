@@ -148,6 +148,43 @@ def test_seal_refuses_failed_query(tmp_path):
         seal_query(ws, "SELECT * FROM does_not_exist")
 
 
+def test_seal_answer_seals_a_whole_turn(tmp_path):
+    """Simulate an agent turn — a recorded session with two governed queries —
+    then seal the NL answer over them."""
+    import asyncio
+    import json as _json
+
+    from datacharter.agent.factory import build_toolbox, detect_auto_pii
+    from datacharter.audit.recorder import FlightRecorder
+    from datacharter.cli import _open_engine
+    from datacharter.contracts import load_charter
+    from datacharter.provenance import seal_answer
+
+    ws = _workspace(tmp_path)
+    keys.generate(ws)
+    charter = load_charter(ws)
+    engine = _open_engine(ws, charter.sources)
+    recorder = FlightRecorder(ws, enabled=True)
+    try:
+        box = build_toolbox(engine, charter, auto_pii=asyncio.run(detect_auto_pii(engine)),
+                            recorder=recorder)
+        session = recorder.start_session("chat", model="fake", question="who are they?")
+        asyncio.run(box.run("query", _json.dumps({"sql": "SELECT id, email FROM people"})))
+        asyncio.run(box.run("query", _json.dumps({"sql": "SELECT count(*) AS n FROM people"})))
+    finally:
+        engine.close()
+
+    r = seal_answer(ws, question="who are they?", answer="Two people; emails masked.",
+                    session=session, model="fake")
+    assert receipt.verify(r)["ok"] is True
+    q = r["body"]["queries"]
+    assert len(q) == 2  # both governed queries of the turn are sealed
+    assert any("email" in x["masked_columns"] for x in q)
+    assert r["body"]["answer_sha256"]  # NL answer sealed
+    link = receipt.verify_audit_link(r, str(ws))
+    assert link["chain_ok"] and link["head_in_chain"]
+
+
 def test_cli_keygen_seal_verify(tmp_path):
     from datacharter.cli import main
 

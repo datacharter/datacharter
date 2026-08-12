@@ -112,12 +112,34 @@ private key: anyone holding it can issue receipts in your name. Rotating the key
 publish the new key and keep the old public key available for historical
 verification.
 
+## Sealing an agent's answer
+
+`provenance seal <sql>` seals a single query, but a real answer is a whole turn:
+the agent's natural-language reply plus every governed query behind it. When the
+built-in chat finishes a turn and the workspace has a signing key, the server
+seals the **answer and all its queries** into one receipt and streams it as a
+final `receipt` event on `POST /api/agent/ask`:
+
+```
+event: text
+data: {"text": "There are 3 customers; emails are masked."}
+
+event: receipt
+data: {"receipt": { "body": { "question": "...", "answer_sha256": "...",
+       "queries": [ ... ], "surface_hash": "...", "audit": { ... } }, ... }}
+```
+
+The receipt's `queries` are read straight from the audit chain, so it commits to
+exactly what the agent saw — same relations, same masked columns, same result
+hashes. Clients fetch the verifying key from `GET /api/provenance/pubkey` and run
+the same offline check as above. No signing key, no `receipt` event — sealing is
+opt-in and never blocks an answer.
+
 ## Scope and roadmap
 
-This first version seals a single governed query — the deterministic core of the
-mechanism, provable without a model in the loop. Next: sealing an agent's
-natural-language answer together with **all** the queries of its turn, and
-(enterprise) binding the full principal and delegation chain and an
+Sealing covers a single governed query (`seal`) and a full built-in-agent turn
+(`/api/agent/ask`). Next: surfacing a one-click "download receipt" in the web UI,
+and (enterprise) binding the full principal and delegation chain and an
 optionally-TEE-rooted signing key. The receipt schema is versioned
 (`datacharter.provenance/v1`) so verifiers can evolve with it.
 

@@ -352,6 +352,17 @@ def create_app(
         status = "broken" if not ok else "empty" if n == 0 else "verified"
         return {"ok": ok, "entries": n, "detail": detail, "status": status}
 
+    @app.get("/api/provenance/pubkey")
+    async def provenance_pubkey() -> dict:
+        """The workspace's answer-provenance public key, so a client can pin it
+        and verify receipts. `null` when no signing key has been created."""
+        from datacharter.provenance import keys
+
+        pub = keys.load_public(workspace)
+        if pub is None:
+            return {"public_key": None, "key_id": None}
+        return {"public_key": pub.hex(), "key_id": keys.fingerprint(pub)}
+
     @app.get("/api/guides/suggestions")
     async def guide_suggestions() -> dict:
         from dataclasses import asdict
@@ -1121,10 +1132,13 @@ def create_app(
 
                     return StreamingResponse(refuse(), media_type="text/event-stream")
 
-            app.state.recorder.start_session("claude-code", question=body.question)
+            cc_session = app.state.recorder.start_session(
+                "claude-code", question=body.question
+            )
 
             async def cc_events() -> AsyncIterator[str]:
                 got_text = False
+                answer: list[str] = []
                 sid = app.state.cc_session.get("id")
                 access_changed = bool(app.state.cc_session.pop("stale", False))
                 # Server-log only (stderr, never the SSE stream): shows whether a
@@ -1145,6 +1159,7 @@ def create_app(
                         app.state.cc_session["id"] = ev["session_id"]
                     if ev["kind"] == "text":
                         got_text = True
+                        answer.append(ev["text"])
                         yield _sse("text", {"text": ev["text"]})
                     elif ev["kind"] == "tool_call":
                         yield _sse("tool_call", {"tool": ev["tool"], "sql": ev.get("sql", "")})
@@ -1156,11 +1171,17 @@ def create_app(
                         if ev.get("is_error"):
                             yield _sse("error", {"detail": ev.get("text") or "Claude Code error"})
                         elif not got_text and ev.get("text"):
+                            answer.append(ev["text"])
                             yield _sse("text", {"text": ev["text"]})
                 print(
                     f"[claude-code] turn done: session={app.state.cc_session.get('id') or 'none'}",
                     file=sys.stderr,
                 )
+                r = _seal_answer(
+                    workspace, body.question, "".join(answer), cc_session, "claude-code"
+                )
+                if r is not None:
+                    yield _sse("receipt", {"receipt": r})
 
             return StreamingResponse(cc_events(), media_type="text/event-stream")
 
@@ -1171,16 +1192,21 @@ def create_app(
             contract_fingerprint(app.state.charter.sources),
         )
         agent = Agent(app.state.toolbox, AgentConfig(llm=app.state.llm, cache=cache))
-        app.state.recorder.start_session(
-            "chat", model=getattr(app.state.llm, "model", None), question=body.question
-        )
+        model = getattr(app.state.llm, "model", None)
+        session = app.state.recorder.start_session("chat", model=model, question=body.question)
 
         async def events() -> AsyncIterator[str]:
+            answer: list[str] = []
             async for ev in agent.run(body.question, history=_bounded_history(body.history)):
+                if ev.kind == "text":
+                    answer.append(ev.text)
                 yield _sse(
                     ev.kind,
                     {"text": ev.text, "tool": ev.tool, "detail": ev.detail, "sql": ev.sql},
                 )
+            r = _seal_answer(workspace, body.question, "".join(answer), session, model)
+            if r is not None:
+                yield _sse("receipt", {"receipt": r})
 
         return StreamingResponse(events(), media_type="text/event-stream")
 
@@ -1189,6 +1215,24 @@ def create_app(
         app.mount("/", StaticFiles(directory=ui_dist, html=True), name="ui")
 
     return app
+
+
+def _seal_answer(
+    workspace: Path, question: str, answer: str, session: str, model: str | None
+) -> dict | None:
+    """Sign a provenance receipt for a completed turn, if the workspace has a
+    signing key. Failure-safe: sealing must never break the chat response."""
+    from datacharter.provenance import keys, seal_answer
+
+    try:
+        if keys.load_public(workspace) is None:
+            return None
+        return seal_answer(
+            workspace, question=question, answer=answer, session=session, model=model
+        )
+    except Exception as exc:  # noqa: BLE001 — a failed seal must not break the answer
+        print(f"[provenance] failed to seal answer: {exc}", file=sys.stderr)
+        return None
 
 
 def _state_key() -> str | None:
