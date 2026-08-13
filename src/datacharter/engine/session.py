@@ -297,6 +297,22 @@ class Engine:
     async def explain(self, sql: str, *, timeout_s: float = 60.0) -> tuple[str, int | None]:
         return await asyncio.to_thread(self.explain_sync, sql)
 
+    def estimated_cost_sync(self, sql: str) -> int | None:
+        """Best-effort pre-execution estimate of the rows the query would return
+        (the plan root's cardinality, so LIMIT/WHERE/aggregation lower it); None
+        when it can't be estimated. Never executes `sql`."""
+        try:
+            conn = self._require_conn()
+            with self._exec_lock:
+                self._ensure_connectors(sql)
+                rows = conn.execute(f"EXPLAIN (FORMAT json) {sql}").fetchall()
+        except duckdb.Error:
+            return None
+        return _root_cardinality(rows[0][-1]) if rows else None
+
+    async def estimated_cost(self, sql: str) -> int | None:
+        return await asyncio.to_thread(self.estimated_cost_sync, sql)
+
     def _execute(self, sql: str, *, row_limit: int = DEFAULT_ROW_LIMIT) -> QueryResult:
         conn = self._require_conn()
         normalized = ensure_allowed(sql)

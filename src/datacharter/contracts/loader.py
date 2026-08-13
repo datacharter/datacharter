@@ -43,6 +43,8 @@ class Charter(BaseModel):
     #: Quarantine prompt-injection payloads in result cells; on by default
     #: (`quarantine: off` disables).
     quarantine_enabled: bool = True
+    #: Pre-execution ceiling on a query's estimated touched rows (None = off).
+    max_scan_rows: int | None = None
     #: Canary tripwires: None = off (default), "block" or "log" when enabled.
     canary_mode: str | None = None
     #: Plain-english policies per relation (aggregate_only / k-anonymity / joins).
@@ -130,6 +132,12 @@ def load_charter(
     else:
         raise CharterError(f"{filename}: 'quarantine' must be on/off (got {quarantine_raw!r}).")
 
+    max_scan_rows = raw.get("max_scan_rows")
+    if max_scan_rows is not None and not (isinstance(max_scan_rows, int) and max_scan_rows > 0):
+        raise CharterError(
+            f"{filename}: 'max_scan_rows' must be a positive integer (got {max_scan_rows!r})."
+        )
+
     canary_raw = raw.get("canary")
     if canary_raw in (None, False, "off"):
         canary_mode: str | None = None
@@ -150,7 +158,7 @@ def load_charter(
         version=version, sources=sources, warnings=warnings, metrics=metrics,
         tests=tests, local_access=local_access, guides=load_guides(workspace),
         audit_enabled=audit_enabled, quarantine_enabled=quarantine_enabled,
-        canary_mode=canary_mode, policies=policies,
+        max_scan_rows=max_scan_rows, canary_mode=canary_mode, policies=policies,
     )
 
 
@@ -204,7 +212,7 @@ def _build_test(name: str, body: Any, filename: str) -> DataTest:
 
 _TOP_LEVEL_KEYS = {
     "version", "sources", "metrics", "tests", "local_access",
-    "audit", "quarantine", "canary", "policies",
+    "audit", "quarantine", "canary", "policies", "max_scan_rows",
 }
 _SOURCE_KEYS = {
     "type", "connection", "credentials", "path", "tables", "pii",

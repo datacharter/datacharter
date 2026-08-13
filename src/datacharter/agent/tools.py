@@ -116,9 +116,12 @@ class ToolBox:
         metrics: list | None = None,
         quarantine: bool = True,
         injection_classifier=None,
+        max_scan_rows: int | None = None,
         timeout_s: float = _DEFAULT_TIMEOUT_S,
     ) -> None:
         self._engine = engine
+        #: Pre-execution ceiling on a query's estimated touched rows (None = off).
+        self._max_scan_rows = max_scan_rows
         #: Scan result cells for prompt-injection payloads and replace them.
         self._quarantine = quarantine
         #: Optional second-tier injection detector behind the heuristic (BYO LLM).
@@ -333,6 +336,15 @@ class ToolBox:
             from datacharter.engine.policy_guard import apply_min_group
 
             run_sql = apply_min_group(run_sql, k)
+        if self._max_scan_rows is not None:
+            est = await self._engine.estimated_cost(run_sql)
+            if est is not None and est > self._max_scan_rows:
+                return (
+                    f"Error: this query is estimated to touch ~{est:,} rows, over the "
+                    f"{self._max_scan_rows:,}-row ceiling set for this workspace, so it "
+                    f"was not run. To proceed: add a WHERE filter or a LIMIT to narrow "
+                    f"it, or aggregate to fewer rows."
+                )
         result = await self._engine.query(
             run_sql, row_limit=_MAX_TOOL_ROWS, timeout_s=self._timeout_s
         )

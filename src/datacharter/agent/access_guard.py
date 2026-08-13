@@ -98,9 +98,11 @@ def check_query_access(
     if violations:
         cols = ", ".join(sorted(violations))
         raise AgentAccessDenied(
-            f"Access denied: column(s) {cols} are masked; they can be selected "
-            f"(values return as '•••') but not used in WHERE, JOIN, "
-            f"GROUP BY, ORDER BY, or a subquery."
+            f"Access denied: column(s) {cols} are masked and cannot be used in "
+            f"WHERE, JOIN, GROUP BY, ORDER BY, or a subquery — that could reveal "
+            f"masked values by inference. To proceed: remove {cols} from those "
+            f"clauses; you may still SELECT the column(s), where values return as "
+            f"'•••'."
         )
 
 

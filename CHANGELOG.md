@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.31.0] - 2026-08-12
+
+### Added
+- **Pre-execution query-cost ceiling** — set `max_scan_rows` in `charter.yaml` and
+  an agent query whose estimated result exceeds it is refused *before it runs*,
+  with a hint to narrow it. A coarse guard against unbounded pulls (estimates are
+  approximate; set it above your normal result sizes). The human SQL editor is
+  unaffected.
+
+### Changed
+- **Denials now explain themselves and are agent-retryable.** The masked-column
+  refusal (and the new cost-ceiling refusal) tell the agent *why* it was denied
+  and *how to proceed* — e.g. "remove the masked column from WHERE; you may still
+  SELECT it, where values return as '•••'" — so a model can correct and retry
+  instead of dead-ending.
+
 ## [0.30.0] - 2026-08-12
 
 ### Added

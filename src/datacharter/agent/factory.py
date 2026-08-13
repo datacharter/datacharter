@@ -58,4 +58,5 @@ def build_toolbox(
         metrics=charter.metrics,
         quarantine=charter.quarantine_enabled,
         injection_classifier=injection_classifier,
+        max_scan_rows=charter.max_scan_rows,
     )
