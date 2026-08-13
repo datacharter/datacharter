@@ -176,6 +176,10 @@ class Budget:
         ))
 
     def reset(self) -> None:
+        """Zero the spend but persist the cap, so the announced ceiling is the one
+        that actually applies to the next run (a reset with `--budget` sets it)."""
         self.spent, self.queries = 0.0, 0
-        if self.path.exists():
-            self.path.unlink()
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps(
+            {"spent": 0.0, "queries": 0, "cap": self.cap}, indent=2
+        ))

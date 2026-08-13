@@ -174,6 +174,17 @@ def test_budget_cap_is_sticky(tmp_path, capsys):
     assert "budget exhausted" in capsys.readouterr().err.lower()
 
 
+def test_reset_persists_the_announced_cap(tmp_path, capsys):
+    _count_workspace(tmp_path)
+    # `--reset --budget 2` announces cap 2.0 — the next no-flag run must honor 2.0,
+    # not revert to the 5.0 default.
+    assert cli_main(["dp", None, str(tmp_path), "--reset", "--budget", "2"]) == 0
+    assert "cap ε=2.0" in capsys.readouterr().out
+    from datacharter.dp import Budget
+
+    assert Budget.load(tmp_path).cap == 2.0 and Budget.load(tmp_path).spent == 0.0
+
+
 def test_cmd_dp_bare_prints_usage(tmp_path, capsys):
     _count_workspace(tmp_path)
     rc = cli_main(["dp", None, str(tmp_path)])

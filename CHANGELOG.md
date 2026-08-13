@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.42.1] - 2026-08-13
+
+### Fixed
+- **`dp --reset` now persists the ε cap it announces.** `dp --reset --budget 2`
+  printed "cap ε=2.0" but cleared the ledger file, so the next run reverted to the
+  5.0 default. Reset now writes a zero-spend ledger with the cap, so the announced
+  ceiling is the one that applies.
+
 ## [0.42.0] - 2026-08-13
 
 ### Fixed
