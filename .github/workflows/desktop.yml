@@ -44,7 +44,7 @@ jobs:
             kind: zip
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           # Release event: build the tagged code. Dispatch: build the current
           # branch (lets us attach beta artifacts to an older tag).
