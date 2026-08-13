@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.31.1] - 2026-08-12
+
+### Fixed
+- The charter loader no longer rejects an `access:` section. It is consumed by the
+  enterprise server (charter-policy roles / OpenFGA row-scopes); the core now
+  tolerates and ignores it, so a valid server charter starts instead of failing on
+  an "unknown key" error.
+
 ## [0.31.0] - 2026-08-12
 
 ### Added

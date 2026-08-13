@@ -213,6 +213,10 @@ def _build_test(name: str, body: Any, filename: str) -> DataTest:
 _TOP_LEVEL_KEYS = {
     "version", "sources", "metrics", "tests", "local_access",
     "audit", "quarantine", "canary", "policies", "max_scan_rows",
+    # `access:` is consumed by the enterprise server (charter-policy roles /
+    # OpenFGA row-scopes); the core tolerates and ignores it rather than rejecting
+    # a valid server charter.
+    "access",
 }
 _SOURCE_KEYS = {
     "type", "connection", "credentials", "path", "tables", "pii",

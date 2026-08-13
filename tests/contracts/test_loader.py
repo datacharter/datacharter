@@ -282,6 +282,17 @@ def test_agent_access_unknown_key_rejected(tmp_path):
         load_charter(write_charter(tmp_path, text))
 
 
+def test_access_section_tolerated_for_server(tmp_path):
+    # The enterprise server's `access:` section (charter-policy roles / OpenFGA
+    # row-scopes) must load through the core, not be rejected as an unknown key.
+    text = (
+        "version: 1\naccess:\n  roles:\n    analyst: [crm.customers]\n"
+        "sources:\n  crm:\n    type: csv\n    path: d.csv\n"
+    )
+    charter = load_charter(write_charter(tmp_path, text))
+    assert [s.name for s in charter.sources] == ["crm"]
+
+
 def test_local_access_values_validated_too(tmp_path):
     ws = write_charter(
         tmp_path,
