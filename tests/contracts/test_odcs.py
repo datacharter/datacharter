@@ -83,6 +83,31 @@ def _write(tmp_path, doc):
     return p
 
 
+def test_sqlite_source_uses_path_not_connection(tmp_path):
+    doc = {
+        "servers": [{"type": "sqlite", "path": "demo/store.db"}],
+        "schema": [{"name": "customers", "properties": [
+            {"name": "email", "classification": "PII"}]}],
+    }
+    charter, _ = import_odcs(doc)
+    src = charter["sources"]["source"]
+    assert src["type"] == "sqlite"
+    assert src["path"] == "demo/store.db"  # path, not an unopenable host/user/password
+    assert "connection" not in src
+
+
+def test_sqlite_round_trips_path(tmp_path):
+    (tmp_path / "charter.yaml").write_text(
+        "version: 1\nsources:\n  store:\n    type: sqlite\n    path: demo/store.db\n"
+        "    tables: [customers]\n    pii:\n      customers: [email]\n")
+    (tmp_path / "d.csv").write_text("x\n1\n")
+    # sqlite path need not exist to load leniently for export.
+    charter = load_charter(tmp_path, lenient_secrets=True)
+    odcs = export_odcs(charter)
+    assert odcs["servers"][0]["type"] == "sqlite"
+    assert odcs["servers"][0]["path"] == "demo/store.db"
+
+
 def test_cli_import_and_export(tmp_path):
     from datacharter.cli import main
 

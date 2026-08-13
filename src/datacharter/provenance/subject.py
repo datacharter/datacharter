@@ -26,16 +26,22 @@ def _sql_literal(value: str) -> str:
 
 def find_relations_with_column(catalog_rows, idx: dict, column: str) -> list[tuple[str, list[str]]]:
     """From a `SHOW ALL TABLES` result, the (relation, columns) pairs that carry
-    the subject key column. `local`/`temp`/`system` scratch schemas are skipped."""
+    the subject key column. `local`/`temp`/`system` scratch schemas are skipped, and
+    the `memory` flat `source__table` aliases are skipped when a real `db.table`
+    exists — otherwise a subject would be counted once per alias, inflating the DSAR."""
     out: list[tuple[str, list[str]]] = []
     col = column.lower()
     for row in catalog_rows:
         db = row[idx["database"]]
         if db in ("system", "temp", "local"):
             continue
+        name = row[idx["name"]]
+        # `memory` `source__table` views duplicate a `source`.`table` registered
+        # under its own schema — count the canonical one, not both.
+        if db == "memory" and "__" in name:
+            continue
         cols = list(row[idx["column_names"]])
         if col in {c.lower() for c in cols}:
-            name = row[idx["name"]]
             relation = name if db == "memory" else f"{db}.{name}"
             out.append((relation, cols))
     return out

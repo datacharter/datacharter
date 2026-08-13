@@ -1,7 +1,7 @@
 """Self-Defending Data: signed envelope, tamper-evidence, TTL self-redaction."""
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from datacharter.cli import main as cli_main
 from datacharter.provenance import keys
@@ -32,7 +32,7 @@ def test_tamper_is_detected(tmp_path):
 
 def test_expiry_self_redacts(tmp_path):
     s = _signer(tmp_path)
-    past = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
+    past = (datetime.now(UTC) - timedelta(hours=2)).isoformat()
     env = build_envelope(workspace="w", surface_hash="h", columns=["id", "email"],
                          rows=[[1, "•••"]], masked_columns=["email"], signer=s,
                          ttl_seconds=60, issued_at=past)
@@ -45,7 +45,7 @@ def test_not_yet_expired(tmp_path):
     s = _signer(tmp_path)
     env = build_envelope(workspace="w", surface_hash="h", columns=["id"], rows=[[1]],
                          masked_columns=[], signer=s, ttl_seconds=3600)
-    opened = open_envelope(env, now=datetime.now(timezone.utc))
+    opened = open_envelope(env, now=datetime.now(UTC))
     assert opened["ok"] and not opened["expired"]
 
 
@@ -71,6 +71,22 @@ def test_cmd_seal_and_open_roundtrip(tmp_path, capsys):
     assert cli_main(["open-data", str(out)]) == 0
     body = capsys.readouterr().out
     assert "•••" in body and "a@b.com" not in body
+
+
+def test_seal_masks_auto_detected_pii(tmp_path, capsys):
+    # An undeclared emails column must be masked in the sealed envelope (audit P1).
+    (tmp_path / "data").mkdir()
+    rows = "id,contact\n" + "\n".join(f"{i},user{i}@corp.example" for i in range(8))
+    (tmp_path / "data" / "c.csv").write_text(rows)
+    (tmp_path / "charter.yaml").write_text(
+        "version: 1\nsources:\n  c:\n    type: csv\n    path: data/c.csv\n")
+    cli_main(["provenance", "keygen", str(tmp_path)])
+    capsys.readouterr()
+    out = tmp_path / "env.json"
+    assert cli_main(["seal-data", "SELECT id, contact FROM c", str(tmp_path), "-o", str(out)]) == 0
+    text = out.read_text()
+    assert "user0@corp.example" not in text  # raw auto-PII never in the payload
+    assert "contact" in json.loads(text)["body"]["policy"]["masked_columns"]
 
 
 def test_cmd_open_detects_tamper(tmp_path, capsys):

@@ -60,6 +60,29 @@ def test_cmd_govern_allow_and_deny(tmp_path, capsys):
     assert "DENY" in capsys.readouterr().out
 
 
+def test_select_star_over_pii_export_is_denied():
+    # SELECT * names no PII but exposes it — export purpose must still DENY (audit P2).
+    d = govern("SELECT * FROM customers", pii_columns={"email"}, purpose="export")
+    assert d.action == Action.DENY
+
+
+def test_export_purpose_phrase_matches():
+    d = govern("SELECT email FROM t WHERE id=1", pii_columns={"email"},
+               purpose="export data to a vendor")
+    assert d.action == Action.DENY  # word-aware, not just the bare keyword
+
+
+def test_naming_pii_directly_steps_up():
+    # A narrow, low-score PII read still steps up (the promise: naming PII → step-up).
+    d = govern("SELECT email FROM t WHERE email = 'x'", pii_columns={"email"})
+    assert d.action == Action.STEP_UP
+
+
+def test_no_pii_narrow_read_allowed():
+    d = govern("SELECT tier FROM t WHERE id = 1", pii_columns={"email"})
+    assert d.action == Action.ALLOW
+
+
 def test_cmd_govern_json(tmp_path, capsys):
     import json
 
@@ -67,3 +90,12 @@ def test_cmd_govern_json(tmp_path, capsys):
     assert cli_main(["govern", "SELECT count(email) FROM c", str(ws), "--json"]) == 2
     doc = json.loads(capsys.readouterr().out)
     assert doc["action"] == "add_noise" and "risk" in doc
+
+
+def test_cmd_govern_runs_on_uncredentialed_charter(tmp_path, capsys):
+    # govern is metadata-only; must not require resolvable ${ENV} creds (audit P1).
+    cli_main(["init", str(tmp_path), "--template", "secure"])
+    capsys.readouterr()
+    rc = cli_main(["govern", "SELECT tier FROM crm.customers WHERE id=1", str(tmp_path)])
+    assert rc in (0, 2)  # ran without crashing on unresolved credentials
+    assert "Decision" in capsys.readouterr().out

@@ -215,14 +215,21 @@ output reproducible, `-o` writes a file, `--format` selects CSV (default) or JSO
 **Differential-privacy query mode.** Add calibrated Laplace noise to an aggregate
 answer and spend from a per-workspace **ε budget** — so an agent can't chain
 "safe" aggregates to difference-out one individual. Supports **COUNT** (sensitivity
-1) and **SUM** (pass `--bound B`, the value range, as its sensitivity); each result
-row is assumed to cover distinct individuals (bounded contribution). `--epsilon`
-sets the per-query privacy loss (default 1.0); `--budget` the workspace cap
-(default 5.0, sequential composition). When a query would exceed the budget it is
-**refused**. `--status` shows spent/remaining; `--reset` clears it. Row-level
-(non-aggregate) queries are refused — noise there would leak the rows. The scope
-and assumptions are stated plainly: DP done wrong is false security, so the
-mechanism, sensitivity, and accounting are all explicit.
+1) and **SUM** (pass `--bound B`, the per-row value bound, as its sensitivity); each
+result row is assumed to cover distinct individuals (bounded contribution).
+`--epsilon` sets the per-query privacy loss (default 1.0); `--budget` the workspace
+cap (default 5.0, sequential composition — **sticky**: set once, honored on later
+runs). When a query would exceed the budget it is **refused**. `--status` shows
+spent/remaining; `--reset` clears it.
+
+Because DP done wrong is false security, the mechanism refuses anything it can't
+noise correctly: **SUM without `--bound`** (would silently under-noise), a query
+**mixing COUNT and SUM** (they need different sensitivities — run them separately),
+**AVG/MIN/MAX** (unbounded sensitivity — derive them from noised COUNT and SUM),
+and any **row-level query** (checked against comment/string-stripped SQL, so an
+aggregate keyword hidden in a comment can't sneak raw rows through). Numeric
+**GROUP BY keys pass through un-noised**, and if a result still carries a PII column
+the query is refused rather than emitted.
 
 ### `asof <ref> [directory] [--query SQL | --relation R] [--rows N] [--json]`
 **Governance time-travel.** Reconstruct the agent-visible surface as it existed at

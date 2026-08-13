@@ -20,12 +20,14 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import secrets
 from dataclasses import dataclass
 from pathlib import Path
 
 __all__ = [
-    "DPError", "laplace", "is_aggregate", "privatize_row", "Budget", "BUDGET_FILE",
+    "DPError", "laplace", "is_aggregate", "aggregate_kinds", "group_by_keys",
+    "strip_sql_noise", "privatize_row", "Budget", "BUDGET_FILE",
 ]
 
 BUDGET_FILE = "dp_budget.json"
@@ -50,14 +52,61 @@ def laplace(scale: float, rng=None) -> float:
 
 
 _AGG_TOKENS = ("count(", "sum(", "avg(", "min(", "max(", "group by")
+# COUNT gets sensitivity 1; SUM needs a caller bound; AVG/MIN/MAX are unbounded-
+# sensitivity under add/remove and are not supported by this simple mechanism.
+_SUM_FN = re.compile(r"\bsum\s*\(", re.IGNORECASE)
+_COUNT_FN = re.compile(r"\bcount\s*\(", re.IGNORECASE)
+_UNSUPPORTED_FN = re.compile(r"\b(avg|min|max|median|quantile|stddev|var)\s*\(", re.IGNORECASE)
+_LINE_COMMENT = re.compile(r"--[^\n]*")
+_BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
+_STRING_LIT = re.compile(r"'(?:[^']|'')*'")
+_GROUP_BY = re.compile(r"\bgroup\s+by\b(.*?)(?:\border\s+by\b|\bhaving\b|\blimit\b|$)",
+                       re.IGNORECASE | re.DOTALL)
 
 
-def is_aggregate(sql: str) -> bool:
-    """True when the query looks like an aggregate (has an aggregate function or a
-    GROUP BY). A guard against pointing DP mode at row-level data, where per-cell
-    noise would be meaningless and leak the rows anyway."""
-    low = sql.lower()
+def strip_sql_noise(sql: str) -> str:
+    """Remove comments and string literals so token checks can't be fooled by an
+    aggregate keyword hidden in a comment or a quoted value."""
+    s = _BLOCK_COMMENT.sub(" ", sql)
+    s = _LINE_COMMENT.sub(" ", s)
+    return _STRING_LIT.sub("''", s)
+
+
+def is_aggregate(sql: str | None) -> bool:
+    """True when the query has an aggregate function or GROUP BY — checked against
+    the comment/literal-stripped text, so `SELECT email FROM t -- sum(` is *not*
+    treated as an aggregate. Guards against pointing DP at row-level data."""
+    if not sql:
+        return False
+    low = strip_sql_noise(sql).lower()
     return any(tok in low for tok in _AGG_TOKENS)
+
+
+def group_by_keys(sql: str) -> set[str]:
+    """Lowercased bare column names in the GROUP BY clause — these are grouping
+    keys (including numeric ids), never aggregate outputs, so they pass through
+    un-noised."""
+    m = _GROUP_BY.search(strip_sql_noise(sql))
+    if not m:
+        return set()
+    keys: set[str] = set()
+    for part in m.group(1).split(","):
+        tok = part.strip().split()[0] if part.strip() else ""
+        # A bare or table-qualified column; skip positional/expression keys.
+        col = tok.rsplit(".", 1)[-1]
+        if col.isidentifier():
+            keys.add(col.lower())
+    return keys
+
+
+def aggregate_kinds(sql: str) -> dict:
+    """Which aggregate families the (noise-stripped) query uses."""
+    s = strip_sql_noise(sql)
+    return {
+        "count": bool(_COUNT_FN.search(s)),
+        "sum": bool(_SUM_FN.search(s)),
+        "unsupported": bool(_UNSUPPORTED_FN.search(s)),
+    }
 
 
 def privatize_row(
@@ -92,12 +141,17 @@ class Budget:
     queries: int = 0
 
     @classmethod
-    def load(cls, ws: Path, cap: float) -> Budget:
+    def load(cls, ws: Path, cap: float | None = None) -> Budget:
+        """Load the ledger. `cap` overrides the workspace cap; when None, the cap
+        persisted on first use is honored (so a later run without `--budget` does
+        not silently reset the ceiling), defaulting to 5.0 if never set."""
         path = ws / ".datacharter" / BUDGET_FILE
         if path.exists():
             data = json.loads(path.read_text())
-            return cls(path, cap, float(data.get("spent", 0.0)), int(data.get("queries", 0)))
-        return cls(path, cap, 0.0, 0)
+            resolved = cap if cap is not None else float(data.get("cap", 5.0))
+            return cls(path, resolved, float(data.get("spent", 0.0)),
+                       int(data.get("queries", 0)))
+        return cls(path, cap if cap is not None else 5.0, 0.0, 0)
 
     @property
     def remaining(self) -> float:

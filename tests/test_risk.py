@@ -67,3 +67,19 @@ def test_cmd_risk_low_query_passes_gate(tmp_path, capsys):
     rc = cli_main(["risk", "SELECT count(*) FROM c WHERE id=1", str(ws), "--fail-on", "high"])
     assert rc == 0
     assert "LOW" in capsys.readouterr().out
+
+
+def test_cmd_risk_runs_on_uncredentialed_charter(tmp_path, capsys):
+    # risk is metadata-only; it must not require resolvable ${ENV} credentials (audit P1).
+    cli_main(["init", str(tmp_path), "--template", "secure"])
+    capsys.readouterr()
+    assert cli_main(["risk", "SELECT email FROM crm.customers", str(tmp_path)]) == 0
+    assert "risk" in capsys.readouterr().out.lower()
+
+
+def test_risk_fail_on_rejects_low():
+    import pytest
+
+    # `low` was a silent no-op; it is no longer an accepted choice.
+    with pytest.raises(SystemExit):
+        cli_main(["risk", "SELECT 1", ".", "--fail-on", "low"])

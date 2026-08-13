@@ -12,6 +12,7 @@ next step, so an agent gets actionable feedback instead of an opaque 403.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from datacharter.dp import is_aggregate
@@ -51,14 +52,29 @@ def _has(risk: RiskAssessment, signal: str) -> bool:
     return any(s.name == signal for s in risk.signals)
 
 
+_EXPORT_PURPOSES = ("export", "extract", "download", "share", "exfiltrat", "send", "copy")
+
+
+def _is_export_purpose(purpose: str) -> bool:
+    """Word-aware match so a real phrase ('export data to a vendor') still counts,
+    not only the bare keyword."""
+    return any(re.search(rf"\b{kw}", purpose) for kw in _EXPORT_PURPOSES)
+
+
 def govern(
     sql: str, *, pii_columns: set[str] | None = None, canaries: set[str] | None = None,
     purpose: str | None = None, has_policies: bool = False,
 ) -> Decision:
     """Reason about the query and return the graduated decision. Rules run in
-    priority order; the first that fires wins (most-restrictive concerns first)."""
+    priority order; the first that fires wins (most-restrictive concerns first).
+    `has_policies` is accepted for call-site symmetry; policy enforcement is handled
+    by the policy guard, not re-derived here."""
+    pii_present = bool(pii_columns)
     risk = score_query(sql, pii_columns=pii_columns, canaries=canaries)
     names_pii = _has(risk, "pii_columns")
+    # `SELECT *` over a PII-bearing workspace exposes PII without naming it — treat
+    # it as touching PII so export/step-up rules can't be dodged with a star.
+    touches_pii = names_pii or (_has(risk, "select_star") and pii_present)
     purpose = (purpose or "").strip().lower()
 
     if _has(risk, "canary_reference"):
@@ -72,9 +88,10 @@ def govern(
                         f"intent risk is high ({risk.score}/100): {top}",
                         "narrow the query — filter rows, drop PII columns, or aggregate", risk)
 
-    if purpose in ("export", "extract", "download", "share") and names_pii:
+    if _is_export_purpose(purpose) and touches_pii:
         return Decision(Action.DENY,
-                        f"purpose '{purpose}' over PII is a bulk-exfiltration shape",
+                        f"an export/extract purpose over PII ('{purpose}') is a bulk-"
+                        "exfiltration shape",
                         "request an aggregate or a governed `seal-data` extract instead", risk)
 
     if _has(risk, "row_serialization"):
@@ -82,10 +99,15 @@ def govern(
                         "whole-row serialization can evade column masking",
                         "select named columns; masking is enforced on the surface", risk)
 
-    if names_pii and is_aggregate(sql):
+    if touches_pii and is_aggregate(sql):
         return Decision(Action.ADD_NOISE,
                         "aggregating over PII can difference-out individuals",
                         "answer under differential privacy: `datacharter dp <sql>`", risk)
+
+    if touches_pii:
+        return Decision(Action.STEP_UP,
+                        "the query reads PII columns directly",
+                        "require step-up auth / a stated purpose before answering", risk)
 
     if risk.band == "medium":
         top = ", ".join(s.name for s in risk.signals[:3])

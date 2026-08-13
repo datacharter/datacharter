@@ -218,7 +218,10 @@ def _cmd_init(args: argparse.Namespace) -> int:
         write_demo_data(ws, seed_tour=tour)
     print(f"Workspace initialized in {ws}.")
     if template is not None:
-        print(f"Template '{template}' — fill in the ${{ENV}} credentials, then: datacharter serve")
+        needs_creds = "${" in TEMPLATES[template][1]
+        hint = ("fill in the ${ENV} credentials, then: datacharter serve" if needs_creds
+                else "point the paths at your files, then: datacharter serve")
+        print(f"Template '{template}' — {hint}")
     elif args.demo:
         print("Demo data in demo/ — try: datacharter serve")
     return 0
@@ -962,7 +965,7 @@ def _cmd_firewall(args: argparse.Namespace) -> int:
     if not (ws / "charter.yaml").exists():
         print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
         return 1
-    charter = load_charter(ws)
+    charter = load_charter(ws, lenient_secrets=True)  # metadata only; no data access
     mode = charter.firewall_mode
     if args.status or not args.sql:
         state = mode or "off"
@@ -999,7 +1002,7 @@ def _cmd_govern(args: argparse.Namespace) -> int:
     if not (ws / "charter.yaml").exists():
         print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
         return 1
-    charter = load_charter(ws)
+    charter = load_charter(ws, lenient_secrets=True)  # reasons over metadata; no data access
     pii = {c.lower() for s in charter.sources for cols in s.pii.values() for c in cols}
     canaries = {"canaries"} if getattr(charter, "canary_mode", None) else set()
 
@@ -1024,8 +1027,10 @@ def _cmd_govern(args: argparse.Namespace) -> int:
 def _cmd_seal_data(args: argparse.Namespace) -> int:
     """Seal a query's masked result into a signed, self-defending envelope that
     carries its policy and (optionally) a TTL out of the workspace."""
+    import asyncio
     import json as _json
 
+    from datacharter.agent.factory import detect_auto_pii
     from datacharter.agent.tools import MASKED
     from datacharter.contracts import load_charter
     from datacharter.contracts.accessplan import effective_surface, surface_hash
@@ -1044,9 +1049,12 @@ def _cmd_seal_data(args: argparse.Namespace) -> int:
         print("No signing key yet. Run `datacharter provenance keygen` first.", file=sys.stderr)
         return 1
     charter = load_charter(ws)
-    pii = {c.lower() for s in charter.sources for cols in s.pii.values() for c in cols}
+    declared = {c.lower() for s in charter.sources for cols in s.pii.values() for c in cols}
     engine = _open_engine(ws, charter.sources)
     try:
+        # Mask everything the agent surface would mask — declared AND value-detected
+        # PII — so a sealed envelope never carries raw values the agent hides.
+        pii = declared | asyncio.run(detect_auto_pii(engine))
         result = engine.query_sync(args.sql)
     except (EngineError, QueryNotAllowed) as exc:
         print(f"Query failed: {exc}", file=sys.stderr)
@@ -1114,7 +1122,7 @@ def _cmd_risk(args: argparse.Namespace) -> int:
     if not (ws / "charter.yaml").exists():
         print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
         return 1
-    charter = load_charter(ws)
+    charter = load_charter(ws, lenient_secrets=True)  # scores over metadata; no data access
     pii = {c.lower() for s in charter.sources for cols in s.pii.values() for c in cols}
     # When canaries are armed, the honeytoken relation is bait — naming it is a signal.
     canaries = {"canaries"} if getattr(charter, "canary_mode", None) else set()
@@ -1130,8 +1138,8 @@ def _cmd_risk(args: argparse.Namespace) -> int:
             print("  (no risk signals — narrow, filtered read)")
 
     if args.fail_on:
-        threshold = {"low": 0, "medium": 30, "high": 70}[args.fail_on]
-        if assessment.score >= threshold and args.fail_on != "low":
+        threshold = {"medium": 30, "high": 70}[args.fail_on]
+        if assessment.score >= threshold:
             return 2
     return 0
 
@@ -1140,8 +1148,10 @@ def _cmd_subject_access(args: argparse.Namespace) -> int:
     """DSAR: a signed record of exactly what an agent can see about one subject
     across every governed relation carrying the key column — PII masked as the
     agent sees it, sealed with the workspace provenance key."""
+    import asyncio
     import json as _json
 
+    from datacharter.agent.factory import detect_auto_pii
     from datacharter.agent.tools import MASKED
     from datacharter.contracts import load_charter
     from datacharter.contracts.accessplan import effective_surface, surface_hash
@@ -1167,10 +1177,12 @@ def _cmd_subject_access(args: argparse.Namespace) -> int:
         return 1
 
     charter = load_charter(ws)
-    pii = {c.lower() for s in charter.sources for cols in s.pii.values() for c in cols}
+    declared = {c.lower() for s in charter.sources for cols in s.pii.values() for c in cols}
     engine = _open_engine(ws, charter.sources)
     records: list[dict] = []
     try:
+        # Mask both declared and value-detected PII, exactly as the agent surface does.
+        pii = declared | asyncio.run(detect_auto_pii(engine))
         catalog = engine.query_sync("SHOW ALL TABLES")
         idx = {c: i for i, c in enumerate(catalog.columns)}
         targets = find_relations_with_column(catalog.rows, idx, args.column)
@@ -1268,14 +1280,29 @@ def _cmd_synth(args: argparse.Namespace) -> int:
 def _cmd_dp(args: argparse.Namespace) -> int:
     """Differential-privacy query mode: Laplace-noise an aggregate and spend from a
     per-workspace ε budget. Refuses non-aggregate queries and an exhausted budget."""
+    import asyncio
     import csv
 
+    from datacharter.agent.factory import detect_auto_pii
     from datacharter.contracts import load_charter
-    from datacharter.dp import Budget, DPError, is_aggregate, privatize_row
+    from datacharter.dp import (
+        Budget,
+        DPError,
+        aggregate_kinds,
+        group_by_keys,
+        is_aggregate,
+        privatize_row,
+    )
     from datacharter.engine.guard import QueryNotAllowed
     from datacharter.engine.session import EngineError
 
-    ws = Path(args.directory).resolve()
+    # `sql` and `directory` are both optional positionals; for --status/--reset a
+    # lone path lands in `sql`. Recover it so the ledger targets the right workspace.
+    sql, directory = args.sql, args.directory
+    if (args.status or args.reset) and directory == "." and sql and Path(sql).is_dir():
+        sql, directory = None, sql
+
+    ws = Path(directory).resolve()
     if not (ws / "charter.yaml").exists():
         print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
         return 1
@@ -1283,20 +1310,40 @@ def _cmd_dp(args: argparse.Namespace) -> int:
     budget = Budget.load(ws, args.budget)
     if args.reset:
         budget.reset()
-        print(f"Privacy budget reset (cap ε={args.budget}).")
+        print(f"Privacy budget reset (cap ε={budget.cap}).")
         return 0
     if args.status:
         print(f"Privacy budget: spent ε={budget.spent:.3f} of {budget.cap} "
               f"over {budget.queries} query(ies); {budget.remaining:.3f} left.")
         return 0
+    if not sql:
+        print("usage: datacharter dp <sql> [--epsilon E] [--bound B]  "
+              "(or --status / --reset)", file=sys.stderr)
+        return 1
 
-    if not is_aggregate(args.sql):
-        print("DP mode is for aggregates (COUNT/SUM/… or GROUP BY). This query returns "
+    if not is_aggregate(sql):
+        print("DP mode is for aggregates (COUNT/SUM or GROUP BY). This query returns "
               "row-level data, where per-cell noise would leak the rows. Aggregate first.",
               file=sys.stderr)
         return 1
-    sensitivity = 1.0 if args.bound is None else float(args.bound)
-    non_negative_int = args.bound is None  # COUNT results are non-negative integers
+    kinds = aggregate_kinds(sql)
+    if kinds["unsupported"]:
+        print("DP supports COUNT and SUM only. AVG/MIN/MAX/median have unbounded "
+              "sensitivity here — compute them from noised COUNT and SUM instead.",
+              file=sys.stderr)
+        return 1
+    if kinds["count"] and kinds["sum"]:
+        print("This query mixes COUNT and SUM, which need different sensitivities. "
+              "Run them as two separate DP queries so each is noised correctly.",
+              file=sys.stderr)
+        return 1
+    if kinds["sum"] and args.bound is None:
+        print("SUM needs --bound (the per-row value bound = its sensitivity). "
+              "Example: datacharter dp \"SELECT sum(amount) ...\" --bound 1000",
+              file=sys.stderr)
+        return 1
+    sensitivity = 1.0 if kinds["count"] else float(args.bound)
+    non_negative_int = kinds["count"]  # COUNT results are non-negative integers
     try:
         budget.check(args.epsilon)
     except DPError as exc:
@@ -1304,18 +1351,34 @@ def _cmd_dp(args: argparse.Namespace) -> int:
         return 1
 
     charter = load_charter(ws)
+    declared_pii = {c.lower() for s in charter.sources for cols in s.pii.values() for c in cols}
     engine = _open_engine(ws, charter.sources)
     try:
-        result = engine.query_sync(args.sql)
+        auto_pii = asyncio.run(detect_auto_pii(engine))
+        result = engine.query_sync(sql)
     except (EngineError, QueryNotAllowed) as exc:
         print(f"Query failed: {exc}", file=sys.stderr)
         return 1
     finally:
         engine.close()
 
+    # Defense in depth: a true aggregate never returns a PII column. If one is
+    # present (e.g. an aggregate over a subquery that still projects PII), refuse —
+    # DP must never emit raw individual values.
+    pii_out = [c for c in result.columns if c.lower() in (declared_pii | auto_pii)]
+    if pii_out:
+        print(f"Refusing: the result exposes PII column(s) {', '.join(pii_out)}. "
+              f"DP is for numeric aggregates, not columns carrying individual values.",
+              file=sys.stderr)
+        return 1
+
+    # Group-by keys pass through un-noised (including numeric ids); only aggregate
+    # output columns get noise.
+    keys = group_by_keys(sql)
     numeric = {
-        i for i, _ in enumerate(result.columns)
-        if all(r[i] is None or isinstance(r[i], (int, float)) for r in result.rows)
+        i for i, c in enumerate(result.columns)
+        if c.lower() not in keys
+        and all(r[i] is None or isinstance(r[i], (int, float)) for r in result.rows)
         and any(r[i] is not None for r in result.rows)
     }
     if not numeric:
@@ -2347,7 +2410,10 @@ def main(argv: list[str] | None = None) -> int:
         "--bound", type=float,
         help="Value bound for a SUM (its sensitivity). Omit for COUNT (sensitivity 1).",
     )
-    p_dp.add_argument("--budget", type=float, default=5.0, help="Total ε cap for the workspace")
+    p_dp.add_argument(
+        "--budget", type=float, default=None,
+        help="Total ε cap for the workspace (sticky; set once, default 5.0)",
+    )
     p_dp.add_argument("--status", action="store_true", help="Show budget spent/remaining and exit")
     p_dp.add_argument("--reset", action="store_true", help="Reset the spent budget and exit")
     p_dp.set_defaults(func=_cmd_dp)
@@ -2384,7 +2450,7 @@ def main(argv: list[str] | None = None) -> int:
     p_risk.add_argument("directory", nargs="?", default=".")
     p_risk.add_argument("--json", action="store_true", help="Emit the assessment as JSON")
     p_risk.add_argument(
-        "--fail-on", choices=["low", "medium", "high"], dest="fail_on",
+        "--fail-on", choices=["medium", "high"], dest="fail_on",
         help="Exit 2 when the score reaches this band (medium≥30, high≥70)",
     )
     p_risk.set_defaults(func=_cmd_risk)

@@ -121,6 +121,16 @@ class FlightRecorder:
             "tool": tool, "sql": args.get("sql"),
         })
 
+    def record_firewall(self, sql: str, action: str, reason: str) -> None:
+        """The Data Firewall's Reasoning-Governor decision for a query — written in
+        both `log` and `block` mode so the governance record is complete."""
+        if not self._enabled:
+            return
+        self._append({
+            "type": "firewall", "session": self._session,
+            "sql": sql, "action": action, "reason": reason,
+        })
+
     def record_access(self, tool: str, arguments: str, result: str) -> None:
         if not self._enabled:
             return

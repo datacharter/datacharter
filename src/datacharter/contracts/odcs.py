@@ -32,6 +32,8 @@ _ODCS_TYPE_TO_SOURCE = {
 _SOURCE_TO_ODCS_TYPE = {"postgres": "postgres", "mysql": "mysql", "snowflake": "snowflake",
                         "bigquery": "bigquery", "mssql": "sqlserver", "duckdb": "duckdb",
                         "sqlite": "sqlite", "iceberg_rest": "databricks"}
+# Source types addressed by a filesystem path rather than a connection dict.
+_PATH_TYPES = {"sqlite", "duckdb"}
 
 _PII_CLASSIFICATIONS = {"pii", "personal", "sensitive", "restricted", "confidential"}
 _PII_TAGS = {"pii", "personal", "sensitive", "phi", "gdpr"}
@@ -70,7 +72,6 @@ def import_odcs(doc: dict) -> tuple[dict, dict]:
     server = servers[0] if servers else {}
     stype = _ODCS_TYPE_TO_SOURCE.get(str(server.get("type", "")).lower(), "postgres")
     name = _sanitize_name(doc.get("name") or server.get("server") or str(doc.get("id") or "source"))
-    conn, creds = _odcs_connection(stype, server)
 
     tables: list[str] = []
     pii: dict[str, list[str]] = {}
@@ -89,9 +90,16 @@ def import_odcs(doc: dict) -> tuple[dict, dict]:
         if desc:
             context[tname] = desc
 
-    src: dict = {"type": stype, "connection": conn}
-    if creds:
-        src["credentials"] = creds
+    # File-backed sources (sqlite/duckdb) are addressed by a `path`, not a
+    # connection dict — a generic host/user/password would be unopenable.
+    if stype in _PATH_TYPES:
+        loc = server.get("path") or server.get("location") or server.get("database")
+        src: dict = {"type": stype, "path": loc or f"data.{stype}"}
+    else:
+        conn, creds = _odcs_connection(stype, server)
+        src = {"type": stype, "connection": conn}
+        if creds:
+            src["credentials"] = creds
     src["tables"] = sorted(tables)
     if pii:
         src["pii"] = dict(sorted(pii.items()))
@@ -114,6 +122,8 @@ def export_odcs(charter: Any) -> dict:
     for src in charter.sources:
         odcs_type = _SOURCE_TO_ODCS_TYPE.get(src.type.value, src.type.value)
         entry = {"server": src.name, "type": odcs_type}
+        if getattr(src, "path", None):  # file-backed source: carry the path so it round-trips
+            entry["path"] = src.path
         for key in ("host", "database", "schema", "project", "dataset", "account", "warehouse"):
             if src.connection.get(key):
                 entry[key] = src.connection[key]

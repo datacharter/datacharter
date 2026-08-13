@@ -3,6 +3,37 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.42.0] - 2026-08-13
+
+### Fixed
+- **`dp` could emit raw PII / row-level records.** `is_aggregate` matched aggregate
+  tokens inside comments and string literals, so a row-level query with `-- sum(`
+  slipped through and returned raw rows labeled "differentially private". Detection
+  now strips comments and string literals first, and DP refuses any result that
+  still carries a PII column (declared **or** value-detected). *(security)*
+- **`seal-data` and `subject-access` masked only declared PII.** A column the agent
+  surface masks by value-detection (`detect_auto_pii`) was written **raw** into
+  signed envelopes and DSAR receipts. Both now mask declared **and** auto-detected
+  PII, matching the agent surface exactly. *(security)*
+- **DP mechanism soundness.** SUM without `--bound` is refused (was silently
+  under-noised at sensitivity 1); a query mixing COUNT and SUM is refused (they need
+  different sensitivities); AVG/MIN/MAX are refused (unbounded sensitivity); numeric
+  GROUP BY keys now pass through un-noised instead of being perturbed.
+- **`risk` / `govern` / `firewall --status` crashed on unresolved `${ENV}`
+  credentials** though they only read metadata — they now load leniently and run on
+  any charter (including the `secure` template) before credentials are wired.
+- **Reasoning Governor:** `SELECT *` over PII no longer evades the export-purpose
+  DENY; the export rule matches a purpose *phrase*, not just the bare keyword; and
+  naming a PII column directly now steps up as documented.
+- **Data Firewall `log` mode now records** the governor's decision to the flight
+  recorder (the write previously called a non-existent method and was dropped).
+- **ODCS import** maps sqlite/duckdb to a `path` (was an unopenable host/user
+  connection); file-backed sources round-trip their path on export.
+- Smaller: the ε **budget cap is now sticky** (a later run without `--budget` keeps
+  the set cap); bare `dp` prints usage instead of a traceback; `dp --status <path>`
+  targets the given workspace; `risk --fail-on low` (a silent no-op) removed; the
+  `files` template's init hint no longer mentions `${ENV}`.
+
 ## [0.41.0] - 2026-08-13
 
 ### Added

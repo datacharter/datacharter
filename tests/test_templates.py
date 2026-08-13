@@ -43,6 +43,13 @@ def test_init_unknown_template_errors(tmp_path, capsys):
     assert "Unknown template" in capsys.readouterr().err
 
 
+def test_files_template_hint_has_no_env_mention(tmp_path, capsys):
+    # The files template has no ${ENV}; its hint must not tell users to fill creds.
+    assert cli_main(["init", str(tmp_path), "--template", "files"]) == 0
+    out = capsys.readouterr().out
+    assert "${ENV}" not in out and "point the paths" in out
+
+
 def test_secure_template_loads_with_firewall(tmp_path):
     from datacharter.contracts import load_charter
 

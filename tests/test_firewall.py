@@ -91,3 +91,34 @@ def test_cmd_firewall_off_status(tmp_path, capsys):
     ws = _write(tmp_path)
     assert cli_main(["firewall", None, str(ws), "--status"]) == 0
     assert "Data Firewall: off" in capsys.readouterr().out
+
+
+@pytest.mark.asyncio
+async def test_log_mode_records_a_firewall_entry(tmp_path):
+    # log mode must actually write a firewall decision to the flight recorder (audit P2).
+    from datacharter.audit import FlightRecorder
+
+    ws = _write(tmp_path, "firewall: log\n")
+    charter = load_charter(ws)
+    engine = Engine(ws, charter.sources).start()
+    from datacharter.agent.factory import build_toolbox, detect_auto_pii
+
+    rec = FlightRecorder(ws, enabled=True)
+    rec.start_session("test", question="q")
+    tb = build_toolbox(engine, charter, auto_pii=await detect_auto_pii(engine), recorder=rec)
+    try:
+        await tb.run("query", json.dumps({"sql": _HIGH_RISK}))
+    finally:
+        engine.close()
+    segs = list((ws / ".datacharter" / "flight").glob("*.jsonl"))
+    text = "".join(p.read_text() for p in segs)
+    assert '"type": "firewall"' in text and '"action": "deny"' in text
+
+
+def test_cmd_firewall_status_on_secure_template(tmp_path, capsys):
+    # firewall --status must work on the secure template even before ${ENV} creds
+    # are filled (audit P1: metadata-only commands load leniently).
+    cli_main(["init", str(tmp_path), "--template", "secure"])
+    capsys.readouterr()
+    assert cli_main(["firewall", None, str(tmp_path), "--status"]) == 0
+    assert "Data Firewall: block" in capsys.readouterr().out
