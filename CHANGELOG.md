@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.39.0] - 2026-08-13
+
+### Added
+- **The Reasoning Governor — `datacharter govern <sql>` (moonshot).** Turns a
+  query's intent, declared `--purpose`, and the PII it touches into one graduated
+  decision — **allow · add-noise · mask-more · step-up · deny** — each with a
+  reason and a concrete next step. It reasons where static RBAC can't: an aggregate
+  over PII → add-noise (`dp`); whole-row serialization → mask-more; naming PII →
+  step-up; an `export` purpose over PII or a honeytoken reference → deny. Exit code
+  encodes the decision for scripting; `--json` for the full record. Composes the
+  intent-`risk` scorer with purpose and sensitivity.
+
 ## [0.38.0] - 2026-08-13
 
 ### Added

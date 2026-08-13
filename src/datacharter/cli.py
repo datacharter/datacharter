@@ -827,6 +827,40 @@ def _cmd_query(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_govern(args: argparse.Namespace) -> int:
+    """The Reasoning Governor: intent + purpose + sensitivity → one graduated
+    decision (allow/add-noise/mask-more/step-up/deny) with a reason and next step."""
+    import json as _json
+
+    from datacharter.contracts import load_charter
+    from datacharter.governor import ACTIONS, govern
+
+    ws = Path(args.directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+    charter = load_charter(ws)
+    pii = {c.lower() for s in charter.sources for cols in s.pii.values() for c in cols}
+    canaries = {"canaries"} if getattr(charter, "canary_mode", None) else set()
+
+    decision = govern(args.sql, pii_columns=pii, canaries=canaries, purpose=args.purpose,
+                      has_policies=bool(charter.policies))
+    if args.json:
+        print(_json.dumps(decision.to_dict(), indent=2))
+    else:
+        print(f"Decision: {decision.action.upper().replace('_', ' ')}")
+        print(f"  why:  {decision.reason}")
+        print(f"  next: {decision.recommendation}")
+        print(f"  (intent risk {decision.risk.score}/100 — {decision.risk.band})")
+
+    # Exit code encodes severity for scripting: 0 allow, 1 deny, 2 anything between.
+    if decision.action == "allow":
+        return 0
+    if decision.action == "deny":
+        return 1
+    return 2 if ACTIONS.index(decision.action) else 0
+
+
 def _cmd_seal_data(args: argparse.Namespace) -> int:
     """Seal a query's masked result into a signed, self-defending envelope that
     carries its policy and (optionally) a TTL out of the workspace."""
@@ -2187,6 +2221,18 @@ def main(argv: list[str] | None = None) -> int:
         help="Exit 2 when the score reaches this band (medium≥30, high≥70)",
     )
     p_risk.set_defaults(func=_cmd_risk)
+
+    p_govern = sub.add_parser(
+        "govern",
+        help="Reasoning Governor: intent+purpose+sensitivity → allow/noise/mask/step-up/deny",
+    )
+    p_govern.add_argument("sql")
+    p_govern.add_argument("directory", nargs="?", default=".")
+    p_govern.add_argument(
+        "--purpose", help="Stated purpose (e.g. analytics, export) — factors into the decision"
+    )
+    p_govern.add_argument("--json", action="store_true", help="Emit the decision as JSON")
+    p_govern.set_defaults(func=_cmd_govern)
 
     p_seald = sub.add_parser(
         "seal-data", help="Seal a masked query result into a signed, self-defending envelope"

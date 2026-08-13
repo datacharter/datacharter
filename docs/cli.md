@@ -156,6 +156,19 @@ structurally can't offer. For wiring `test`, `drift`, and this check into Dagste
 Airflow, or CI as run-blocking gates, see
 [Governance gates for data pipelines](pipeline-gates.html).
 
+### `govern <sql> [directory] [--purpose TEXT] [--json]`
+**The Reasoning Governor.** Turn a query's intent, declared `--purpose`, and the
+PII it touches into one graduated decision: **allow · add-noise · mask-more ·
+step-up · deny** — each with a reason and a concrete next step. Static RBAC can say
+"may this principal read this column?"; it can't say "yes, but *this* query — a
+whole-row serialization for an export purpose — is denied." The governor sits on
+the query shape (via the intent [`risk`](cli.html) scorer) and picks the
+least-restrictive action that still holds the line: an aggregate over PII →
+*add-noise* (run `dp`); `to_json(row)` → *mask-more*; naming PII → *step-up*; an
+`export` purpose over PII or a honeytoken reference → *deny*. Exit code encodes the
+decision (0 allow, 1 deny, 2 in between) for scripting; `--json` for the full
+record.
+
 ### `risk <sql> [directory] [--json] [--fail-on low|medium|high]`
 **Query-intent risk scoring.** Grade *how risky a query's shape is* before it runs
 — so a governed surface can graduate its response by intent, which static
