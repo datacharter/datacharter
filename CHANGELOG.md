@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.33.0] - 2026-08-13
+
+### Added
+- **Governance time-travel — `datacharter asof <git-ref>`.** Reconstruct the
+  agent-visible surface as it existed at any charter version, or replay a query
+  against current data masked by *that ref's* PII rules. Answers "what would the
+  agent have seen under last March's rules?" — DataCharter versions the
+  **governance**, not just the data, so a column can return raw at an earlier ref
+  and `•••` today, proving exactly when a rule took effect.
+- **Continuous compliance — `datacharter monitor`.** Runs every governance gate
+  in one pass (`test`, `drift`, `access diff`, the `redteam` gauntlet) and reports
+  a single pass/fail status; `--json` for alerting, `--no-gauntlet` for the fast
+  gates. Turns point-in-time `evidence` into a repeatable signal a scheduler can
+  watch. Exits non-zero on any violation.
+
 ## [0.32.0] - 2026-08-12
 
 ### Added

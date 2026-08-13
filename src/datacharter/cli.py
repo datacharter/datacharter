@@ -827,6 +827,141 @@ def _cmd_query(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_asof(args: argparse.Namespace) -> int:
+    """Governance time-travel: reconstruct the agent-visible surface as it was at a
+    git ref, and (optionally) run a query masked by *that* charter's PII rules
+    against today's data — "what would the agent have seen under last March's rules?"."""
+    import csv
+    import json as _json
+
+    from datacharter.contracts.accessplan import effective_surface, surface_hash
+    from datacharter.contracts.loader import CharterError
+
+    ws = Path(args.directory).resolve()
+    ref = args.ref.split("git:", 1)[-1] if args.ref.startswith("git:") else args.ref
+    try:
+        text = _git_show_charter(ws, ref)
+    except _GitError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    if text is None:
+        print(f"No charter.yaml committed at git ref '{ref}'.", file=sys.stderr)
+        return 1
+    try:
+        ref_charter = _load_charter_text(text)
+    except CharterError as exc:
+        print(f"Charter at '{ref}' does not parse: {exc}", file=sys.stderr)
+        return 1
+
+    if not args.query and not args.relation:
+        surface = effective_surface(ref_charter)
+        if args.json:
+            print(_json.dumps({"ref": ref, "surface_hash": surface_hash(surface),
+                               "surface": surface}, indent=2, sort_keys=True))
+            return 0
+        print(f"Agent-visible surface as of {ref}  (surface_hash {surface_hash(surface)[:12]})")
+        for sname, sinfo in surface.get("sources", {}).items():
+            print(f"  {sname} ({sinfo.get('type')})")
+            for tbl, tinfo in sinfo.get("tables", {}).items():
+                masked = ", ".join(tinfo.get("pii") or []) or "—"
+                rf = tinfo.get("row_filter")
+                extra = f"  row_filter: {rf}" if rf else ""
+                print(f"    {tbl}: masked[{masked}]{extra}")
+        return 0
+
+    # Query/relation mode: run against current data, mask by the ref charter's PII.
+    import asyncio
+
+    from datacharter.agent.tools import MASKED
+    from datacharter.contracts import load_charter
+    from datacharter.engine.session import EngineError
+
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws} to reach the data.", file=sys.stderr)
+        return 1
+    if args.relation and not _is_relation(args.relation):
+        print(f"Invalid relation name: {args.relation!r}", file=sys.stderr)
+        return 1
+    sql = args.query or f"SELECT * FROM {args.relation}"
+    pii = {c.lower() for s in ref_charter.sources for cols in s.pii.values() for c in cols}
+    engine = _open_engine(ws, load_charter(ws).sources)
+    try:
+        result = asyncio.run(engine.query(sql, row_limit=args.rows))
+    except EngineError as exc:
+        print(f"Query failed: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        engine.close()
+    mask = {i for i, c in enumerate(result.columns) if c.lower() in pii}
+    writer = csv.writer(sys.stdout)
+    writer.writerow(result.columns)
+    for row in result.rows:
+        writer.writerow(
+            [MASKED if i in mask else ("" if v is None else v) for i, v in enumerate(row)]
+        )
+    return 0
+
+
+def _cmd_monitor(args: argparse.Namespace) -> int:
+    """Run the governance gates in one pass and report an aggregate compliance status.
+
+    Each gate is the real command's code (captured), so a green monitor is evidence
+    about what actually runs. Exits non-zero if any gate reports a violation."""
+    import contextlib
+    import io
+
+    from datacharter.compliance import CheckResult, ComplianceReport, render_report
+
+    ws = Path(args.directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+
+    def _run(fn, ns) -> tuple[bool, str]:
+        buf = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+                rc = fn(argparse.Namespace(**ns))
+        except Exception as exc:  # a gate that raises is a failed gate, not a crashed monitor
+            return False, f"{type(exc).__name__}: {exc}"
+        return rc == 0, buf.getvalue()
+
+    report = ComplianceReport()
+    base = {"directory": str(ws)}
+
+    ok, out = _run(_cmd_test, {**base, "select": None})
+    report.results.append(CheckResult("contract-tests", ok, out))
+
+    ok, out = _run(_cmd_drift, {**base, "update": False})
+    report.results.append(CheckResult("schema-drift", ok, out))
+
+    # Access-plan gate needs a committed baseline; skip cleanly outside a git tree.
+    try:
+        in_git = _git_show_charter(ws, "HEAD") is not None
+    except _GitError:
+        in_git = False
+    if in_git:
+        ok, out = _run(_cmd_access, {
+            **base, "access_action": "diff", "against": "git:HEAD", "old": None,
+            "new": None, "json": False, "md": False, "fail_on": "widened",
+        })
+        report.results.append(CheckResult("access-plan", ok, out))
+    else:
+        report.results.append(CheckResult("access-plan", True, "not a git work tree", skipped=True))
+
+    if not args.no_gauntlet:
+        ok, out = _run(_cmd_redteam, {**base})
+        report.results.append(CheckResult("gauntlet", ok, out))
+    else:
+        report.results.append(CheckResult("gauntlet", True, "", skipped=True))
+
+    if args.json:
+        print(report.to_json())
+    else:
+        print(render_report(report))
+    return 0 if report.ok else 1
+
+
 def _cmd_test(args: argparse.Namespace) -> int:
     from datacharter.contracts import load_charter
     from datacharter.contracts.datatests import DataTestError, check_sql
@@ -1592,6 +1727,30 @@ def main(argv: list[str] | None = None) -> int:
         "--format", choices=["table", "csv", "json"], default="table", help="Output format"
     )
     p_query.set_defaults(func=_cmd_query)
+
+    p_asof = sub.add_parser(
+        "asof", help="Governance time-travel: the agent surface (or a masked query) as of a git ref"
+    )
+    p_asof.add_argument("ref", help="Git ref of the charter version (e.g. main~5 or a commit sha)")
+    p_asof.add_argument("directory", nargs="?", default=".")
+    p_asof.add_argument("--query", help="Run this SQL, masked by the ref charter's PII rules")
+    p_asof.add_argument("--relation", help="Masked sample of a relation under the ref's rules")
+    p_asof.add_argument("--rows", type=int, default=20, help="Row limit for --query/--relation")
+    p_asof.add_argument("--json", action="store_true", help="Emit the surface snapshot as JSON")
+    p_asof.set_defaults(func=_cmd_asof)
+
+    p_monitor = sub.add_parser(
+        "monitor", help="Continuous compliance: run every governance gate and report one status"
+    )
+    p_monitor.add_argument("directory", nargs="?", default=".")
+    p_monitor.add_argument(
+        "--json", action="store_true", help="Emit the report as JSON (for alerting)"
+    )
+    p_monitor.add_argument(
+        "--no-gauntlet", action="store_true", dest="no_gauntlet",
+        help="Skip the redteam gauntlet (faster; run the fast gates only)",
+    )
+    p_monitor.set_defaults(func=_cmd_monitor)
 
     p_metric = sub.add_parser(
         "metric", help="Run a contract-defined metric (charter.yaml metrics:)"

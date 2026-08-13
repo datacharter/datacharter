@@ -1,0 +1,14 @@
+version: 0.33.0
+date: 2026-08-13
+who: release_gate.sh (automated; run on the release machine)
+wheel-gate: pass
+journey: pass
+claude-code-round: pass
+notes: |
+    ✓ claude-binary: 2.1.228 (Claude Code)
+    ✓ tool-surface: governed surface asserted (37 denied)
+    ✓ data-question: tools=['list_tables', 'query'] answer='I will find the people table and count its rows.The people table has **3** rows.'
+    ✓ pii-masked: raw emails absent from every event
+    ✓ follow-up-memory: answer='3'
+    ✓ local-llm: skipped — no local runtime running
+  claude live check: 6/6 passed

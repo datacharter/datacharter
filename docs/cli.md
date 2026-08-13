@@ -156,6 +156,25 @@ structurally can't offer. For wiring `test`, `drift`, and this check into Dagste
 Airflow, or CI as run-blocking gates, see
 [Governance gates for data pipelines](pipeline-gates.html).
 
+### `asof <ref> [directory] [--query SQL | --relation R] [--rows N] [--json]`
+**Governance time-travel.** Reconstruct the agent-visible surface as it existed at
+a git ref — "what would the agent have seen under last March's rules?". With no
+`--query`/`--relation` it prints the surface as of that charter version (tables,
+masked columns, row filters, `surface_hash`). With `--query` or `--relation` it
+runs the query against *current* data but masks it by *that ref's* PII rules, so
+you can replay a question under an older policy. Versions the **governance**, not
+just the data — the same masked column can come back raw at an earlier ref and
+`•••` today, proving exactly when a rule took effect.
+
+### `monitor [directory] [--json] [--no-gauntlet]`
+**Continuous compliance.** Run every governance gate in one pass — `test`,
+`drift`, `access diff --fail-on widened` (vs `git:HEAD`), and the `redteam`
+gauntlet — and report a single status. Each gate is the real command's code, so a
+green monitor is evidence about what actually runs. **Exits non-zero if any gate
+reports a violation**, so a scheduler (cron, a CI schedule) turns point-in-time
+`evidence` into a repeatable, alertable signal. `--json` emits the per-gate report
+for alerting; `--no-gauntlet` runs the fast gates only.
+
 ### `test [directory] [--select name]`
 Run the [data assertions](charter-yaml.html#tests) declared under `tests:` and
 **exit non-zero if any fail** — for CI. `--select` runs one test by name.
