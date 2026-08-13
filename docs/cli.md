@@ -156,6 +156,26 @@ structurally can't offer. For wiring `test`, `drift`, and this check into Dagste
 Airflow, or CI as run-blocking gates, see
 [Governance gates for data pipelines](pipeline-gates.html).
 
+### `risk <sql> [directory] [--json] [--fail-on low|medium|high]`
+**Query-intent risk scoring.** Grade *how risky a query's shape is* before it runs
+— so a governed surface can graduate its response by intent, which static
+table/column RBAC can't express. A transparent, capped heuristic reads the SQL text
+and the contract's PII list (no data): `SELECT *`, naming PII columns, whole-row
+serialization (`to_json`/`string_agg` — a masking-evasion shape), unbounded reads,
+set-operation differencing, multi-join re-identification, and honeytoken
+references each carry a **named weight**. Prints a 0–100 score and band
+(low/medium/high) with the reasons, or `--json`. `--fail-on medium|high` exits `2`
+at that band — a step-up/deny gate.
+
+### `subject-access <value> [directory] [--column email] [-o file]`
+**Subject-access receipt (DSAR).** Produce a signed record of exactly what an AI
+agent can see about one person — GDPR Art. 15 / EU AI Act transparency, answered
+from the data plane. It looks the subject up by key column (`--column`, default
+`email`) across every governed relation that carries it, and seals the result with
+the workspace [provenance](provenance.html) key. What the receipt shows is what the
+agent sees: **PII columns come back masked** (`•••`). Verify it offline with
+`datacharter provenance verify`. `-o` writes the receipt to a file.
+
 ### `synth <relation> [directory] [--rows N] [--format csv|json] [-o file] [--seed S]`
 **Governed synthetic data.** Generate realistic rows that match a relation's schema
 but hold no real data — PII columns come out as clearly-synthetic stand-ins

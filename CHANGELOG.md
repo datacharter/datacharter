@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.36.0] - 2026-08-13
+
+### Added
+- **Subject-access receipts (DSAR) — `datacharter subject-access <value>`.** A
+  signed record of exactly what an AI agent can see about one person (GDPR Art. 15
+  / EU AI Act transparency). Looks the subject up by key column across every
+  governed relation that carries it and seals the masked result with the workspace
+  provenance key — PII comes back `•••`, exactly as the agent sees it. Verifiable
+  offline with `provenance verify`.
+- **Query-intent risk scoring — `datacharter risk <sql>`.** Grades how risky a
+  query's *shape* is before it runs (SELECT *, naming PII, whole-row serialization,
+  unbounded reads, differencing, honeytoken references), each with a named weight,
+  as a 0–100 score and band. `--fail-on medium|high` exits `2` as a step-up/deny
+  gate — intent-aware governance that static RBAC can't express. This completes the
+  whitespace-six (DP · intent-risk · synth · subject-access · monitor · asof).
+
 ## [0.35.0] - 2026-08-13
 
 ### Added

@@ -827,6 +827,113 @@ def _cmd_query(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_risk(args: argparse.Namespace) -> int:
+    """Score a query's intent risk from its shape + the PII it names, so a governed
+    surface can graduate its response. Transparent heuristic; `--fail-on` gates."""
+    import json as _json
+
+    from datacharter.contracts import load_charter
+    from datacharter.risk import score_query
+
+    ws = Path(args.directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+    charter = load_charter(ws)
+    pii = {c.lower() for s in charter.sources for cols in s.pii.values() for c in cols}
+    # When canaries are armed, the honeytoken relation is bait — naming it is a signal.
+    canaries = {"canaries"} if getattr(charter, "canary_mode", None) else set()
+
+    assessment = score_query(args.sql, pii_columns=pii, canaries=canaries)
+    if args.json:
+        print(_json.dumps(assessment.to_dict(), indent=2))
+    else:
+        print(f"Intent risk: {assessment.score}/100 — {assessment.band.upper()}")
+        for s in assessment.signals:
+            print(f"  +{s.weight:>2}  {s.name}: {s.detail}")
+        if not assessment.signals:
+            print("  (no risk signals — narrow, filtered read)")
+
+    if args.fail_on:
+        threshold = {"low": 0, "medium": 30, "high": 70}[args.fail_on]
+        if assessment.score >= threshold and args.fail_on != "low":
+            return 2
+    return 0
+
+
+def _cmd_subject_access(args: argparse.Namespace) -> int:
+    """DSAR: a signed record of exactly what an agent can see about one subject
+    across every governed relation carrying the key column — PII masked as the
+    agent sees it, sealed with the workspace provenance key."""
+    import json as _json
+
+    from datacharter.agent.tools import MASKED
+    from datacharter.contracts import load_charter
+    from datacharter.contracts.accessplan import effective_surface, surface_hash
+    from datacharter.engine.session import EngineError
+    from datacharter.provenance import keys
+    from datacharter.provenance.subject import (
+        build_subject_access,
+        find_relations_with_column,
+        subject_query,
+    )
+
+    ws = Path(args.directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+    if not args.column.replace("_", "").isalnum():
+        print(f"Invalid column name: {args.column!r}", file=sys.stderr)
+        return 1
+    try:
+        signer = keys.load_signer(ws)
+    except keys.ProvenanceKeyError:
+        print("No signing key yet. Run `datacharter provenance keygen` first.", file=sys.stderr)
+        return 1
+
+    charter = load_charter(ws)
+    pii = {c.lower() for s in charter.sources for cols in s.pii.values() for c in cols}
+    engine = _open_engine(ws, charter.sources)
+    records: list[dict] = []
+    try:
+        catalog = engine.query_sync("SHOW ALL TABLES")
+        idx = {c: i for i, c in enumerate(catalog.columns)}
+        targets = find_relations_with_column(catalog.rows, idx, args.column)
+        for relation, _cols in targets:
+            res = engine.query_sync(subject_query(relation, args.column, args.value))
+            masked_cols = [c for c in res.columns if c.lower() in pii]
+            mask_idx = {i for i, c in enumerate(res.columns) if c.lower() in pii}
+            rows = [
+                {c: (MASKED if i in mask_idx else v) for i, (c, v) in enumerate(
+                    zip(res.columns, row, strict=True))}
+                for row in res.rows
+            ]
+            records.append({
+                "relation": relation, "matched_rows": len(rows),
+                "columns": list(res.columns), "masked_columns": masked_cols, "rows": rows,
+            })
+    except EngineError as exc:
+        print(f"Subject lookup failed: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        engine.close()
+
+    sh = surface_hash(effective_surface(charter))
+    r = build_subject_access(
+        workspace=str(ws), subject_column=args.column, subject_value=args.value,
+        surface_hash=sh, records=records, signer=signer,
+    )
+    text = _json.dumps(r, indent=2, default=str)
+    total = r["body"]["total_matched_rows"]
+    if args.output:
+        Path(args.output).write_text(text)
+        print(f"Wrote {args.output} — {total} row(s) across {len(records)} relation(s), "
+              f"receipt {r['content_hash'][:12]} signed by key {r['signature']['key_id']}")
+    else:
+        print(text)
+    return 0
+
+
 def _cmd_synth(args: argparse.Namespace) -> int:
     """Generate governed synthetic data for a relation: schema-matched fake rows with
     PII columns rendered as clearly-synthetic stand-ins, never real values."""
@@ -1905,6 +2012,30 @@ def main(argv: list[str] | None = None) -> int:
     p_synth.add_argument("-o", "--output", help="Write to a file instead of stdout")
     p_synth.add_argument("--seed", type=int, help="Seed for reproducible output")
     p_synth.set_defaults(func=_cmd_synth)
+
+    p_subject = sub.add_parser(
+        "subject-access",
+        help="Signed DSAR: what an agent can see about one subject (PII masked)",
+    )
+    p_subject.add_argument("value", help="The subject's key value (e.g. an email)")
+    p_subject.add_argument("directory", nargs="?", default=".")
+    p_subject.add_argument(
+        "--column", default="email", help="Key column to match on (default: email)"
+    )
+    p_subject.add_argument("-o", "--output", help="Write the signed receipt to a file")
+    p_subject.set_defaults(func=_cmd_subject_access)
+
+    p_risk = sub.add_parser(
+        "risk", help="Score a query's intent risk (shape + PII named) — for step-up gating"
+    )
+    p_risk.add_argument("sql")
+    p_risk.add_argument("directory", nargs="?", default=".")
+    p_risk.add_argument("--json", action="store_true", help="Emit the assessment as JSON")
+    p_risk.add_argument(
+        "--fail-on", choices=["low", "medium", "high"], dest="fail_on",
+        help="Exit 2 when the score reaches this band (medium≥30, high≥70)",
+    )
+    p_risk.set_defaults(func=_cmd_risk)
 
     p_metric = sub.add_parser(
         "metric", help="Run a contract-defined metric (charter.yaml metrics:)"
