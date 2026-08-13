@@ -55,6 +55,112 @@ metrics:
     time_column: placed_on
 """
 
+# Template gallery: opinionated starting points for common stacks. Each is a
+# runnable charter with governance already wired — fill in the ${ENV} credentials.
+TEMPLATES: dict[str, tuple[str, str]] = {
+    "postgres": (
+        "A Postgres source with PII masking and a row filter",
+        """\
+# DataCharter — Postgres analytics. Fill ${PG_*} from .env or the keyring.
+version: 1
+
+sources:
+  warehouse:
+    type: postgres
+    connection:
+      host: ${PG_HOST}
+      port: 5432
+      database: ${PG_DATABASE}
+      user: ${PG_USER}
+    credentials:
+      password: ${PG_PASSWORD}
+    tables: [customers, orders]
+    pii:
+      customers: [email, phone]
+    row_filters:
+      # Agents only ever see production rows, never test accounts.
+      customers: "region <> 'ZZ'"
+""",
+    ),
+    "warehouse": (
+        "A Snowflake warehouse with aggregate-only + k-anonymity policies",
+        """\
+# DataCharter — Snowflake warehouse. Fill ${SNOWFLAKE_*} from .env or the keyring.
+version: 1
+
+sources:
+  analytics:
+    type: snowflake
+    connection:
+      account: ${SNOWFLAKE_ACCOUNT}
+      database: ${SNOWFLAKE_DATABASE}
+      schema: PUBLIC
+      warehouse: ${SNOWFLAKE_WAREHOUSE}
+      user: ${SNOWFLAKE_USER}
+    credentials:
+      password: ${SNOWFLAKE_PASSWORD}
+    tables: [customers, events]
+    pii:
+      customers: [email]
+
+policies:
+  # Agents may only aggregate this table, and never over groups smaller than 5.
+  analytics.customers:
+    aggregate_only: true
+    min_group_size: 5
+""",
+    ),
+    "files": (
+        "Local CSV / Parquet files as governed sources — no database needed",
+        """\
+# DataCharter — local files. Point paths at your CSV/Parquet and run `datacharter serve`.
+version: 1
+
+sources:
+  events:
+    type: parquet
+    path: data/events.parquet
+  people:
+    type: csv
+    path: data/people.csv
+    pii:
+      people: [email, ssn]
+""",
+    ),
+    "secure": (
+        "A fully-hardened charter: firewall, canaries, policies, quarantine",
+        """\
+# DataCharter — maximum governance. The whole stack turned on.
+version: 1
+
+# Deny queries the Reasoning Governor rejects, on every agent query.
+firewall: block
+# Plant masked honeytokens that alarm if masking ever fails.
+canary: on
+# Quarantine prompt-injection payloads found in result cells (default on).
+quarantine: on
+
+sources:
+  crm:
+    type: postgres
+    connection:
+      host: ${PG_HOST}
+      database: ${PG_DATABASE}
+      user: ${PG_USER}
+    credentials:
+      password: ${PG_PASSWORD}
+    tables: [customers]
+    pii:
+      customers: [email, phone, ssn]
+
+policies:
+  crm.customers:
+    aggregate_only: true
+    min_group_size: 10
+""",
+    ),
+}
+
 ENV_EXAMPLE = """\
 # Copy to .env and fill in real values. .env is gitignored.
 # EXAMPLE_DB_PASSWORD=change-me
@@ -76,6 +182,18 @@ def _open_engine(workspace: Path, sources: list):
 
 
 def _cmd_init(args: argparse.Namespace) -> int:
+    if getattr(args, "list_templates", False):
+        print("Available templates (datacharter init --template <name>):")
+        for name, (desc, _) in TEMPLATES.items():
+            print(f"  {name:10} — {desc}")
+        return 0
+
+    template = getattr(args, "template", None)
+    if template is not None and template not in TEMPLATES:
+        avail = ", ".join(TEMPLATES)
+        print(f"Unknown template '{template}'. Available: {avail}.", file=sys.stderr)
+        return 1
+
     ws = Path(args.directory).resolve()
     ws.mkdir(parents=True, exist_ok=True)
     charter = ws / "charter.yaml"
@@ -84,7 +202,11 @@ def _cmd_init(args: argparse.Namespace) -> int:
         return 1
 
     tour = args.demo and getattr(args, "tour", False)
-    charter.write_text((TOUR_CHARTER if tour else DEMO_CHARTER) if args.demo else CHARTER_TEMPLATE)
+    if template is not None:
+        charter.write_text(TEMPLATES[template][1])
+    else:
+        charter.write_text(
+            (TOUR_CHARTER if tour else DEMO_CHARTER) if args.demo else CHARTER_TEMPLATE)
     (ws / ".env.example").write_text(ENV_EXAMPLE)
     (ws / "queries").mkdir(exist_ok=True)
     (ws / "guides").mkdir(exist_ok=True)
@@ -95,7 +217,9 @@ def _cmd_init(args: argparse.Namespace) -> int:
     if args.demo:
         write_demo_data(ws, seed_tour=tour)
     print(f"Workspace initialized in {ws}.")
-    if args.demo:
+    if template is not None:
+        print(f"Template '{template}' — fill in the ${{ENV}} credentials, then: datacharter serve")
+    elif args.demo:
         print("Demo data in demo/ — try: datacharter serve")
     return 0
 
@@ -2020,6 +2144,13 @@ def main(argv: list[str] | None = None) -> int:
     p_init.add_argument(
         "--tour", action="store_true",
         help="With --demo: include guides, evals, a policy, and a seeded audit chain",
+    )
+    p_init.add_argument(
+        "--template", help="Start from a gallery template (see --list-templates)"
+    )
+    p_init.add_argument(
+        "--list-templates", action="store_true", dest="list_templates",
+        help="List the available starter templates and exit",
     )
     p_init.set_defaults(func=_cmd_init)
 

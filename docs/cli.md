@@ -10,10 +10,14 @@ Run `datacharter <command> --help` for the exact flags.
 
 ## Setup
 
-### `init [directory] [--demo] [--force]`
+### `init [directory] [--demo] [--force] [--template NAME] [--list-templates]`
 Scaffold a workspace: `charter.yaml`, `queries/`, `.env.example`, `.gitignore`.
 `--demo` includes a generated demo dataset; `--force` overwrites an existing
-`charter.yaml`.
+`charter.yaml`. **`--template NAME`** starts from a gallery starter with governance
+already wired — `postgres` (PII + a row filter), `warehouse` (Snowflake with
+aggregate-only + k-anonymity policies), `files` (local CSV/Parquet), or `secure`
+(the whole stack: firewall, canaries, policies, quarantine). `--list-templates`
+prints them. Fill in the `${ENV}` credentials and run `datacharter serve`.
 
 ### `demo [directory]`
 A zero-config, narrated walkthrough of the governance — no server, no account.

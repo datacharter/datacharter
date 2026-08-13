@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.41.0] - 2026-08-13
+
+### Added
+- **Template gallery — `datacharter init --template <name>`.** Start from an
+  opinionated, runnable charter with governance already wired: `postgres` (PII + a
+  row filter), `warehouse` (Snowflake with aggregate-only + k-anonymity policies),
+  `files` (local CSV/Parquet), or `secure` (the whole stack — firewall, canaries,
+  policies, quarantine). `--list-templates` shows them. Cuts time-to-first-governed-
+  workspace to one command.
+
 ## [0.40.0] - 2026-08-13
 
 ### Added
