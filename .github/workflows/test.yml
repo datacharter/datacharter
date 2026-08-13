@@ -10,8 +10,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v7
-      - name: Install
-        run: uv venv && uv pip install -e ".[dev]"
+      - name: Install (from the lockfile)
+        run: uv sync --extra dev --frozen
       - name: Lint
         run: .venv/bin/ruff check .
       - name: Unit tests
@@ -46,8 +46,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v7
-      - name: Install
-        run: uv venv && uv pip install -e ".[dev]"
+      - name: Install (from the lockfile)
+        run: uv sync --extra dev --frozen
       - name: Seed databases
         run: |
           sudo apt-get install -y -q postgresql-client mysql-client >/dev/null
@@ -101,8 +101,7 @@ jobs:
           echo "VIDAIMOCK_BIN=$bin" >> "$GITHUB_ENV"
       - name: Install + e2e
         run: |
-          uv venv
-          uv pip install -e ".[dev]"
+          uv sync --extra dev --frozen
           .venv/bin/pytest -m e2e -q
 
   journey:

@@ -9,7 +9,8 @@ description: How DataCharter protects your data, credentials, and machine.
 # Security & privacy posture
 
 DataCharter runs on your machine, against your data. Here is exactly what it
-does — and doesn't — do.
+does — and doesn't — do. For a one-page overview of how DataCharter is built to be
+trustworthy — architecture, supply chain, disclosure — see [Trust & security](trust.html).
 
 ## No telemetry
 

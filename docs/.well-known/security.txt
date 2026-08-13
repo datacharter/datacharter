@@ -1,0 +1,6 @@
+# DataCharter security contact — https://datacharter.dev/security.html
+Contact: https://github.com/datacharter/datacharter/security/advisories/new
+Expires: 2027-08-12T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://datacharter.dev/.well-known/security.txt
+Policy: https://datacharter.dev/security.html
