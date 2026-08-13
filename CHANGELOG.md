@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.40.0] - 2026-08-13
+
+### Added
+- **The Data Firewall — `firewall:` charter mode + `datacharter firewall` (moonshot).**
+  The governed choke point every agent routes through. Set `firewall: block` (or
+  `log`) in `charter.yaml` and the **Reasoning Governor runs live on every agent
+  query** through `serve`/`mcp`: a denied query is refused at the tool boundary
+  with its reason, so the agent gets actionable feedback instead of raw rows. The
+  `firewall` command evaluates a query through the configured mode (BLOCKED /
+  FLAGGED / PASSED) and `--status` shows it. **Default off — zero change to the
+  agent surface unless a workspace opts in.** This lands the fourth moonshot; the
+  five-bet arch (provenance keystone · firewall · self-defending data · governor ·
+  GovBench) is complete.
+
 ## [0.39.0] - 2026-08-13
 
 ### Added

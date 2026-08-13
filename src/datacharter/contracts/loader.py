@@ -47,6 +47,9 @@ class Charter(BaseModel):
     max_scan_rows: int | None = None
     #: Canary tripwires: None = off (default), "block" or "log" when enabled.
     canary_mode: str | None = None
+    #: Data Firewall: None = off, "log" = record the governor's decision per query,
+    #: "block" = deny queries the Reasoning Governor rejects on the agent surface.
+    firewall_mode: str | None = None
     #: Plain-english policies per relation (aggregate_only / k-anonymity / joins).
     policies: dict = Field(default_factory=dict)
 
@@ -150,6 +153,21 @@ def load_charter(
             f"{filename}: 'canary' must be on/off or {{mode: block|log}} (got {canary_raw!r})."
         )
 
+    firewall_raw = raw.get("firewall")
+    if firewall_raw in (None, False, "off"):
+        firewall_mode: str | None = None
+    elif firewall_raw in (True, "on"):
+        firewall_mode = "block"
+    elif firewall_raw in ("log", "block"):
+        firewall_mode = firewall_raw
+    elif isinstance(firewall_raw, dict) and firewall_raw.get("mode") in ("block", "log"):
+        firewall_mode = firewall_raw["mode"]
+    else:
+        raise CharterError(
+            f"{filename}: 'firewall' must be off/log/block or {{mode: block|log}} "
+            f"(got {firewall_raw!r})."
+        )
+
     from datacharter.contracts.policies import parse_policies
 
     policies = parse_policies(raw.get("policies") or {})
@@ -158,7 +176,8 @@ def load_charter(
         version=version, sources=sources, warnings=warnings, metrics=metrics,
         tests=tests, local_access=local_access, guides=load_guides(workspace),
         audit_enabled=audit_enabled, quarantine_enabled=quarantine_enabled,
-        max_scan_rows=max_scan_rows, canary_mode=canary_mode, policies=policies,
+        max_scan_rows=max_scan_rows, canary_mode=canary_mode,
+        firewall_mode=firewall_mode, policies=policies,
     )
 
 
@@ -212,7 +231,7 @@ def _build_test(name: str, body: Any, filename: str) -> DataTest:
 
 _TOP_LEVEL_KEYS = {
     "version", "sources", "metrics", "tests", "local_access",
-    "audit", "quarantine", "canary", "policies", "max_scan_rows",
+    "audit", "quarantine", "canary", "firewall", "policies", "max_scan_rows",
     # `access:` is consumed by the enterprise server (charter-policy roles /
     # OpenFGA row-scopes); the core tolerates and ignores it rather than rejecting
     # a valid server charter.

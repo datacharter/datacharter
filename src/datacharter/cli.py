@@ -827,6 +827,42 @@ def _cmd_query(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_firewall(args: argparse.Namespace) -> int:
+    """The Data Firewall: evaluate a query through the charter's configured
+    enforcement mode. The same governor runs live on the agent surface when the
+    charter sets `firewall: block`."""
+    from datacharter.contracts import load_charter
+    from datacharter.governor import Action, govern
+
+    ws = Path(args.directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+    charter = load_charter(ws)
+    mode = charter.firewall_mode
+    if args.status or not args.sql:
+        state = mode or "off"
+        print(f"Data Firewall: {state}")
+        if mode is None:
+            print("  Enable it in charter.yaml: `firewall: block` (deny) or `firewall: log`.")
+        else:
+            print("  The Reasoning Governor runs on every agent query through this workspace.")
+        return 0
+
+    pii = {c.lower() for s in charter.sources for cols in s.pii.values() for c in cols}
+    canaries = {"canaries"} if charter.canary_mode else set()
+    decision = govern(args.sql, pii_columns=pii, canaries=canaries,
+                      has_policies=bool(charter.policies))
+    blocked = mode == "block" and decision.action == Action.DENY
+    verdict = "BLOCKED" if blocked else ("FLAGGED" if mode == "log" and
+                                         decision.action != Action.ALLOW else "PASSED")
+    print(f"Data Firewall ({mode or 'off'}): {verdict}")
+    print(f"  decision: {decision.action.upper().replace('_', ' ')} — {decision.reason}")
+    if verdict != "PASSED":
+        print(f"  next: {decision.recommendation}")
+    return 1 if blocked else 0
+
+
 def _cmd_govern(args: argparse.Namespace) -> int:
     """The Reasoning Governor: intent + purpose + sensitivity → one graduated
     decision (allow/add-noise/mask-more/step-up/deny) with a reason and next step."""
@@ -2233,6 +2269,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_govern.add_argument("--json", action="store_true", help="Emit the decision as JSON")
     p_govern.set_defaults(func=_cmd_govern)
+
+    p_firewall = sub.add_parser(
+        "firewall",
+        help="Data Firewall: evaluate a query through the charter's configured enforcement",
+    )
+    p_firewall.add_argument("sql", nargs="?", help="Query to evaluate (omit with --status)")
+    p_firewall.add_argument("directory", nargs="?", default=".")
+    p_firewall.add_argument("--status", action="store_true", help="Show the firewall mode and exit")
+    p_firewall.set_defaults(func=_cmd_firewall)
 
     p_seald = sub.add_parser(
         "seal-data", help="Seal a masked query result into a signed, self-defending envelope"

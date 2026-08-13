@@ -117,9 +117,14 @@ class ToolBox:
         quarantine: bool = True,
         injection_classifier=None,
         max_scan_rows: int | None = None,
+        firewall_mode: str | None = None,
         timeout_s: float = _DEFAULT_TIMEOUT_S,
     ) -> None:
         self._engine = engine
+        #: Data Firewall mode: None = off, "log" = record the governor's decision,
+        #: "block" = refuse queries the Reasoning Governor denies. Default off keeps
+        #: the agent surface unchanged unless a charter opts in.
+        self._firewall_mode = firewall_mode
         #: Pre-execution ceiling on a query's estimated touched rows (None = off).
         self._max_scan_rows = max_scan_rows
         #: Scan result cells for prompt-injection payloads and replace them.
@@ -311,6 +316,23 @@ class ToolBox:
                     break
         return json.dumps(payload, default=str)
 
+    def _firewall_check(self, sql: str) -> str | None:
+        """Run the Reasoning Governor over the query. In "block" mode, return an
+        Error string for a DENY (the agent gets the reason); otherwise record the
+        decision and return None. "log" mode always records and never blocks."""
+        from datacharter.governor import Action, govern
+
+        canaries = {"canaries"} if self.canary is not None else set()
+        decision = govern(sql, pii_columns=self._masked_names, canaries=canaries,
+                          has_policies=bool(self._policies))
+        rec = getattr(self.recorder, "record_firewall", None)
+        if callable(rec):
+            rec(sql, decision.action, decision.reason)
+        if self._firewall_mode == "block" and decision.action == Action.DENY:
+            return (f"Error: the data firewall denied this query — {decision.reason}. "
+                    f"{decision.recommendation}.")
+        return None
+
     async def _query(self, args: dict) -> str:
         sql = str(args.get("sql", ""))
         # The agent surface is strictly read-only: reject CREATE/DROP of local.*
@@ -322,6 +344,10 @@ class ToolBox:
             ensure_allowed(sql, allow_local_ddl=False)
         except QueryNotAllowed as exc:
             return f"Error: {exc}"
+        if self._firewall_mode:
+            blocked = self._firewall_check(sql)
+            if blocked is not None:
+                return blocked
         k = None
         if self._policies:
             from datacharter.engine.policy_guard import PolicyRefusal, check_policies

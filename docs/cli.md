@@ -156,6 +156,16 @@ structurally can't offer. For wiring `test`, `drift`, and this check into Dagste
 Airflow, or CI as run-blocking gates, see
 [Governance gates for data pipelines](pipeline-gates.html).
 
+### `firewall <sql> [directory] [--status]`
+**The Data Firewall** — the governed choke point every agent routes through. Turn
+it on in `charter.yaml` with `firewall: block` (deny) or `firewall: log` (record
+only), and the [Reasoning Governor](cli.html) runs on **every query the agent makes
+through this workspace**: a query the governor denies is refused at the tool
+boundary with its reason, so the agent gets actionable feedback instead of raw
+rows. This command evaluates a query through the configured mode — `BLOCKED`,
+`FLAGGED` (log mode), or `PASSED` — and `--status` shows the current mode. The same
+enforcement runs live in `serve` and `mcp`. Default off; opt in per workspace.
+
 ### `govern <sql> [directory] [--purpose TEXT] [--json]`
 **The Reasoning Governor.** Turn a query's intent, declared `--purpose`, and the
 PII it touches into one graduated decision: **allow · add-noise · mask-more ·

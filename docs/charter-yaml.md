@@ -32,6 +32,7 @@ sources:
 | `audit` / `canary` | no | Flight recorder (default on) and canary tripwires ([audit](audit.html)). |
 | `quarantine` | no | Quarantine prompt-injection payloads in result cells (default on; `quarantine: off` disables) ([security](security.html#prompt-injection-quarantine)). |
 | `max_scan_rows` | no | A coarse pre-execution ceiling: a positive integer. An agent query whose estimated result exceeds it is refused *before running*, with a retryable hint to narrow it. Estimates are approximate — set it well above your normal result sizes; it catches unbounded pulls, not narrow queries. |
+| `firewall` | no | The Data Firewall: `off` (default), `log` (record the Reasoning Governor's decision on every agent query), or `block` (refuse queries the governor denies at the tool boundary). Enforces intent-aware governance on the live agent surface ([CLI](cli.html#firewall-sql-directory---status)). |
 
 Everything else — `pii`, `tables`, `agent_access`, `row_filters`, `context` —
 is **source-level**: it lives inside a `sources.<name>:` block. Placing one at
