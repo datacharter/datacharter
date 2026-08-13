@@ -156,6 +156,19 @@ structurally can't offer. For wiring `test`, `drift`, and this check into Dagste
 Airflow, or CI as run-blocking gates, see
 [Governance gates for data pipelines](pipeline-gates.html).
 
+### `dp <sql> [directory] [--epsilon E] [--bound B] [--budget C] [--status] [--reset]`
+**Differential-privacy query mode.** Add calibrated Laplace noise to an aggregate
+answer and spend from a per-workspace **ε budget** — so an agent can't chain
+"safe" aggregates to difference-out one individual. Supports **COUNT** (sensitivity
+1) and **SUM** (pass `--bound B`, the value range, as its sensitivity); each result
+row is assumed to cover distinct individuals (bounded contribution). `--epsilon`
+sets the per-query privacy loss (default 1.0); `--budget` the workspace cap
+(default 5.0, sequential composition). When a query would exceed the budget it is
+**refused**. `--status` shows spent/remaining; `--reset` clears it. Row-level
+(non-aggregate) queries are refused — noise there would leak the rows. The scope
+and assumptions are stated plainly: DP done wrong is false security, so the
+mechanism, sensitivity, and accounting are all explicit.
+
 ### `asof <ref> [directory] [--query SQL | --relation R] [--rows N] [--json]`
 **Governance time-travel.** Reconstruct the agent-visible surface as it existed at
 a git ref — "what would the agent have seen under last March's rules?". With no

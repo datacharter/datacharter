@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.34.0] - 2026-08-13
+
+### Added
+- **Differential-privacy query mode — `datacharter dp <sql>`.** Adds calibrated
+  Laplace noise to an aggregate and spends from a per-workspace **ε budget**, so an
+  agent can't chain "safe" aggregates to difference-out an individual. Supports
+  COUNT (sensitivity 1) and SUM (`--bound` for its sensitivity); `--epsilon` per
+  query, `--budget` the cap, refused when exhausted; `--status`/`--reset`.
+  Non-aggregate queries are refused. Scope and assumptions are documented plainly —
+  the noise source is cryptographic, the accounting is conservative sequential
+  composition.
+
 ## [0.33.0] - 2026-08-13
 
 ### Added

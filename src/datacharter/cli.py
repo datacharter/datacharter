@@ -827,6 +827,76 @@ def _cmd_query(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_dp(args: argparse.Namespace) -> int:
+    """Differential-privacy query mode: Laplace-noise an aggregate and spend from a
+    per-workspace ε budget. Refuses non-aggregate queries and an exhausted budget."""
+    import csv
+
+    from datacharter.contracts import load_charter
+    from datacharter.dp import Budget, DPError, is_aggregate, privatize_row
+    from datacharter.engine.guard import QueryNotAllowed
+    from datacharter.engine.session import EngineError
+
+    ws = Path(args.directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+
+    budget = Budget.load(ws, args.budget)
+    if args.reset:
+        budget.reset()
+        print(f"Privacy budget reset (cap ε={args.budget}).")
+        return 0
+    if args.status:
+        print(f"Privacy budget: spent ε={budget.spent:.3f} of {budget.cap} "
+              f"over {budget.queries} query(ies); {budget.remaining:.3f} left.")
+        return 0
+
+    if not is_aggregate(args.sql):
+        print("DP mode is for aggregates (COUNT/SUM/… or GROUP BY). This query returns "
+              "row-level data, where per-cell noise would leak the rows. Aggregate first.",
+              file=sys.stderr)
+        return 1
+    sensitivity = 1.0 if args.bound is None else float(args.bound)
+    non_negative_int = args.bound is None  # COUNT results are non-negative integers
+    try:
+        budget.check(args.epsilon)
+    except DPError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+    charter = load_charter(ws)
+    engine = _open_engine(ws, charter.sources)
+    try:
+        result = engine.query_sync(args.sql)
+    except (EngineError, QueryNotAllowed) as exc:
+        print(f"Query failed: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        engine.close()
+
+    numeric = {
+        i for i, _ in enumerate(result.columns)
+        if all(r[i] is None or isinstance(r[i], (int, float)) for r in result.rows)
+        and any(r[i] is not None for r in result.rows)
+    }
+    if not numeric:
+        print("No numeric aggregate column to privatize in the result.", file=sys.stderr)
+        return 1
+    budget.spend(args.epsilon)
+
+    writer = csv.writer(sys.stdout)
+    writer.writerow(result.columns)
+    for row in result.rows:
+        writer.writerow(privatize_row(
+            list(row), numeric, epsilon=args.epsilon, sensitivity=sensitivity,
+            non_negative_int=non_negative_int,
+        ))
+    print(f"# ε={args.epsilon} spent (Laplace, sensitivity={sensitivity:g}); "
+          f"budget {budget.remaining:.3f}/{budget.cap} left", file=sys.stderr)
+    return 0
+
+
 def _cmd_asof(args: argparse.Namespace) -> int:
     """Governance time-travel: reconstruct the agent-visible surface as it was at a
     git ref, and (optionally) run a query masked by *that* charter's PII rules
@@ -1751,6 +1821,21 @@ def main(argv: list[str] | None = None) -> int:
         help="Skip the redteam gauntlet (faster; run the fast gates only)",
     )
     p_monitor.set_defaults(func=_cmd_monitor)
+
+    p_dp = sub.add_parser(
+        "dp", help="Differential-privacy query mode: Laplace-noise an aggregate under an ε budget"
+    )
+    p_dp.add_argument("sql", nargs="?", help="Aggregate SQL (COUNT/SUM/… or GROUP BY)")
+    p_dp.add_argument("directory", nargs="?", default=".")
+    p_dp.add_argument("--epsilon", type=float, default=1.0, help="Privacy loss for this query")
+    p_dp.add_argument(
+        "--bound", type=float,
+        help="Value bound for a SUM (its sensitivity). Omit for COUNT (sensitivity 1).",
+    )
+    p_dp.add_argument("--budget", type=float, default=5.0, help="Total ε cap for the workspace")
+    p_dp.add_argument("--status", action="store_true", help="Show budget spent/remaining and exit")
+    p_dp.add_argument("--reset", action="store_true", help="Reset the spent budget and exit")
+    p_dp.set_defaults(func=_cmd_dp)
 
     p_metric = sub.add_parser(
         "metric", help="Run a contract-defined metric (charter.yaml metrics:)"
