@@ -144,7 +144,7 @@ jobs:
         run: cat /tmp/journey-serve.log
       - name: Upload screenshots
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: journey-shots
           path: journey-shots/
