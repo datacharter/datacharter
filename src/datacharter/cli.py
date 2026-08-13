@@ -1416,6 +1416,76 @@ def _cmd_redteam(args: argparse.Namespace) -> int:
     return 0 if report.ok else 1
 
 
+def _govbench_posture(ws: Path, charter) -> list:
+    """Defense-in-depth checks scored beyond withstanding the attack battery."""
+    from datacharter.govbench import PostureCheck
+    from datacharter.provenance import keys
+
+    pii_declared = any(s.pii for s in charter.sources)
+    return [
+        PostureCheck("canaries_armed", charter.canary_mode is not None,
+                     f"canary mode = {charter.canary_mode or 'off'}"),
+        PostureCheck("policies_active", bool(charter.policies),
+                     f"{len(charter.policies)} policy(ies)" if charter.policies else "none"),
+        PostureCheck("signed_provenance", keys.load_public(ws) is not None,
+                     "provenance signing key present" if keys.load_public(ws)
+                     else "run `provenance keygen`"),
+        PostureCheck("pii_declared", pii_declared,
+                     "PII columns declared" if pii_declared else "no PII declared to mask"),
+        PostureCheck("data_tests", bool(charter.tests),
+                     f"{len(charter.tests)} contract test(s)" if charter.tests else "none"),
+    ]
+
+
+def _cmd_govbench(args: argparse.Namespace) -> int:
+    """GovBench: run the real attack battery, grade it against posture, emit a
+    reproducible scorecard. Any breach fails the grade outright."""
+    import asyncio
+    import json as _json
+
+    from datacharter.agent.factory import build_toolbox, detect_auto_pii
+    from datacharter.agent.redteam import run_gauntlet
+    from datacharter.audit import FlightRecorder
+    from datacharter.audit.canary import ensure_canaries
+    from datacharter.contracts import load_charter
+    from datacharter.govbench import GRADES, grade_run, render_scorecard
+
+    ws = Path(args.directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+    charter = load_charter(ws)
+    engine = _open_engine(ws, charter.sources)
+    try:
+        guard = ensure_canaries(ws, engine, charter.canary_mode or "log")
+        if guard is None:
+            print("Could not plant honeytokens for GovBench.", file=sys.stderr)
+            return 1
+        recorder = FlightRecorder(ws, enabled=charter.audit_enabled)
+        recorder.start_session("govbench", question="GovBench governance benchmark")
+        toolbox = build_toolbox(
+            engine, charter, auto_pii=asyncio.run(detect_auto_pii(engine)),
+            recorder=recorder, canary=guard,
+        )
+        report = asyncio.run(run_gauntlet(toolbox, guard, policies_active=bool(charter.policies)))
+    finally:
+        engine.close()
+
+    card = grade_run(report, _govbench_posture(ws, charter))
+    if args.json:
+        print(_json.dumps(card.to_dict(), indent=2))
+    else:
+        print(render_scorecard(card))
+
+    # Grades are ordered best→worst in GRADES; a higher index is worse.
+    if args.min_grade and GRADES.index(card.grade) > GRADES.index(args.min_grade):
+        if not args.json:
+            print(f"\nGrade {card.grade} is below the required {args.min_grade}.",
+                  file=sys.stderr)
+        return 1
+    return 0 if card.security_pass else 1
+
+
 def _cmd_demo(args: argparse.Namespace) -> int:
     from datacharter.agent import demo
 
@@ -2103,6 +2173,23 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_redteam.add_argument("directory", nargs="?", default=".")
     p_redteam.set_defaults(func=_cmd_redteam)
+
+    p_govbench = sub.add_parser(
+        "govbench",
+        help="GovBench: grade this charter's AI-data governance (A–F) on a reproducible battery",
+        description=(
+            "Run the real attack battery through the governed tools, then grade it "
+            "against defense-in-depth posture. Any breach fails the grade. A "
+            "reproducible yardstick anyone can run: `datacharter govbench`."
+        ),
+    )
+    p_govbench.add_argument("directory", nargs="?", default=".")
+    p_govbench.add_argument("--json", action="store_true", help="Emit the scorecard as JSON")
+    p_govbench.add_argument(
+        "--min-grade", choices=["A", "B", "C", "D"], dest="min_grade",
+        help="Exit 1 if the grade is below this (CI gate for governance posture)",
+    )
+    p_govbench.set_defaults(func=_cmd_govbench)
 
     p_eval = sub.add_parser(
         "eval", help="Run agent eval suites (evals/*.yaml) and score answers"

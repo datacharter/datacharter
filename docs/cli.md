@@ -291,6 +291,18 @@ your data. **Exits 1 on any breach** — drop `datacharter redteam` into CI to
 prove your charter's governance still holds on every change. The run is recorded
 to the flight recorder.
 
+### `govbench [directory] [--json] [--min-grade A|B|C|D]`
+**GovBench — the open benchmark for AI-data governance.** Run the real `redteam`
+attack battery through the governed tools, then **grade** the result (A–F) against
+defense-in-depth posture — canaries armed, policies active, signed provenance,
+declared PII, contract tests. **Any breach fails the grade outright**: you can't
+score well while an attack succeeds. Among charters that withstand everything, the
+grade rewards how much protection is actually configured. Prints a scorecard with
+score, per-attack result, and posture, or `--json`. `--min-grade B` exits 1 below
+that grade — a governance-posture gate for CI. The battery is offline and
+deterministic, so the number is reproducible anywhere: the yardstick every buyer
+can run.
+
 ### `suggest [directory] [--apply]`
 Mine your workspace's query history for repeated habits your
 [guides](guides.html) don't mention yet, and propose guide lines with the

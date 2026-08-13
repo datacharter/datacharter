@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.37.0] - 2026-08-13
+
+### Added
+- **GovBench — `datacharter govbench` (moonshot).** The open benchmark for AI-data
+  governance: run the real `redteam` attack battery through the governed tools,
+  then grade the result **A–F** against defense-in-depth posture (canaries,
+  policies, signed provenance, declared PII, contract tests). Any breach fails the
+  grade outright; among charters that withstand everything, the grade rewards
+  configured protection. `--json` scorecard, `--min-grade` CI gate. Offline and
+  deterministic — a reproducible yardstick anyone can run.
+
 ## [0.36.0] - 2026-08-13
 
 ### Added
