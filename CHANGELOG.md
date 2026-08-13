@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.35.0] - 2026-08-13
+
+### Added
+- **Governed synthetic data — `datacharter synth <relation>`.** Generate
+  schema-matched rows that hold no real data: PII columns come out as clearly-
+  synthetic stand-ins (`user1234@example.com`, `+1-555-01xx`), never a real value.
+  The generator reads the same charter that guards prod, so dev/test/CI fixtures
+  inherit the same PII policy. `--rows`, `--seed` (reproducible), `-o`, `--format
+  csv|json`.
+
 ## [0.34.0] - 2026-08-13
 
 ### Added

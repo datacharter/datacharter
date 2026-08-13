@@ -827,6 +827,62 @@ def _cmd_query(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_synth(args: argparse.Namespace) -> int:
+    """Generate governed synthetic data for a relation: schema-matched fake rows with
+    PII columns rendered as clearly-synthetic stand-ins, never real values."""
+    import csv
+    import json as _json
+
+    from datacharter.contracts import load_charter
+    from datacharter.engine.session import EngineError
+    from datacharter.synth import Column, synthesize
+
+    ws = Path(args.directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+    if not _is_relation(args.relation):
+        print(f"Invalid relation name: {args.relation!r}", file=sys.stderr)
+        return 1
+    charter = load_charter(ws)
+    pii = {c.lower() for s in charter.sources for cols in s.pii.values() for c in cols}
+    engine = _open_engine(ws, charter.sources)
+    try:
+        schema = engine.query_sync(f"DESCRIBE SELECT * FROM {args.relation}")
+    except EngineError as exc:
+        print(f"Could not read the schema of {args.relation}: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        engine.close()
+
+    ci = {c: i for i, c in enumerate(schema.columns)}
+    columns = [
+        Column(row[ci["column_name"]], row[ci["column_type"]],
+               is_pii=str(row[ci["column_name"]]).lower() in pii)
+        for row in schema.rows
+    ]
+    if not columns:
+        print(f"{args.relation} has no columns to synthesize.", file=sys.stderr)
+        return 1
+    rows = synthesize(columns, args.rows, seed=args.seed)
+
+    import contextlib
+
+    names = [c.name for c in columns]
+    with (open(args.output, "w", newline="") if args.output
+          else contextlib.nullcontext(sys.stdout)) as out:
+        if args.format == "json":
+            _json.dump([dict(zip(names, r, strict=True)) for r in rows], out, default=str)
+            out.write("\n")
+        else:
+            writer = csv.writer(out)
+            writer.writerow(names)
+            writer.writerows(rows)
+    if args.output:
+        print(f"Wrote {args.rows} synthetic row(s) for {args.relation} to {args.output}.")
+    return 0
+
+
 def _cmd_dp(args: argparse.Namespace) -> int:
     """Differential-privacy query mode: Laplace-noise an aggregate and spend from a
     per-workspace ε budget. Refuses non-aggregate queries and an exhausted budget."""
@@ -1836,6 +1892,19 @@ def main(argv: list[str] | None = None) -> int:
     p_dp.add_argument("--status", action="store_true", help="Show budget spent/remaining and exit")
     p_dp.add_argument("--reset", action="store_true", help="Reset the spent budget and exit")
     p_dp.set_defaults(func=_cmd_dp)
+
+    p_synth = sub.add_parser(
+        "synth", help="Generate governed synthetic data for a relation (PII columns faked)"
+    )
+    p_synth.add_argument("relation")
+    p_synth.add_argument("directory", nargs="?", default=".")
+    p_synth.add_argument("--rows", type=int, default=100, help="Rows to generate (default 100)")
+    p_synth.add_argument(
+        "--format", choices=["csv", "json"], default="csv", help="Output format"
+    )
+    p_synth.add_argument("-o", "--output", help="Write to a file instead of stdout")
+    p_synth.add_argument("--seed", type=int, help="Seed for reproducible output")
+    p_synth.set_defaults(func=_cmd_synth)
 
     p_metric = sub.add_parser(
         "metric", help="Run a contract-defined metric (charter.yaml metrics:)"

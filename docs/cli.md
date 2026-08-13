@@ -156,6 +156,14 @@ structurally can't offer. For wiring `test`, `drift`, and this check into Dagste
 Airflow, or CI as run-blocking gates, see
 [Governance gates for data pipelines](pipeline-gates.html).
 
+### `synth <relation> [directory] [--rows N] [--format csv|json] [-o file] [--seed S]`
+**Governed synthetic data.** Generate realistic rows that match a relation's schema
+but hold no real data — PII columns come out as clearly-synthetic stand-ins
+(`user1234@example.com`, `+1-555-01xx`), never a real value. Because the generator
+reads the *same* `charter.yaml` that guards production, your dev/test/CI fixtures
+inherit the same PII policy. `--rows` sets the count (default 100), `--seed` makes
+output reproducible, `-o` writes a file, `--format` selects CSV (default) or JSON.
+
 ### `dp <sql> [directory] [--epsilon E] [--bound B] [--budget C] [--status] [--reset]`
 **Differential-privacy query mode.** Add calibrated Laplace noise to an aggregate
 answer and spend from a per-workspace **ε budget** — so an agent can't chain
