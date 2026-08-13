@@ -827,6 +827,87 @@ def _cmd_query(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_seal_data(args: argparse.Namespace) -> int:
+    """Seal a query's masked result into a signed, self-defending envelope that
+    carries its policy and (optionally) a TTL out of the workspace."""
+    import json as _json
+
+    from datacharter.agent.tools import MASKED
+    from datacharter.contracts import load_charter
+    from datacharter.contracts.accessplan import effective_surface, surface_hash
+    from datacharter.engine.guard import QueryNotAllowed
+    from datacharter.engine.session import EngineError
+    from datacharter.provenance import keys
+    from datacharter.selfdefend import build_envelope
+
+    ws = Path(args.directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+    try:
+        signer = keys.load_signer(ws)
+    except keys.ProvenanceKeyError:
+        print("No signing key yet. Run `datacharter provenance keygen` first.", file=sys.stderr)
+        return 1
+    charter = load_charter(ws)
+    pii = {c.lower() for s in charter.sources for cols in s.pii.values() for c in cols}
+    engine = _open_engine(ws, charter.sources)
+    try:
+        result = engine.query_sync(args.sql)
+    except (EngineError, QueryNotAllowed) as exc:
+        print(f"Query failed: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        engine.close()
+
+    mask_idx = {i for i, c in enumerate(result.columns) if c.lower() in pii}
+    masked_cols = [c for i, c in enumerate(result.columns) if i in mask_idx]
+    rows = [[MASKED if i in mask_idx else v for i, v in enumerate(row)] for row in result.rows]
+    env = build_envelope(
+        workspace=str(ws), surface_hash=surface_hash(effective_surface(charter)),
+        columns=list(result.columns), rows=rows, masked_columns=masked_cols,
+        signer=signer, ttl_seconds=args.ttl,
+    )
+    text = _json.dumps(env, indent=2, default=str)
+    if args.output:
+        Path(args.output).write_text(text)
+        ttl = f", expires in {args.ttl}s" if args.ttl else ""
+        print(f"Sealed {len(rows)} row(s) → {args.output} "
+              f"(masked {len(masked_cols)} column(s){ttl}, "
+              f"key {env['signature']['key_id']})")
+    else:
+        print(text)
+    return 0
+
+
+def _cmd_open_data(args: argparse.Namespace) -> int:
+    """Open a self-defending envelope: verify the signature, honor the TTL
+    (self-redact on expiry), and print the still-masked rows."""
+    import csv
+    import json as _json
+
+    from datacharter.selfdefend import open_envelope
+
+    try:
+        env = _json.loads(Path(args.envelope).read_text())
+    except (OSError, ValueError) as exc:
+        print(f"Could not read envelope: {exc}", file=sys.stderr)
+        return 1
+    opened = open_envelope(env, expected_pubkey=args.pubkey)
+    if opened["tampered"]:
+        for name, ok in opened["checks"].items():
+            print(f"  {'PASS' if ok else 'FAIL'}  {name}", file=sys.stderr)
+        print("TAMPERED — envelope signature failed, refusing to open.", file=sys.stderr)
+        return 1
+    if opened["expired"]:
+        print(f"# EXPIRED at {opened['policy'].get('expires_at')} — payload self-redacted",
+              file=sys.stderr)
+    writer = csv.writer(sys.stdout)
+    writer.writerow(opened["columns"])
+    writer.writerows(opened["rows"])
+    return 0 if opened["ok"] else 2
+
+
 def _cmd_risk(args: argparse.Namespace) -> int:
     """Score a query's intent risk from its shape + the PII it names, so a governed
     surface can graduate its response. Transparent heuristic; `--fail-on` gates."""
@@ -2106,6 +2187,22 @@ def main(argv: list[str] | None = None) -> int:
         help="Exit 2 when the score reaches this band (medium≥30, high≥70)",
     )
     p_risk.set_defaults(func=_cmd_risk)
+
+    p_seald = sub.add_parser(
+        "seal-data", help="Seal a masked query result into a signed, self-defending envelope"
+    )
+    p_seald.add_argument("sql")
+    p_seald.add_argument("directory", nargs="?", default=".")
+    p_seald.add_argument("--ttl", type=int, help="Seconds until the payload self-redacts on open")
+    p_seald.add_argument("-o", "--output", help="Write the envelope to a file")
+    p_seald.set_defaults(func=_cmd_seal_data)
+
+    p_opend = sub.add_parser(
+        "open-data", help="Open a self-defending envelope: verify, honor TTL, print masked rows"
+    )
+    p_opend.add_argument("envelope")
+    p_opend.add_argument("--pubkey", help="Pin the expected signer public key (hex)")
+    p_opend.set_defaults(func=_cmd_open_data)
 
     p_metric = sub.add_parser(
         "metric", help="Run a contract-defined metric (charter.yaml metrics:)"

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.38.0] - 2026-08-13
+
+### Added
+- **Self-Defending Data — `datacharter seal-data` / `open-data` (moonshot).** Ship
+  rows inside a signed policy envelope so the charter follows the data out of the
+  workspace. Three properties travel with the bytes: tamper-evident (signed — one
+  altered byte fails to open), already masked (PII masked at seal time, never in
+  the payload), and self-expiring (`--ttl` makes the payload self-redact on open
+  past its deadline). `open-data` refuses a tampered envelope and self-redacts an
+  expired one. The envelope is a provenance receipt — same offline verification.
+
 ## [0.37.0] - 2026-08-13
 
 ### Added

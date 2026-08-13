@@ -248,6 +248,22 @@ recompute the hash, verify the signature, and (`--pubkey`) pin the key; `--fligh
 [Verifiable answer provenance](provenance.html) for the receipt format and
 verification algorithm.
 
+### `seal-data <sql> [directory] [--ttl SECONDS] [-o file]`
+**Self-Defending Data.** Seal a query's masked result into a signed envelope so the
+charter *follows the data* out of the workspace — into agent memory, a cache, a
+ticket, a downstream tool. Three properties travel with the bytes: **tamper-
+evident** (signed; one altered byte fails to open), **already masked** (PII was
+masked at seal time, so raw values are never in the payload), and **self-expiring**
+(with `--ttl`, the payload self-redacts on open past its deadline). The envelope is
+a [provenance](provenance.html) receipt, so it verifies with the same offline
+checks.
+
+### `open-data <envelope> [--pubkey HEX]`
+Open a self-defending envelope: verify the signature (**refuse if tampered**),
+honor the TTL (**self-redact every cell if expired**), and print the still-masked
+rows as CSV. `--pubkey` pins the expected signer. Exit `1` on tamper, `2` on
+expired, `0` when valid.
+
 ### `snapshot <name> <sql> [directory]`
 Save a query's result as `local.<name>` along with its SQL.
 
