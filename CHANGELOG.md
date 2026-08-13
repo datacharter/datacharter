@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.32.0] - 2026-08-12
+
+### Added
+- **Open Data Contract Standard (ODCS) interop.** `datacharter import odcs
+  <contract>` turns an ODCS `DataContract` into a governed charter (source type +
+  connection from `servers`, tables + PII from `schema.properties`), and
+  `datacharter export odcs` publishes a charter as an ODCS `DataContract`. Round-
+  trips both ways, so DataCharter plugs into the data-contract ecosystem.
+- **Governance gates for data pipelines** — docs wiring the exit-coded check
+  commands (`test`, `drift`, `access diff --fail-on widened`) into Dagster asset
+  checks / ops, Airflow tasks, and CI, so a contract violation fails the run.
+  See [pipeline-gates](https://datacharter.dev/pipeline-gates.html).
+
 ## [0.31.1] - 2026-08-12
 
 ### Fixed

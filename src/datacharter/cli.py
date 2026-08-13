@@ -1102,6 +1102,66 @@ def _cmd_import_dbt(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_import_odcs(args: argparse.Namespace) -> int:
+    from datacharter.contracts import load_charter
+    from datacharter.contracts.odcs import import_odcs_file
+
+    src = Path(args.contract)
+    if not src.exists():
+        print(f"No such contract: {src}", file=sys.stderr)
+        return 1
+    try:
+        text, summary = import_odcs_file(str(src))
+    except (ValueError, KeyError, TypeError) as exc:
+        print(f"Could not parse ODCS contract {src}: {exc}", file=sys.stderr)
+        return 1
+    if summary["tables"] == 0:
+        print("No tables found in the contract's schema — nothing to import.", file=sys.stderr)
+        return 1
+
+    out = Path(args.out) if args.out else Path.cwd() / "charter.yaml"
+    if out.exists() and not args.force:
+        print(f"{out} exists; use --force to overwrite or -o to write elsewhere.", file=sys.stderr)
+        return 1
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(text)
+
+    warn = ""
+    try:
+        load_charter(out.parent, out.name, lenient_secrets=True)
+    except Exception as exc:  # noqa: BLE001
+        warn = f"\n  ⚠ the generated charter did not validate: {exc}"
+    unmapped = "  (unmapped server type — verify)" if summary["unmapped_type"] else ""
+    print(f"Wrote {out}")
+    print(f"  server type → {summary['source_type']}{unmapped}")
+    print(f"  1 source · {summary['tables']} table(s) · {summary['pii_columns']} PII column(s)")
+    print("  Next: fill the connection + ${ENV} credentials, then "
+          "`datacharter scan` / `datacharter serve`.")
+    if warn:
+        print(warn, file=sys.stderr)
+    return 0
+
+
+def _cmd_export_odcs(args: argparse.Namespace) -> int:
+    from datacharter.contracts import load_charter
+    from datacharter.contracts.odcs import export_odcs_yaml
+
+    ws = Path(args.directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+    charter = load_charter(ws, lenient_secrets=True)
+    text = export_odcs_yaml(charter)
+    if args.out:
+        Path(args.out).write_text(text)
+        print(f"Wrote {args.out} — ODCS DataContract "
+              f"({len(charter.sources)} server(s), "
+              f"{sum(len(s.tables) for s in charter.sources)} table(s)).")
+    else:
+        print(text)
+    return 0
+
+
 def _cmd_eval(args: argparse.Namespace) -> int:
     import asyncio
 
@@ -1432,6 +1492,18 @@ def main(argv: list[str] | None = None) -> int:
     p_dbt.add_argument("-o", "--out", default=None, help="Output path (default: ./charter.yaml)")
     p_dbt.add_argument("--force", action="store_true", help="Overwrite an existing charter.yaml")
     p_dbt.set_defaults(func=_cmd_import_dbt)
+    p_odcs = import_sub.add_parser("odcs", help="Build a charter.yaml from an ODCS data contract")
+    p_odcs.add_argument("contract", help="Path to an ODCS DataContract (YAML or JSON)")
+    p_odcs.add_argument("-o", "--out", default=None, help="Output path (default: ./charter.yaml)")
+    p_odcs.add_argument("--force", action="store_true", help="Overwrite an existing charter.yaml")
+    p_odcs.set_defaults(func=_cmd_import_odcs)
+
+    p_export = sub.add_parser("export", help="Export the charter to another contract format")
+    export_sub = p_export.add_subparsers(dest="exporter", required=True)
+    p_eodcs = export_sub.add_parser("odcs", help="Export charter.yaml as an ODCS data contract")
+    p_eodcs.add_argument("directory", nargs="?", default=".")
+    p_eodcs.add_argument("-o", "--out", default=None, help="Output path (default: stdout)")
+    p_eodcs.set_defaults(func=_cmd_export_odcs)
 
     p_mcp = sub.add_parser(
         "mcp", help="Run an MCP server over stdio exposing the governed query tools"

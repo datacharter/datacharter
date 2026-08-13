@@ -41,6 +41,20 @@ model/source descriptions become per-table agent context. Connection host and
 credentials aren't in the manifest, so they're written as `${ENV}` placeholders to
 fill in. Turns a whole dbt project into a governed contract in one command.
 
+### `import odcs <contract.yaml|.json> [-o path] [--force]`
+Generate a `charter.yaml` from an [Open Data Contract Standard](https://bitol.io)
+(ODCS) `DataContract`. The source type + connection come from `servers`; each
+`schema` object becomes a table; a property classified `PII`/`sensitive`/…
+(or tagged `pii`) becomes a masked column; descriptions become agent context.
+DataCharter reads the open standard, so an existing data contract adopts governance
+in one step.
+
+### `export odcs [directory] [-o path]`
+Publish your `charter.yaml` as an ODCS `DataContract` — each source a `server`,
+each table a `schema` object, each declared-PII column classified `PII`. Prints to
+stdout or writes a file. Round-trips with `import odcs`, so DataCharter plugs into
+the data-contract ecosystem in both directions.
+
 ### `serve [directory]`
 Start the local web app (API + UI) on `http://127.0.0.1:8321`.
 
@@ -138,7 +152,9 @@ block a PR that quietly widens what an agent can see:
 
 Because the whole governance surface is a file in git, agent data access can be
 code-reviewed like any other change — something a runtime-state governance server
-structurally can't offer.
+structurally can't offer. For wiring `test`, `drift`, and this check into Dagster,
+Airflow, or CI as run-blocking gates, see
+[Governance gates for data pipelines](pipeline-gates.html).
 
 ### `test [directory] [--select name]`
 Run the [data assertions](charter-yaml.html#tests) declared under `tests:` and
