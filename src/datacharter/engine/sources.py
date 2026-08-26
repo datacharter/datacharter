@@ -156,12 +156,58 @@ def _iceberg_rest_registration(source: Source) -> list[str]:
     return stmts
 
 
+#: DuckLake catalog backends whose DuckDB extension must be present to read the
+#: metadata database. The scheme prefix identifies each in `connection.metadata`.
+_DUCKLAKE_CATALOG_EXT = {"postgres:": "postgres", "mysql:": "mysql", "sqlite:": "sqlite"}
+_REMOTE_SCHEMES = ("s3://", "gcs://", "gs://", "az://", "azure://", "r2://")
+
+
+def _ducklake_registration(source: Source, workspace: Path) -> list[str]:
+    """A DuckLake lakehouse catalog — metadata in a DuckDB file or a
+    SQLite/Postgres/MySQL database, data as Parquet on the local filesystem or
+    object storage — attached read-only via the `ducklake` extension. The catalog
+    stores its own DATA_PATH, so it is only needed on first attach or to override.
+    Object-store data rides a DuckDB secret; catalog-DB credentials go in the
+    `metadata` connection string as `${ENV}` references (the DuckLake convention)."""
+    conn = source.connection
+    metadata = str(conn.get("metadata") or "").strip()
+    if not metadata:
+        raise SourceConfigError(
+            f"Source '{source.name}' (ducklake) needs connection.metadata — a catalog "
+            "file path, or a 'postgres:' / 'sqlite:' / 'mysql:' connection string."
+        )
+    stmts = ["INSTALL ducklake", "LOAD ducklake"]
+    # A SQL-catalog scheme passes through as-is (and needs its backend extension);
+    # a bare local path is resolved against the workspace like other file sources.
+    backend = next((e for p, e in _DUCKLAKE_CATALOG_EXT.items() if metadata.startswith(p)), None)
+    if backend:
+        stmts += [f"INSTALL {backend}", f"LOAD {backend}"]
+    elif "://" not in metadata:
+        metadata = str((workspace / metadata).resolve())
+
+    data_path = str(conn.get("data_path") or "").strip()
+    if data_path.startswith(_REMOTE_SCHEMES):
+        secret = _s3_secret(source)
+        if secret:
+            stmts.append(secret)
+    opts = []
+    if data_path:
+        opts.append(f"DATA_PATH {_q(data_path)}")
+    if conn.get("metadata_schema"):
+        opts.append(f"METADATA_SCHEMA {_q(conn['metadata_schema'])}")
+    opts.append("READ_ONLY")
+    stmts.append(f"ATTACH {_q('ducklake:' + metadata)} AS {source.name} ({', '.join(opts)})")
+    return stmts
+
+
 def registration_sql(source: Source, workspace: Path) -> list[str]:
     """Statements that register a source on a session (secrets + attach/view)."""
     if source.type == SourceType.MOTHERDUCK:
         return _motherduck_registration(source)
     if source.type == SourceType.ICEBERG_REST:
         return _iceberg_rest_registration(source)
+    if source.type == SourceType.DUCKLAKE:
+        return _ducklake_registration(source, workspace)
     if source.type == SourceType.SQLITE:
         path = _resolve_path(source, workspace)
         return [f"ATTACH {_q(path)} AS {source.name} (TYPE sqlite, READ_ONLY)"]
@@ -204,6 +250,8 @@ def qualified_name(source: Source, table: str) -> str:
         return f"{name}.{conn.get('schema', 'main')}.{table}"
     if st == SourceType.ICEBERG_REST:  # Iceberg namespace == schema
         return f"{name}.{conn.get('namespace', 'default')}.{table}"
+    if st == SourceType.DUCKLAKE:
+        return f"{name}.{conn.get('schema', 'main')}.{table}"
     if st == SourceType.MSSQL:
         return f"{name}.{conn.get('schema', 'dbo')}.{table}"
     return f"{name}.{table}"

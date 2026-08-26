@@ -270,7 +270,7 @@ def _build_source(name: str, body: Any, resolver: SecretResolver, warnings: list
         raise CharterError(f"{ctx}.type: {type_raw!r} is not one of: {valid}.") from None
 
     credentials = _resolve_credentials(ctx, body.get("credentials") or {}, resolver)
-    connection = _check_connection(ctx, body.get("connection") or {})
+    connection = _check_connection(ctx, body.get("connection") or {}, resolver)
     path_value = body.get("path")
     if path_value is not None:
         path_value = resolver.interpolate(str(path_value))
@@ -386,16 +386,21 @@ def _resolve_credentials(ctx: str, creds: Any, resolver: SecretResolver) -> dict
     return resolved
 
 
-def _check_connection(ctx: str, connection: Any) -> dict[str, str | int]:
+def _check_connection(ctx: str, connection: Any, resolver: SecretResolver) -> dict[str, str | int]:
     if not isinstance(connection, dict):
         raise CharterError(f"{ctx}.connection: must be a mapping.")
+    out: dict[str, str | int] = {}
     for key, value in connection.items():
+        # Validate the raw value first — a credential-shaped key must still be a
+        # ${NAME} reference — then interpolate so ${ENV} works in connection strings
+        # (e.g. a DuckLake catalog DSN). Non-string values pass through unchanged.
         if _CREDENTIAL_KEY.search(str(key)) and not FULL_REF.match(str(value)):
             raise CharterError(
                 f"{ctx}.connection.{key}: credential-shaped keys belong under "
                 f"'credentials:' with a ${{NAME}} reference."
             )
-    return {str(k): v for k, v in connection.items()}
+        out[str(key)] = resolver.interpolate(str(value)) if isinstance(value, str) else value
+    return out
 
 
 def _lint_path(ctx: str, value: str, stype: SourceType, warnings: list[str]) -> None:

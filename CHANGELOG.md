@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.43.0] - 2026-08-26
+
+### Added
+- **DuckLake connector.** A new `ducklake` source type attaches a
+  [DuckLake](https://ducklake.select) lakehouse read-only — metadata in a
+  DuckDB/SQLite/Postgres/MySQL catalog, data as Parquet on local or object storage
+  — and governs its tables like any other source (PII masking, the Access Plan, the
+  agent surface). Point `connection.metadata` at a catalog file or a `postgres:` /
+  `sqlite:` / `mysql:` DSN; object-store data rides a DuckDB secret from
+  `credentials`. Verified end-to-end against the real `ducklake` extension.
+- **`${ENV}` interpolation now applies to `connection` values**, not just `path`
+  and `credentials` — so a catalog DSN (e.g. a DuckLake Postgres catalog) can carry
+  `${VAR}` references. A no-op for existing sources.
+
 ## [0.42.1] - 2026-08-13
 
 ### Fixed

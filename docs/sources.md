@@ -52,6 +52,7 @@ DataCharter writes the source into `charter.yaml` and registers it live.
 | `snowflake` | connector-extract | `datacharter[snowflake]` extra | Connector pushdown planner + aggregation pushdown; **materialized, capped by `max_rows`** |
 | `motherduck` | ATTACH (`md:`) | `motherduck` (signed, auto-installed) | Native DuckDB filter + projection over your MotherDuck cloud database, read-only |
 | `iceberg_rest` | ATTACH (REST catalog) | `iceberg` core extension | Native DuckDB filter + projection over an Iceberg REST catalog (Polaris / Nessie / Lakekeeper / Unity / Glue / S3 Tables), read-only |
+| `ducklake` | ATTACH (DuckLake catalog) | `ducklake` core extension | Native DuckDB filter + projection over a DuckLake lakehouse (metadata in DuckDB/SQLite/Postgres/MySQL, data as Parquet on local/object storage), read-only |
 
 ## Pushdown, honestly
 
@@ -154,5 +155,42 @@ not the same thing:
 Governance is unchanged either way: the catalog is attached `READ_ONLY`, and PII
 you declare on its tables is masked on the agent surface exactly as for any other
 source.
+
+## DuckLake lakehouses
+
+A `ducklake` source attaches a [DuckLake](https://ducklake.select) catalog and
+exposes its tables as `<source>.<schema>.<table>` (schema defaults to `main`).
+DuckLake keeps table metadata in a SQL database and the data as Parquet files, so a
+source has two parts:
+
+- **`connection.metadata`** (required) — the catalog. Either a **file path** (a
+  local `*.ducklake` / DuckDB file, resolved against the workspace) or a SQL-backed
+  DSN with a scheme: `postgres:…`, `sqlite:…`, or `mysql:…`. The backing DuckDB
+  extension is loaded automatically. Put catalog-DB credentials in the DSN as
+  `${ENV}` references — connection strings are interpolated.
+- **`connection.data_path`** (optional) — where the Parquet data lives. DuckLake
+  stores this in the catalog, so you only need it to point at a new location or an
+  object store. For `s3://` / `gcs://` / `az://` data, the `credentials` block
+  (`key_id` / `secret` / `region` / `endpoint`) becomes a DuckDB secret — it never
+  goes into the ATTACH string.
+
+```yaml
+sources:
+  lake:
+    type: ducklake
+    connection:
+      metadata: "postgres:dbname=catalog host=${PG_HOST} user=${PG_USER} password=${PG_PASSWORD}"
+      data_path: s3://my-bucket/lake
+    credentials:
+      key_id: ${AWS_ACCESS_KEY_ID}
+      secret: ${AWS_SECRET_ACCESS_KEY}
+      region: us-east-1
+    tables: [customers, orders]
+    pii:
+      customers: [email]
+```
+
+The catalog is attached `READ_ONLY`, and declared PII is masked on the agent
+surface exactly as for any other source.
 
 Next: [Connect an agent →](agent.html)
