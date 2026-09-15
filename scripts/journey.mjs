@@ -76,7 +76,7 @@ async function dismissTour() {
 try {
   await step("first-run", async () => {
     await page.goto(base, { waitUntil: "networkidle" });
-    await page.getByText("No data sources yet").waitFor({ timeout: 15000 });
+    await page.getByText("Drop a file, or charter this folder").waitFor({ timeout: 15000 });
   });
 
   await step("load-demo", async () => {
