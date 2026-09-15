@@ -56,6 +56,7 @@ async function step(name, fn) {
 }
 
 async function runSql(sql) {
+  await page.getByRole("button", { name: "SQL", exact: true }).click();
   await page.locator(".monaco-editor").first().click();
   await page.keyboard.press("ControlOrMeta+a");
   // insertText, not keyboard.type: Monaco drops characters under type().
