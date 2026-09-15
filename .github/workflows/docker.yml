@@ -1,0 +1,39 @@
+name: docker
+
+# Build the images and lint the Helm chart. No registry push.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build stdio MCP catalog image
+        run: docker build -t datacharter-mcp .
+      - name: Build MCP HTTP image
+        run: docker build -f packaging/oci/Dockerfile -t datacharter:dev .
+
+  chart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: azure/setup-helm@v4
+      - name: helm lint + template
+        run: |
+          helm lint chart \
+            --set oauth.issuer=https://auth.example.test \
+            --set oauth.audience=https://datacharter.example.test/mcp \
+            --set oauth.jwksUri=https://auth.example.test/jwks
+          helm template dc chart \
+            --set oauth.issuer=https://auth.example.test \
+            --set oauth.audience=https://datacharter.example.test/mcp \
+            --set oauth.jwksUri=https://auth.example.test/jwks \
+            | grep -q 'runAsNonRoot: true'
+          if helm template dc chart >/tmp/helm-no-oauth.txt 2>&1; then
+            echo "helm template without OAuth must fail"
+            exit 1
+          fi
+          grep -q oauth.issuer /tmp/helm-no-oauth.txt

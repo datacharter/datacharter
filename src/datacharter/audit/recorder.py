@@ -14,7 +14,7 @@ import hashlib
 import json
 import os
 import uuid
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -44,6 +44,7 @@ __all__ = ["FlightRecorder", "canonical_hash", "GENESIS", "FLIGHT_DIR"]
 FLIGHT_DIR = ".datacharter/flight"
 GENESIS = "0" * 64
 _SEGMENT_MAX_BYTES = 10 * 1024 * 1024
+_FROM_ENV = object()
 
 
 def canonical_hash(entry: dict) -> str:
@@ -56,11 +57,20 @@ def canonical_hash(entry: dict) -> str:
 class FlightRecorder:
     """Writes session + access entries; failure-safe (never breaks a query)."""
 
-    def __init__(self, workspace: Path | str, enabled: bool = True) -> None:
+    def __init__(
+        self, workspace: Path | str, enabled: bool = True, *, sink=_FROM_ENV
+    ) -> None:
         self._dir = Path(workspace) / FLIGHT_DIR
         self._enabled = enabled
         self._session = ""
         self._degraded = False
+        # sink=None means no SIEM. Omit the kwarg to read DATACHARTER_AUDIT / OTLP.
+        if sink is _FROM_ENV:
+            from datacharter.audit.sink import sink_from_env
+
+            self._sink = sink_from_env()
+        else:
+            self._sink = sink
 
     @property
     def degraded(self) -> bool:
@@ -159,19 +169,28 @@ class FlightRecorder:
 
     def _append(self, body: dict) -> None:
         try:
+            from datacharter.audit.sink import current_principal, siem_event
+
+            payload = dict(body)
+            who = current_principal()
+            if who:
+                payload.setdefault("principal", who)
             self._dir.mkdir(parents=True, exist_ok=True)
             with _locked(self._dir / ".lock"):
                 seg, prev, seq = self._tail()
                 entry = {
                     "seq": seq + 1,
                     "ts": datetime.now(UTC).isoformat(),
-                    **body,
+                    **payload,
                     "prev": prev,
                 }
                 entry["hash"] = canonical_hash(entry)
                 with open(seg, "a") as f:
                     f.write(json.dumps(entry, default=str) + "\n")
             self._degraded = False
+            if self._sink is not None:
+                with suppress(Exception):
+                    self._sink.record(siem_event(entry))
         except Exception as exc:  # auditing must never break a query...
             # ...but dropping every write forever (e.g. a corrupt tail line)
             # must not be silent: the user believes access is being recorded.

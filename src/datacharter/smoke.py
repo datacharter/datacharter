@@ -117,6 +117,26 @@ def run_battery(base_url: str) -> list[tuple[str, bool, str]]:
         assert body["entries"] >= 1, body
         return f"{body['entries']} entries"
 
+    def mcp_http():
+        import json as _json
+
+        resp = client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "query",
+                    "arguments": {"sql": "SELECT 1 AS n"},
+                },
+            },
+        ).raise_for_status()
+        body = resp.json()
+        payload = _json.loads(body["result"]["content"][0]["text"])
+        assert payload["rows"] == [[1]], payload
+        return "streamable-http"
+
     check("health", health)
     check("ui-served", ui_served)
     check("timestamptz-fetch", timestamptz)
@@ -126,6 +146,7 @@ def run_battery(base_url: str) -> list[tuple[str, bool, str]]:
     check("contract-write", access_write)
     check("snapshot-recheck", snapshot_recheck)
     check("audit-verify", audit_verify)
+    check("mcp-http", mcp_http)
     client.close()
     return results
 

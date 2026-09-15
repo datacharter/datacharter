@@ -8,6 +8,25 @@ export interface SourceInfo {
   has_credential?: boolean;
 }
 
+export interface CharterSourceGov {
+  name: string;
+  tables: string[];
+  pii: Record<string, string[]>;
+  row_filters: Record<string, string>;
+}
+
+export interface CharterPayload {
+  yaml: string;
+  sources: CharterSourceGov[];
+  policies: Record<string, string[]>;
+}
+
+export interface StudioPatch {
+  pii: { source: string; table: string; columns: string[] }[];
+  row_filters: { source: string; table: string; predicate: string }[];
+  policies: { relation: string; sentences: string[] }[];
+}
+
 export interface SourceFormData {
   name: string;
   type: string;
@@ -74,11 +93,30 @@ export const api = {
   sources: () =>
     request<{ sources: SourceInfo[]; warnings: string[] }>("/api/sources"),
   tables: () => request<{ tables: TableInfo[] }>("/api/tables"),
-  query: (sql: string, rowLimit = 10000, record = false) =>
+  query: (
+    sql: string,
+    rowLimit = 10000,
+    record = false,
+    opts?: { offset?: number; signal?: AbortSignal },
+  ) =>
     request<QueryResult>("/api/query", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ sql, row_limit: rowLimit, record }),
+      body: JSON.stringify({
+        sql,
+        row_limit: rowLimit,
+        record,
+        offset: opts?.offset ?? 0,
+      }),
+      signal: opts?.signal,
+    }),
+  cancelQuery: () => request<{ cancelled: boolean }>("/api/query/cancel", { method: "POST" }),
+  charter: () => request<CharterPayload>("/api/charter"),
+  saveCharterStudio: (patch: StudioPatch) =>
+    request<{ saved: boolean }>("/api/charter/studio", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(patch),
     }),
   // The governed tool surface — exactly what a connected agent receives for
   // this SQL: masking, policies, and row filters applied (or a refusal string).
@@ -118,6 +156,12 @@ export const api = {
     request<{ removed: string }>(`/api/sources/${name}`, { method: "DELETE" }),
   loadDemo: () =>
     request<{ sources: SourceInfo[] }>("/api/demo", { method: "POST" }),
+  charterFromFiles: () =>
+    request<{
+      added: { name: string; type: string; path: string }[];
+      skipped: string[];
+      pii: Record<string, string[]>;
+    }>("/api/charter/from-files", { method: "POST" }),
   setAgentAccess: (a: { source: string; table?: string; column?: string; value: boolean }) =>
     request<{ ok: boolean }>("/api/agent-access", {
       method: "POST",
@@ -202,6 +246,14 @@ export const api = {
       `/api/snapshot/${name}/recheck`,
       { method: "POST" },
     ),
+  listQueries: () => request<{ queries: string[] }>("/api/queries"),
+  readQuery: (name: string) => request<{ name: string; sql: string }>(`/api/queries/${name}`),
+  saveQuery: (name: string, sql: string) =>
+    request<{ saved: string }>("/api/queries", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, sql }),
+    }),
   listMetrics: () =>
     request<{ metrics: { name: string; sql: string; dimensions: string[]; has_time: boolean }[] }>(
       "/api/metrics",

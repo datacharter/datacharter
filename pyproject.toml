@@ -38,6 +38,8 @@ dependencies = [
     # Ed25519 signing/verification for portable, operator-independent answer
     # provenance receipts; stdlib has no asymmetric signature primitive.
     "cryptography>=42.0",
+    # RS256 JWT verify for optional MCP OAuth 2.1 resource-server mode.
+    "PyJWT[crypto]>=2.8",
 ]
 
 [project.optional-dependencies]
@@ -68,6 +70,9 @@ path = "src/datacharter/__init__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["src/datacharter"]
 artifacts = ["src/datacharter/server/static/**/*"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/datacharter/agent/govbench_v1.json" = "datacharter/agent/govbench_v1.json"
 
 [tool.hatch.build.targets.sdist]
 # Ship the built UI in the sdist too, so a source install needs no Node.

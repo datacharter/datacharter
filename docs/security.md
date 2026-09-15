@@ -1,9 +1,8 @@
 ---
+layout: default
 title: Security & privacy posture
 description: How DataCharter protects your data, credentials, and machine.
 ---
-
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [Editor](editor.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Guides](guides.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Workspace](workspace.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
 
 # Security & privacy posture
@@ -16,7 +15,10 @@ trustworthy — architecture, supply chain, disclosure — see [Trust & security
 
 Zero. DataCharter makes no analytics, crash-reporting, or "phone-home" calls of
 any kind. The server binds to `127.0.0.1` (localhost) by default; `--host` is an
-explicit opt-in for network exposure.
+explicit opt-in for network exposure. The optional SIEM sink
+(`DATACHARTER_AUDIT` / `DATACHARTER_OTLP_ENDPOINT`) posts metadata to *your*
+collector, and only if you set it. Never raw rows. See [Audit](audit.html#siem-json-and-otlp).
+In-cluster MCP HTTP (Helm) requires OAuth. See [Deploy](deploy.html).
 
 ## The engine is read-only
 

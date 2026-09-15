@@ -4,7 +4,9 @@ import { api, type QueryResult, type SourceInfo, type TableInfo } from "./api";
 import ChartPanel from "./components/ChartPanel";
 import ChatPanel from "./components/ChatPanel";
 import QueryFiles from "./components/QueryFiles";
+import QueryTabs from "./components/QueryTabs";
 import ResultsGrid from "./components/ResultsGrid";
+import CharterStudio from "./components/CharterStudio";
 import SourceTree from "./components/SourceTree";
 import SourcesView from "./components/SourcesView";
 import AuditView from "./components/AuditView";
@@ -18,16 +20,30 @@ import { makeEpoch, shouldPreview } from "./lib/queryLifecycle";
 import CommandPalette from "./components/CommandPalette";
 import HistoryPanel from "./components/HistoryPanel";
 import ProfileBars from "./components/ProfileBars";
-import { type Command } from "./lib/commandPalette";
+import { buildPaletteCommands } from "./lib/paletteCommands";
 import { shouldReplaceEditor } from "./lib/editorGuard";
 import { formatEstimate } from "./lib/estimate";
 import { exportRequest } from "./lib/mask";
+import { decodeQueryHash, encodeQueryHash } from "./lib/queryHash";
+import { resultToMarkdown } from "./lib/resultMarkdown";
 import { useResize } from "./lib/useResize";
 import Tutorial, { hasSeenTutorial } from "./components/Tutorial";
 import { registerCompletions } from "./monaco";
 import { STARTER, agentExampleFor, exampleFor, shouldShowLaunchpad, shouldShowTour } from "./onboarding";
 
-type Tab = "results" | "chart" | "profile" | "plan";
+type Tab = "results" | "chart" | "profile" | "plan" | "sql";
+type Door = "explore" | "ask" | "govern";
+type GovernPage = "sources" | "evals" | "guides" | "audit" | "studio";
+type QueryBuf = {
+  id: string;
+  title: string;
+  sql: string;
+  result: QueryResult | null;
+  error: string | null;
+  offset: number;
+};
+
+const PAGE_ROWS = 10000;
 
 export default function App() {
   const [sources, setSources] = useState<SourceInfo[]>([]);
@@ -47,6 +63,14 @@ export default function App() {
   const [previewError, setPreviewError] = useState<string | null>(null); // live-preview parse error
   const [previewExpanded, setPreviewExpanded] = useState(false);
   const [running, setRunning] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [queryTabs, setQueryTabs] = useState<QueryBuf[]>(() => [
+    { id: "1", title: "Query 1", sql: STARTER, result: null, error: null, offset: 0 },
+  ]);
+  const [activeTabId, setActiveTabId] = useState("1");
+  const [savedQueries, setSavedQueries] = useState<string[]>([]);
+  const [connectTick, setConnectTick] = useState(0);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [tab, setTab] = useState<Tab>("results");
   const [agentView, setAgentView] = useState(false);
   // The TRUE agent view: the current SQL re-run through the governed tool
@@ -60,9 +84,16 @@ export default function App() {
   const [dragging, setDragging] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [catalogLoaded, setCatalogLoaded] = useState(false);
-  const [view, setView] = useState<"explorer" | "sources" | "evals" | "guides" | "audit">(
-    "explorer",
-  );
+  const [view, setView] = useState<"explorer" | GovernPage>("explorer");
+  const [door, setDoor] = useState<Door>("explore");
+  const openGovern = (page: GovernPage) => {
+    setDoor("govern");
+    setView(page);
+  };
+  const openExplore = () => {
+    setDoor("explore");
+    setView("explorer");
+  };
   const [showHelp, setShowHelp] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [estimate, setEstimate] = useState<number | null | undefined>(undefined);
@@ -86,7 +117,6 @@ export default function App() {
   }, [tables]);
   const sidebarW = useResize("dc-sidebar-w", 260, "x", false, 160);
   const chatW = useResize("dc-chat-w", 340, "x", true, 240);
-  const editorH = useResize("dc-editor-h", 300, "y", false, 120);
   const sqlRef = useRef(sql);
   sqlRef.current = sql;
   const lastLoadedRef = useRef(sql); // last value WE put in the editor (for dirty detection)
@@ -98,6 +128,13 @@ export default function App() {
   tablesRef.current = tables;
   const resultRef = useRef(result);
   resultRef.current = result;
+  const activeTabIdRef = useRef(activeTabId);
+  activeTabIdRef.current = activeTabId;
+  const offsetRef = useRef(offset);
+  offsetRef.current = offset;
+  const errorRef = useRef(error);
+  errorRef.current = error;
+  const abortRef = useRef<AbortController | null>(null);
   // Sequencing for the two result producers (live preview vs. explicit Run) so a
   // late preview response can't clobber a full Run result. See queryLifecycle.
   const epoch = useRef(makeEpoch()).current;
@@ -143,10 +180,18 @@ export default function App() {
       api.sources().then((b) => setSources(b.sources)),
       api.tables().then((b) => setTables(b.tables)),
       api.listMetrics().then((b) => setMetrics(b.metrics)),
+      api.listQueries().then((b) => setSavedQueries(b.queries)),
     ]).finally(() => setCatalogLoaded(true));
   }, []);
 
   useEffect(refreshCatalog, [refreshCatalog]);
+
+  useEffect(() => {
+    const sqlFromLink = decodeQueryHash(window.location.hash);
+    if (!sqlFromLink) return;
+    loadSql(sqlFromLink);
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+  }, [loadSql]);
 
   useEffect(() => {
     void api.health().then((h) => {
@@ -169,30 +214,115 @@ export default function App() {
   }, [catalogLoaded, sources.length]);
 
   const run = useCallback(
-    async (sqlText?: string) => {
+    async (sqlText?: string, pageOffset = 0) => {
       const text = sqlText ?? sqlRef.current;
+      const tabId = activeTabIdRef.current;
       clearTimeout(previewTimer.current); // cancel any pending preview…
+      abortRef.current?.abort();
+      const ac = new AbortController();
+      abortRef.current = ac;
       const token = epoch.next(); // …and invalidate any preview already in flight
       lastRunSqlRef.current = text;
       setRunning(true);
       setError(null);
       setProfileResult(null);
       try {
-        const res = await api.query(text, 10000, true);
+        const res = await api.query(text, PAGE_ROWS, pageOffset === 0, {
+          offset: pageOffset,
+          signal: ac.signal,
+        });
         if (!epoch.isCurrent(token)) return; // a newer run/preview superseded us
-        setResult(res);
-        setTab("results");
+        setQueryTabs((tabs) =>
+          tabs.map((t) =>
+            t.id === tabId
+              ? { ...t, sql: text, result: res, error: null, offset: pageOffset }
+              : t,
+          ),
+        );
+        if (activeTabIdRef.current === tabId) {
+          setResult(res);
+          setTab("results");
+          setOffset(pageOffset);
+        }
         refreshCatalog();
       } catch (e) {
         if (!epoch.isCurrent(token)) return;
-        setResult(null);
-        setError((e as Error).message);
+        if ((e as Error).name === "AbortError") return;
+        if ((e as { kind?: string }).kind === "query_cancelled") return;
+        const msg = (e as Error).message;
+        setQueryTabs((tabs) =>
+          tabs.map((t) => (t.id === tabId ? { ...t, error: msg, result: null } : t)),
+        );
+        if (activeTabIdRef.current === tabId) {
+          setResult(null);
+          setError(msg);
+        }
       } finally {
-        setRunning(false);
+        if (epoch.isCurrent(token)) setRunning(false);
       }
     },
     [refreshCatalog, epoch],
   );
+
+  const cancelRun = useCallback(async () => {
+    abortRef.current?.abort();
+    epoch.next();
+    setRunning(false);
+    try {
+      await api.cancelQuery();
+    } catch {
+      /* nothing in flight is fine */
+    }
+  }, [epoch]);
+
+  const snapshotActive = (): QueryBuf[] =>
+    queryTabs.map((t) =>
+      t.id === activeTabId
+        ? { ...t, sql, result, error, offset }
+        : t,
+    );
+
+  const applyTab = (next: QueryBuf) => {
+    setActiveTabId(next.id);
+    setSql(next.sql);
+    setResult(next.result);
+    setError(next.error);
+    setOffset(next.offset);
+    lastLoadedRef.current = next.sql;
+  };
+
+  const selectQueryTab = (id: string) => {
+    if (id === activeTabId) return;
+    const saved = snapshotActive();
+    const next = saved.find((t) => t.id === id);
+    if (!next) return;
+    setQueryTabs(saved);
+    applyTab(next);
+  };
+
+  const newQueryTab = () => {
+    const saved = snapshotActive();
+    const buf: QueryBuf = {
+      id: `q${Date.now()}`,
+      title: `Query ${saved.length + 1}`,
+      sql: STARTER,
+      result: null,
+      error: null,
+      offset: 0,
+    };
+    setQueryTabs([...saved, buf]);
+    applyTab(buf);
+  };
+
+  const closeQueryTab = (id: string) => {
+    if (queryTabs.length === 1) return;
+    const saved = snapshotActive();
+    const idx = saved.findIndex((t) => t.id === id);
+    const nextTabs = saved.filter((t) => t.id !== id);
+    const next = nextTabs[Math.max(0, idx - 1)] ?? nextTabs[0];
+    setQueryTabs(nextTabs);
+    applyTab(next);
+  };
 
   const loadAndRunExample = useCallback(() => {
     const example = exampleFor(tablesRef.current);
@@ -269,10 +399,12 @@ export default function App() {
     else setActionError((await resp.json()).error?.message ?? "Snapshot failed");
   }, [refreshCatalog]);
 
-  const exportResult = useCallback(async () => {
+  const exportResult = useCallback(async (formatOverride?: string) => {
+    const format = formatOverride ?? exportFormat;
+    if (formatOverride) setExportFormat(formatOverride);
     const { body, filename } = exportRequest(
       sqlRef.current,
-      exportFormat,
+      format,
       agentView,
       maskedColumns,
       resultRef.current?.columns ?? [],
@@ -303,9 +435,10 @@ export default function App() {
         window.confirm("Replace your current query with a SELECT for this table?")
       ) {
         loadSql(next);
+        run(next);
       }
     },
-    [loadSql],
+    [loadSql, run],
   );
 
   const explain = useCallback(async () => {
@@ -332,7 +465,9 @@ export default function App() {
         setActionError(body.error?.message ?? "Upload failed");
         return;
       }
-      loadSql(`SELECT * FROM ${body.table} LIMIT 100;`);
+      const preview = `SELECT * FROM ${body.table} LIMIT 100;`;
+      loadSql(preview);
+      run(preview);
       refreshCatalog();
       // A detection FAILURE (columns left unmasked) must be loud — surface it as
       // an error, not the friendly governance notice.
@@ -340,13 +475,37 @@ export default function App() {
       const n = uploadNotice(body.table, body.pii ?? []);
       if (n) setNotice(n);
     },
-    [refreshCatalog],
+    [refreshCatalog, loadSql, run],
   );
 
   const loadDemo = useCallback(async () => {
     await api.loadDemo();
     refreshCatalog();
   }, [refreshCatalog]);
+
+  const charterFiles = useCallback(async () => {
+    const body = await api.charterFromFiles();
+    refreshCatalog();
+    if (body.added.length === 0) {
+      setNotice(
+        body.skipped.length
+          ? "Those files are already in the charter."
+          : "No csv, parquet, json, or xlsx files in this folder.",
+      );
+      return;
+    }
+    const first = body.added[0];
+    const preview = `SELECT * FROM ${first.name} LIMIT 100;`;
+    loadSql(preview);
+    run(preview);
+    const pii = Object.entries(body.pii)
+      .filter(([, cols]) => cols.length)
+      .map(([n, cols]) => `${n}: ${cols.join(", ")}`)
+      .join("; ");
+    setNotice(
+      `Chartered ${body.added.length} file(s).${pii ? ` PII flagged (${pii}). Review charter.yaml.` : " Review charter.yaml."}`,
+    );
+  }, [refreshCatalog, loadSql, run]);
 
   const removeObject = useCallback(
     async (kind: "snapshot" | "upload", name: string) => {
@@ -389,41 +548,183 @@ export default function App() {
         e.preventDefault();
         setPaletteOpen((o) => !o);
       }
+      if (e.key === "Escape" && runningRef.current) {
+        e.preventDefault();
+        void cancelRun();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, [cancelRun]);
+
+  const saveQueryFile = useCallback(async () => {
+    const name = window.prompt("Save as queries/<name>.sql", "query");
+    if (!name) return;
+    try {
+      await api.saveQuery(name, sqlRef.current);
+      refreshCatalog();
+    } catch (e) {
+      setActionError((e as Error).message);
+    }
+  }, [refreshCatalog]);
+
+  const copyText = useCallback(async (text: string, ok: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setNotice(ok);
+    } catch {
+      setActionError("Could not copy to the clipboard.");
+    }
   }, []);
 
-  const commands = useMemo<Command[]>(() => {
-    const a = (id: string, label: string, run: () => void): Command => ({ id, label, run });
-    const actions = [
-      a("run", "Run query", () => run()),
-      a("export", "Export result", () => exportResult()),
-      a("snapshot", "Snapshot result", () => snapshot()),
-      a("profile", "Profile", () => profile()),
-      a("explain", "Explain plan", () => explain()),
-      a("estimate", "Estimate cost", () => estimateCost()),
-      a("history", "Query history", () => setShowHistory(true)),
-      a("tab-results", "Go to Results", () => setTab("results")),
-      a("tab-chart", "Go to Chart", () => setTab("chart")),
-      a("tab-plan", "Go to Plan", () => setTab("plan")),
-      a("agent-view", "Toggle Agent view", () => setAgentView((v) => !v)),
-      a("theme", "Toggle theme", () => setTheme((t) => (t === "dark" ? "light" : "dark"))),
-      a("help", "Help — About & FAQ", () => setShowHelp(true)),
-      a("tour", "Take the tour", () => setShowTutorial(true)),
-    ];
-    const tableCmds = tables.map((t) => {
-      const rel = t.source === "memory" ? t.table : `${t.source}.${t.table}`;
-      return a(`open:${rel}`, `Open ${rel}`, () => pickRelation(rel));
+  const exportEvidence = useCallback(async () => {
+    const resp = await fetch("/api/audit/export", { method: "POST" });
+    if (!resp.ok) {
+      setActionError("Could not export audit evidence.");
+      return;
+    }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "audit-evidence.zip";
+    a.click();
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const commands = useMemo(() => {
+    const owned = new Set(sources.map((s) => s.name));
+    return buildPaletteCommands({
+      handlers: {
+        run: () => void run(),
+        cancel: () => void cancelRun(),
+        newQueryTab,
+        closeQueryTab: () => closeQueryTab(activeTabId),
+        nextPage: () => {
+          if (result?.truncated) void run(undefined, offset + PAGE_ROWS);
+        },
+        prevPage: () => {
+          if (offset > 0) void run(undefined, Math.max(0, offset - PAGE_ROWS));
+        },
+        exportResult: () => void exportResult(),
+        exportAs: (format) => void exportResult(format),
+        snapshot,
+        profile,
+        explain,
+        estimate: estimateCost,
+        history: () => setShowHistory(true),
+        goTab: (t) => (t === "profile" ? void profile() : setTab(t)),
+        toggleAgentView: () => setAgentView((v) => !v),
+        toggleTheme: () => setTheme((t) => (t === "dark" ? "light" : "dark")),
+        help: () => setShowHelp(true),
+        tour: () => setShowTutorial(true),
+        explore: openExplore,
+        ask: () => setDoor("ask"),
+        govern: openGovern,
+        connectLlm: () => {
+          setDoor("ask");
+          setConnectTick((n) => n + 1);
+        },
+        loadDemo: () => void loadDemo(),
+        charterFiles: () => void charterFiles(),
+        addSource: () => openGovern("sources"),
+        uploadFile: () => fileRef.current?.click(),
+        saveQuery: () => void saveQueryFile(),
+        copyMarkdown: () => {
+          const grid = agentView && agentResult ? agentResult : result;
+          if (!grid) {
+            setActionError("Run a query first.");
+            return;
+          }
+          void copyText(
+            resultToMarkdown(sqlRef.current, grid, {
+              maskColumns: agentView && !agentResult ? maskedColumns : undefined,
+            }),
+            "Copied Markdown.",
+          );
+        },
+        copyLink: () =>
+          void copyText(
+            `${window.location.origin}${window.location.pathname}${encodeQueryHash(sqlRef.current)}`,
+            "Copied link to this query.",
+          ),
+        copySql: () => void copyText(sqlRef.current, "Copied SQL."),
+        exportEvidence: () => {
+          openGovern("audit");
+          void exportEvidence();
+        },
+        runDataTests: () => {
+          openGovern("evals");
+          void api
+            .runDataTests()
+            .then((r) =>
+              setNotice(r.passed ? "All data tests passed." : "Some data tests failed. See Evals."),
+            )
+            .catch((e) => setActionError((e as Error).message));
+        },
+        disconnectAgent: () =>
+          void api.setAgentBackend("none").then(() => setNotice("Agent disconnected.")),
+      },
+      tables,
+      metrics,
+      queries: savedQueries,
+      snapshots: tables.filter((t) => t.source === "local").map((t) => t.table),
+      uploads: tables.filter((t) => t.source === "memory" && !owned.has(t.table)).map((t) => t.table),
+      queryTabs,
+      onOpenQuery: (name) => {
+        void api.readQuery(name).then((b) => loadSql(b.sql)).catch((e) => setActionError((e as Error).message));
+      },
+      onRunMetric: (metricSql) => {
+        loadSql(`${metricSql};\n`);
+        void run(metricSql);
+      },
+      onOpenTable: pickRelation,
+      onRecheck: (name) => {
+        void api
+          .recheckSnapshot(name)
+          .then((r) =>
+            setNotice(r.changed ? `Snapshot ${name} changed (−${r.gone} +${r.new}).` : `Snapshot ${name} unchanged.`),
+          )
+          .catch((e) => setActionError((e as Error).message));
+      },
+      onPromote: (name) => {
+        void api
+          .promoteUpload(name)
+          .then(refreshCatalog)
+          .catch((e) => setActionError((e as Error).message));
+      },
+      onSelectTab: selectQueryTab,
     });
-    const metricCmds = metrics.map((m) =>
-      a(`metric:${m.name}`, `Run metric: ${m.name}`, () => {
-        loadSql(`${m.sql};\n`);
-        run(m.sql);
-      }),
-    );
-    return [...actions, ...metricCmds, ...tableCmds];
-  }, [run, exportResult, snapshot, profile, explain, estimateCost, pickRelation, tables, metrics, loadSql]);
+  }, [
+    run,
+    cancelRun,
+    exportResult,
+    snapshot,
+    profile,
+    explain,
+    estimateCost,
+    pickRelation,
+    tables,
+    metrics,
+    loadSql,
+    result,
+    offset,
+    queryTabs,
+    activeTabId,
+    sources,
+    savedQueries,
+    agentView,
+    agentResult,
+    maskedColumns,
+    copyText,
+    saveQueryFile,
+    exportEvidence,
+    loadDemo,
+    charterFiles,
+    refreshCatalog,
+    sql,
+    error,
+  ]);
 
   return (
     <div
@@ -455,7 +756,7 @@ export default function App() {
             loadAndRunExample,
             showChart: () => setTab("chart"),
             showProfile: profile,
-            showView: setView,
+            showView: (v) => (v === "explorer" ? openExplore() : openGovern(v as GovernPage)),
             toggleAgentView: () => setAgentView((v) => !v),
             runAgentExample,
           }}
@@ -499,7 +800,26 @@ export default function App() {
           />
         </svg>
         <span className="name">DataCharter</span>
-        <span className="tagline">charter your data</span>
+        <nav className="doors" aria-label="Mode">
+          <button
+            className={door === "explore" ? "door-btn on" : "door-btn"}
+            onClick={openExplore}
+          >
+            Explore
+          </button>
+          <button
+            className={door === "ask" ? "door-btn on" : "door-btn"}
+            onClick={() => setDoor("ask")}
+          >
+            Ask
+          </button>
+          <button
+            className={door === "govern" ? "door-btn on" : "door-btn"}
+            onClick={() => openGovern(view === "explorer" ? "audit" : view)}
+          >
+            Govern
+          </button>
+        </nav>
         <span className="spacer" />
         <button
           className="topbar-btn"
@@ -515,36 +835,15 @@ export default function App() {
         >
           History
         </button>
+        <button
+          className="topbar-btn"
+          onClick={() => setPaletteOpen(true)}
+          title="Command palette (⌘K)"
+        >
+          ⌘K
+        </button>
         <button className="topbar-btn" onClick={() => setShowHelp(true)} title="About & FAQ">
           Docs
-        </button>
-        <button
-          className="topbar-btn"
-          onClick={() => setView(view === "sources" ? "explorer" : "sources")}
-          title="Manage data sources"
-        >
-          {view === "sources" ? "Explorer" : "Sources"}
-        </button>
-        <button
-          className="topbar-btn"
-          onClick={() => setView(view === "evals" ? "explorer" : "evals")}
-          title="Run agent evals and measure guide-lift"
-        >
-          {view === "evals" ? "Explorer" : "Evals"}
-        </button>
-        <button
-          className="topbar-btn"
-          onClick={() => setView(view === "guides" ? "explorer" : "guides")}
-          title="Edit workspace guides (agent context)"
-        >
-          {view === "guides" ? "Explorer" : "Guides"}
-        </button>
-        <button
-          className="topbar-btn"
-          onClick={() => setView(view === "audit" ? "explorer" : "audit")}
-          title="Tamper-evident audit of agent data access"
-        >
-          {view === "audit" ? "Explorer" : "Audit"}
         </button>
         <button
           className="help-btn"
@@ -573,33 +872,72 @@ export default function App() {
         </aside>
         <div className="resizer-x" onMouseDown={sidebarW.onMouseDown} />
         <main className="main">
-          {view === "sources" ? (
-            <SourcesView onChange={refreshCatalog} />
-          ) : view === "evals" ? (
-            <EvalsView />
-          ) : view === "guides" ? (
-            <GuidesEditor />
-          ) : view === "audit" ? (
-            <AuditView />
+          {door === "ask" ? (
+            <ChatPanel dark={dark} connectTick={connectTick} onOpenSql={(s) => { loadSql(s); openExplore(); setTab("sql"); }} />
+          ) : door === "govern" ? (
+            <>
+              <div className="govern-nav">
+                {(["audit", "studio", "sources", "evals", "guides"] as const).map((page) => (
+                  <button
+                    key={page}
+                    className={view === page ? "door-btn on" : "door-btn"}
+                    onClick={() => openGovern(page)}
+                  >
+                    {page[0].toUpperCase() + page.slice(1)}
+                  </button>
+                ))}
+              </div>
+              {view === "sources" ? (
+                <SourcesView onChange={refreshCatalog} />
+              ) : view === "studio" ? (
+                <CharterStudio onSaved={refreshCatalog} />
+              ) : view === "evals" ? (
+                <EvalsView />
+              ) : view === "guides" ? (
+                <GuidesEditor />
+              ) : (
+                <AuditView />
+              )}
+            </>
           ) : shouldShowLaunchpad(catalogLoaded, sources.length, tables.length) ? (
             <EmptyState
-              onAddSource={() => setView("sources")}
+              onAddSource={() => openGovern("sources")}
               onUpload={uploadFile}
               onLoadDemo={loadDemo}
+              onCharterFiles={charterFiles}
             />
           ) : (
           <>
-          <section className="editor-pane" style={{ height: editorH.size }}>
-            <div className="toolbar">
-              <button
-                className="primary"
-                onClick={() => run()}
-                disabled={running}
-                title="Run the query (⌘/Ctrl+Enter)"
-              >
-                {running ? "Running…" : "Run"}
-              </button>
-              <QueryFiles currentSql={() => sqlRef.current} onLoad={loadSql} />
+          <QueryTabs
+            tabs={queryTabs}
+            activeId={activeTabId}
+            onSelect={selectQueryTab}
+            onNew={newQueryTab}
+            onClose={closeQueryTab}
+          />
+          <div className="toolbar">
+              {running ? (
+                <button
+                  className="danger"
+                  onClick={() => void cancelRun()}
+                  title="Cancel the running query (Esc)"
+                >
+                  Cancel
+                </button>
+              ) : (
+                <button
+                  className="primary"
+                  onClick={() => run()}
+                  title="Run the query (⌘/Ctrl+Enter)"
+                >
+                  Run
+                </button>
+              )}
+              <QueryFiles
+                key={savedQueries.join(",")}
+                currentSql={() => sqlRef.current}
+                onLoad={loadSql}
+              />
               <button
                 onClick={snapshot}
                 title="Save this result as a reusable local.<name> table"
@@ -617,7 +955,7 @@ export default function App() {
                 ))}
               </select>
               <button
-                onClick={exportResult}
+                onClick={() => void exportResult()}
                 title={
                   agentView
                     ? "Download the masked Agent-view result (PII → •••)"
@@ -642,31 +980,13 @@ export default function App() {
                 </span>
               )}
             </div>
-            <MonacoEditor
-              language="sql"
-              theme={dark ? "dc-dark" : "dc-light"}
-              value={sql}
-              onChange={(v) => setSql(v ?? "")}
-              onMount={(editor, monaco) => {
-                editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => run());
-                registerCompletions(monaco, () => tablesRef.current);
-              }}
-              options={{
-                minimap: { enabled: false },
-                fontSize: 13,
-                scrollBeyondLastLine: false,
-                automaticLayout: true,
-              }}
-            />
-          </section>
-          <div className="resizer-y" onMouseDown={editorH.onMouseDown} />
           <section className="results-pane">
             <div className="tabs">
               <button
                 className={tab === "results" ? "tab active" : "tab"}
                 onClick={() => setTab("results")}
               >
-                Results
+                Data
               </button>
               <button
                 className={tab === "chart" ? "tab active" : "tab"}
@@ -677,6 +997,12 @@ export default function App() {
               </button>
               <button className={tab === "profile" ? "tab active" : "tab"} onClick={profile}>
                 Profile
+              </button>
+              <button
+                className={tab === "sql" ? "tab active" : "tab"}
+                onClick={() => setTab("sql")}
+              >
+                SQL
               </button>
               <button
                 className={tab === "plan" ? "tab active" : "tab"}
@@ -716,6 +1042,26 @@ export default function App() {
               </div>
             )}
             <div className="tab-body">
+              {!error && tab === "sql" && (
+                <div className="sql-tab">
+                  <MonacoEditor
+                    language="sql"
+                    theme={dark ? "dc-dark" : "dc-light"}
+                    value={sql}
+                    onChange={(v) => setSql(v ?? "")}
+                    onMount={(editor, monaco) => {
+                      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => run());
+                      registerCompletions(monaco, () => tablesRef.current);
+                    }}
+                    options={{
+                      minimap: { enabled: false },
+                      fontSize: 13,
+                      scrollBeyondLastLine: false,
+                      automaticLayout: true,
+                    }}
+                  />
+                </div>
+              )}
               {error && (
                 <div className="error-box">
                   <span>{error}</span>
@@ -742,7 +1088,12 @@ export default function App() {
                 )
               )}
               {!error && tab === "results" && result && !agentView && (
-                <ResultsGrid result={result} />
+                <ResultsGrid
+                  result={result}
+                  offset={offset}
+                  onPrev={() => void run(undefined, Math.max(0, offset - PAGE_ROWS))}
+                  onNext={() => void run(undefined, offset + PAGE_ROWS)}
+                />
               )}
               {!error && tab === "chart" && result && (
                 <ChartPanel
@@ -771,19 +1122,34 @@ export default function App() {
                 ) : planLoading ? (
                   <div className="empty-state">Planning…</div>
                 ) : null)}
-              {!error && !result && tab !== "profile" && (
-                <div className="empty-state">Run a query to see results.</div>
+              {!error && !result && tab !== "profile" && tab !== "sql" && (
+                <div className="empty-state">Pick a table, or drop a file.</div>
               )}
             </div>
           </section>
           </>
           )}
         </main>
-        <div className="resizer-x" onMouseDown={chatW.onMouseDown} />
-        <aside className="chat-dock" style={{ width: chatW.size }}>
-          <ChatPanel dark={dark} onOpenSql={loadSql} />
-        </aside>
+        {door === "explore" && !shouldShowLaunchpad(catalogLoaded, sources.length, tables.length) && (
+          <>
+            <div className="resizer-x" onMouseDown={chatW.onMouseDown} />
+            <aside className="chat-dock" style={{ width: chatW.size }}>
+              <ChatPanel dark={dark} connectTick={connectTick} onOpenSql={(s) => { loadSql(s); setTab("sql"); }} />
+            </aside>
+          </>
+        )}
       </div>
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".csv,.parquet,.json,.xlsx"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) void uploadFile(f);
+          e.target.value = "";
+        }}
+      />
     </div>
   );
 }

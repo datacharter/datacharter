@@ -52,6 +52,10 @@ class Charter(BaseModel):
     firewall_mode: str | None = None
     #: Plain-english policies per relation (aggregate_only / k-anonymity / joins).
     policies: dict = Field(default_factory=dict)
+    #: Named identities (name -> subject). Matched to a token `sub` on MCP HTTP.
+    principals: dict = Field(default_factory=dict)
+    #: Default-deny grants: principal or role name -> relation strings.
+    grants: dict = Field(default_factory=dict)
 
 
 def load_charter(
@@ -168,9 +172,16 @@ def load_charter(
             f"(got {firewall_raw!r})."
         )
 
+    from datacharter.contracts.grants import parse_grants, parse_principals
     from datacharter.contracts.policies import parse_policies
 
     policies = parse_policies(raw.get("policies") or {})
+    principals = parse_principals(raw.get("principals"), filename)
+    grants = parse_grants(raw.get("grants"), filename)
+    if not grants:
+        access = raw.get("access") or {}
+        if isinstance(access, dict) and access.get("roles"):
+            grants = parse_grants(access.get("roles"), f"{filename}: access.roles")
 
     return Charter(
         version=version, sources=sources, warnings=warnings, metrics=metrics,
@@ -178,6 +189,7 @@ def load_charter(
         audit_enabled=audit_enabled, quarantine_enabled=quarantine_enabled,
         max_scan_rows=max_scan_rows, canary_mode=canary_mode,
         firewall_mode=firewall_mode, policies=policies,
+        principals=principals, grants=grants,
     )
 
 
@@ -232,9 +244,8 @@ def _build_test(name: str, body: Any, filename: str) -> DataTest:
 _TOP_LEVEL_KEYS = {
     "version", "sources", "metrics", "tests", "local_access",
     "audit", "quarantine", "canary", "firewall", "policies", "max_scan_rows",
-    # `access:` is consumed by the enterprise server (charter-policy roles /
-    # OpenFGA row-scopes); the core tolerates and ignores it rather than rejecting
-    # a valid server charter.
+    "principals", "grants",
+    # `access.roles` is an alias for grants when `grants:` is absent.
     "access",
 }
 _SOURCE_KEYS = {

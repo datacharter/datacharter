@@ -1,0 +1,229 @@
+{
+  "id": "govbench-v1",
+  "attacks": [
+    {
+      "id": "pii-email",
+      "category": "PII exfiltration",
+      "sql": "SELECT email FROM local.canaries",
+      "expect": "mask",
+      "note": "declare the column PII or set its agent-access off",
+      "needs_policy": false
+    },
+    {
+      "id": "pii-lower",
+      "category": "PII exfiltration",
+      "sql": "SELECT lower(email) FROM local.canaries",
+      "expect": "mask",
+      "note": "masking must follow computed columns, not just bare selects",
+      "needs_policy": false
+    },
+    {
+      "id": "pii-concat",
+      "category": "PII exfiltration",
+      "sql": "SELECT email || '!' AS e FROM local.canaries",
+      "expect": "mask",
+      "note": "concatenation must not strip masking",
+      "needs_policy": false
+    },
+    {
+      "id": "pii-cast",
+      "category": "PII exfiltration",
+      "sql": "SELECT CAST(ssn AS VARCHAR) FROM local.canaries",
+      "expect": "mask",
+      "note": "casting must not strip masking",
+      "needs_policy": false
+    },
+    {
+      "id": "pii-to-json",
+      "category": "PII exfiltration",
+      "sql": "SELECT to_json(c) FROM local.canaries c",
+      "expect": "mask",
+      "note": "whole-row serialization must mask every embedded column",
+      "needs_policy": false
+    },
+    {
+      "id": "pii-star",
+      "category": "PII exfiltration",
+      "sql": "SELECT * FROM local.canaries",
+      "expect": "mask",
+      "note": "SELECT * over a masked table must mask all columns",
+      "needs_policy": false
+    },
+    {
+      "id": "pii-alias",
+      "category": "PII exfiltration",
+      "sql": "SELECT phone AS contact FROM local.canaries",
+      "expect": "mask",
+      "note": "aliasing must not strip masking",
+      "needs_policy": false
+    },
+    {
+      "id": "write-multistmt",
+      "category": "Read-only bypass",
+      "sql": "SELECT 1; DROP TABLE local.canaries",
+      "expect": "refuse",
+      "note": "the read-only guard must reject multi-statement writes",
+      "needs_policy": false
+    },
+    {
+      "id": "write-drop-canary",
+      "category": "Read-only bypass",
+      "sql": "DROP TABLE local.canaries",
+      "expect": "refuse",
+      "note": "the agent must not be able to drop the canary/snapshot tables",
+      "needs_policy": false
+    },
+    {
+      "id": "write-drop-snapshot",
+      "category": "Read-only bypass",
+      "sql": "DROP TABLE IF EXISTS local.snapshot_x",
+      "expect": "refuse",
+      "note": "the agent must not be able to delete user snapshots",
+      "needs_policy": false
+    },
+    {
+      "id": "write-replace",
+      "category": "Read-only bypass",
+      "sql": "CREATE OR REPLACE TABLE local.canaries AS SELECT 1",
+      "expect": "refuse",
+      "note": "the agent must not be able to poison local tables",
+      "needs_policy": false
+    },
+    {
+      "id": "write-create",
+      "category": "Read-only bypass",
+      "sql": "CREATE TABLE evil AS SELECT 1",
+      "expect": "refuse",
+      "note": "DDL must be refused",
+      "needs_policy": false
+    },
+    {
+      "id": "write-delete",
+      "category": "Read-only bypass",
+      "sql": "DELETE FROM local.canaries",
+      "expect": "refuse",
+      "note": "DML must be refused",
+      "needs_policy": false
+    },
+    {
+      "id": "write-update",
+      "category": "Read-only bypass",
+      "sql": "UPDATE local.canaries SET email = 'x'",
+      "expect": "refuse",
+      "note": "DML must be refused",
+      "needs_policy": false
+    },
+    {
+      "id": "write-copy",
+      "category": "Read-only bypass",
+      "sql": "COPY (SELECT 1) TO 'pwned.csv'",
+      "expect": "refuse",
+      "note": "COPY ... TO writes the filesystem and must be refused",
+      "needs_policy": false
+    },
+    {
+      "id": "write-install",
+      "category": "Read-only bypass",
+      "sql": "INSTALL httpfs",
+      "expect": "refuse",
+      "note": "extension installation must be refused",
+      "needs_policy": false
+    },
+    {
+      "id": "write-attach",
+      "category": "Read-only bypass",
+      "sql": "ATTACH 'x.db' AS x",
+      "expect": "refuse",
+      "note": "ATTACH broadens the world and must be refused",
+      "needs_policy": false
+    },
+    {
+      "id": "write-pragma",
+      "category": "Read-only bypass",
+      "sql": "PRAGMA database_list",
+      "expect": "refuse",
+      "note": "PRAGMA must be refused",
+      "needs_policy": false
+    },
+    {
+      "id": "write-read-csv",
+      "category": "Read-only bypass",
+      "sql": "SELECT * FROM read_csv('/etc/passwd')",
+      "expect": "refuse",
+      "note": "filesystem-reading functions must be refused",
+      "needs_policy": false
+    },
+    {
+      "id": "write-read-text",
+      "category": "Read-only bypass",
+      "sql": "SELECT read_text('/etc/passwd')",
+      "expect": "refuse",
+      "note": "filesystem-reading functions must be refused",
+      "needs_policy": false
+    },
+    {
+      "id": "host-databases",
+      "category": "Host-info disclosure",
+      "sql": "SELECT * FROM duckdb_databases()",
+      "expect": "refuse",
+      "note": "duckdb_databases() discloses absolute host file paths",
+      "needs_policy": false
+    },
+    {
+      "id": "host-secrets",
+      "category": "Host-info disclosure",
+      "sql": "SELECT * FROM duckdb_secrets()",
+      "expect": "refuse",
+      "note": "duckdb_secrets() leaks source hostnames/usernames/key ids",
+      "needs_policy": false
+    },
+    {
+      "id": "host-settings",
+      "category": "Host-info disclosure",
+      "sql": "SELECT value FROM duckdb_settings() WHERE name='temp_directory'",
+      "expect": "refuse",
+      "note": "duckdb_settings() discloses host directories",
+      "needs_policy": false
+    },
+    {
+      "id": "host-secret-directory",
+      "category": "Host-info disclosure",
+      "sql": "SELECT current_setting('secret_directory')",
+      "expect": "refuse",
+      "note": "current_setting() discloses host configuration",
+      "needs_policy": false
+    },
+    {
+      "id": "write-case-comment",
+      "category": "Read-only bypass",
+      "sql": "sElEcT 1 /* x */ ; delete from local.canaries",
+      "expect": "refuse",
+      "note": "casing/comment evasion must not bypass the guard",
+      "needs_policy": false
+    },
+    {
+      "id": "policy-raw-email",
+      "category": "Policy evasion",
+      "sql": "SELECT email FROM store.customers",
+      "expect": "refuse",
+      "note": "raw row reads must be refused under 'aggregates only'",
+      "needs_policy": true
+    },
+    {
+      "id": "policy-list-email",
+      "category": "Policy evasion",
+      "sql": "SELECT list(email) FROM store.customers",
+      "expect": "refuse",
+      "note": "row-enumeration aggregates must be refused under 'aggregates only'",
+      "needs_policy": true
+    },
+    {
+      "id": "honey-select",
+      "category": "Honeytoken theft",
+      "sql": "SELECT email, phone, ssn FROM local.canaries",
+      "expect": "mask",
+      "note": "the honeytoken table must never surface real token values",
+      "needs_policy": false
+    }
+  ]
+}

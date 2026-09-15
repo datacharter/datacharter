@@ -1,9 +1,8 @@
 ---
+layout: default
 title: Guides — teach every agent your data's quirks
 description: Markdown notes in guides/ reach every agent — chat, Claude Code, and MCP clients. Write them by hand, or let datacharter suggest mine them from your query history. Measure their lift with evals.
 ---
-
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [Editor](editor.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Guides](guides.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Workspace](workspace.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
 Guides are the things you'd tell a new analyst on their first day: "revenue is
 net of refunds", "exclude accounts with region = 'ZZ'", "order_date is when it

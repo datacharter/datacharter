@@ -44,3 +44,23 @@ def test_audit_empty_workspace(tmp_path, capsys):
     cli_main(["init", str(tmp_path)])
     assert cli_main(["audit", str(tmp_path)]) == 0
     assert "No audit entries yet" in capsys.readouterr().out
+
+
+def test_audit_siem_writes_ndjson_without_rows(tmp_path, capsys):
+    _seed(tmp_path)
+    capsys.readouterr()
+    assert cli_main(["audit", str(tmp_path), "siem"]) == 0
+    lines = [json.loads(ln) for ln in capsys.readouterr().out.splitlines() if ln.strip()]
+    assert lines
+    access = next(e for e in lines if e.get("type") == "access")
+    assert access["decision"] == "allow"
+    assert access["sql"] == "SELECT 1"
+    assert "rows" not in access
+
+
+def test_audit_siem_out_file(tmp_path):
+    _seed(tmp_path)
+    dest = tmp_path / "siem.ndjson"
+    assert cli_main(["audit", str(tmp_path), "siem", "--out", str(dest)]) == 0
+    lines = [json.loads(ln) for ln in dest.read_text().splitlines() if ln]
+    assert any(e.get("type") == "access" for e in lines)

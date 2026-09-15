@@ -9,7 +9,15 @@ from ruamel.yaml import YAML
 
 from datacharter.contracts.loader import CHARTER_FILE
 
-__all__ = ["upsert_source", "remove_source", "set_pii", "ContractWriteError"]
+__all__ = [
+    "upsert_source",
+    "remove_source",
+    "set_pii",
+    "replace_pii",
+    "set_row_filter",
+    "set_policy_sentences",
+    "ContractWriteError",
+]
 
 
 class ContractWriteError(Exception):
@@ -112,6 +120,13 @@ def set_agent_access(
     _write(path, y, data)
 
 
+def _source_entry(data, source: str):
+    sources = data.get("sources") or {}
+    if source not in sources:
+        raise ContractWriteError(f"Source '{source}' is not in the charter.")
+    return sources[source]
+
+
 def set_pii(workspace: Path, source: str, table: str, columns: list[str]) -> None:
     """Merge PII column names into one source's pii map (round-trip).
 
@@ -120,14 +135,99 @@ def set_pii(workspace: Path, source: str, table: str, columns: list[str]) -> Non
     """
     path = workspace / CHARTER_FILE
     y, data = _load(path)
-    sources = data.get("sources") or {}
-    if source not in sources:
-        raise ContractWriteError(f"Source '{source}' is not in the charter.")
-    entry = sources[source]
+    entry = _source_entry(data, source)
     pii = entry.get("pii")
     if pii is None:
         pii = {}
         entry["pii"] = pii
     existing = list(pii.get(table) or [])
     pii[table] = existing + [c for c in columns if c not in existing]
+    _write(path, y, data)
+
+
+def replace_pii(workspace: Path, source: str, table: str, columns: list[str]) -> None:
+    """Replace one table's PII list. Empty columns drops that table from the map."""
+    path = workspace / CHARTER_FILE
+    y, data = _load(path)
+    entry = _source_entry(data, source)
+    pii = entry.get("pii")
+    if pii is None:
+        pii = {}
+        entry["pii"] = pii
+    unique = list(dict.fromkeys(columns))
+    if unique:
+        pii[table] = unique
+    else:
+        pii.pop(table, None)
+        if not pii:
+            entry.pop("pii", None)
+    _write(path, y, data)
+
+
+def _validate_predicate(predicate: str) -> None:
+    import json
+
+    import duckdb
+
+    con = duckdb.connect()
+    try:
+        raw = con.execute(
+            "SELECT json_serialize_sql(?)", [f"SELECT 1 WHERE ({predicate})"]
+        ).fetchone()[0]
+        tree = json.loads(raw)
+        if isinstance(tree, dict) and tree.get("error"):
+            msg = tree.get("error_message") or tree.get("error")
+            raise ContractWriteError(f"Invalid row filter: {msg}")
+    except ContractWriteError:
+        raise
+    except Exception as exc:
+        raise ContractWriteError(f"Invalid row filter: {exc}") from None
+    finally:
+        con.close()
+
+
+def set_row_filter(workspace: Path, source: str, table: str, predicate: str) -> None:
+    """Set or clear one table's row filter. Empty predicate removes it."""
+    pred = (predicate or "").strip()
+    if pred:
+        _validate_predicate(pred)
+    path = workspace / CHARTER_FILE
+    y, data = _load(path)
+    entry = _source_entry(data, source)
+    filters = entry.get("row_filters")
+    if filters is None:
+        filters = {}
+        entry["row_filters"] = filters
+    if pred:
+        filters[table] = pred
+    else:
+        filters.pop(table, None)
+        if not filters:
+            entry.pop("row_filters", None)
+    _write(path, y, data)
+
+
+def set_policy_sentences(workspace: Path, relation: str, sentences: list[str]) -> None:
+    """Replace one relation's policy sentences. Empty list removes the relation."""
+    from datacharter.contracts.loader_errors import CharterError
+    from datacharter.contracts.policies import parse_policies
+
+    cleaned = [s.strip() for s in sentences if isinstance(s, str) and s.strip()]
+    if cleaned:
+        try:
+            parse_policies({relation: cleaned})
+        except CharterError as exc:
+            raise ContractWriteError(str(exc)) from None
+    path = workspace / CHARTER_FILE
+    y, data = _load(path)
+    policies = data.get("policies")
+    if policies is None:
+        policies = {}
+        data["policies"] = policies
+    if cleaned:
+        policies[relation] = cleaned
+    else:
+        policies.pop(relation, None)
+        if not policies:
+            data.pop("policies", None)
     _write(path, y, data)

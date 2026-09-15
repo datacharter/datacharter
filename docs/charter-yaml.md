@@ -1,14 +1,17 @@
 ---
+layout: default
 title: charter.yaml reference
 description: Every field of a source contract, plus how credentials resolve.
 ---
-
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [Editor](editor.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Guides](guides.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Workspace](workspace.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
 `charter.yaml` is the heart of a workspace. It describes your sources the way a
 data contract does: connection shape, which tables to expose, and which columns
 are PII. It never holds secrets. Credentials are `${NAME}` references resolved at
 load time from your environment, a local `.env`, or your OS keyring.
+
+**Govern → Studio** edits PII, row filters, and policies visually. The YAML pane
+is this file. Saving writes through the same round-trip writer that preserves
+comments and `${NAME}` refs.
 
 ## Top-level shape
 
@@ -33,11 +36,39 @@ sources:
 | `quarantine` | no | Quarantine prompt-injection payloads in result cells (default on; `quarantine: off` disables) ([security](security.html#prompt-injection-quarantine)). |
 | `max_scan_rows` | no | A coarse pre-execution ceiling: a positive integer. An agent query whose estimated result exceeds it is refused *before running*, with a retryable hint to narrow it. Estimates are approximate — set it well above your normal result sizes; it catches unbounded pulls, not narrow queries. |
 | `firewall` | no | The Data Firewall: `off` (default), `log` (record the Reasoning Governor's decision on every agent query), or `block` (refuse queries the governor denies at the tool boundary). Enforces intent-aware governance on the live agent surface ([CLI](cli.html#firewall-sql-directory---status)). |
+| `principals` | no | Named identities for MCP HTTP. Each value is a subject string or `{sub, roles?}`. Matched to the bearer token `sub`. |
+| `grants` | no | Default-deny access for those identities (and JWT `roles`). Lists of `source.table`, `source.table.column`, `source.*`, or `*`. Enforced on MCP HTTP only. Local stdio and the UI stay the owner. |
 
 Everything else — `pii`, `tables`, `agent_access`, `row_filters`, `context` —
 is **source-level**: it lives inside a `sources.<name>:` block. Placing one at
 the top level is a load error (it would otherwise be silently ignored, which is
 worse).
+
+## Principals and grants (MCP HTTP)
+
+Identities live in git. A second principal is not an account on our servers.
+`grants` are default-deny. Table grants include every column; a
+`source.table.column` grant shows the table but only that column. `store.*`
+is every table in `store`. JWT `roles` also match grant keys.
+
+```yaml
+principals:
+  analyst: alice@corp
+  batch:
+    sub: svc-batch
+    roles: [etl]
+
+grants:
+  analyst:
+    - store.orders
+    - store.customers.tier
+  etl:
+    - store.*
+```
+
+Enforced on `POST /mcp` when the caller has a token `sub`. Local `datacharter mcp`
+stdio and the UI do not prune. `access.roles` is still accepted as an alias for
+`grants` when `grants:` is absent.
 
 The file must be a YAML mapping. `sources` is keyed by name (not a list), so
 each source name is unique by construction.

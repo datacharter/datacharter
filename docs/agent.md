@@ -1,9 +1,8 @@
 ---
+layout: default
 title: AI agent modes — Claude Code, Ollama local models, or any OpenAI-compatible endpoint
 description: Chat with your data using your Claude Code subscription, a fully local Ollama model, or any OpenAI-compatible agent — governed and PII-masked either way.
 ---
-
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [Editor](editor.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Guides](guides.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Workspace](workspace.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
 DataCharter has an optional natural-language agent that turns a plain-language
 question into SQL against your sources. It is genuinely optional.
@@ -31,14 +30,30 @@ Point the agent at any OpenAI-compatible `/chat/completions` endpoint (a hosted
 API, a self-hosted server such as vLLM, or a local runtime that speaks the same
 protocol). Set the endpoint and key in the environment, then serve:
 
+Recommended hosted default is SpaceXAI (`grok-4.6`):
+
 ```sh
-export OPENAI_BASE_URL=https://api.example.com/v1   # any OpenAI-compatible API
+export OPENAI_BASE_URL=https://api.x.ai/v1
+export XAI_API_KEY=...          # from console.x.ai
+export DATACHARTER_MODEL=grok-4.6
+datacharter serve
+```
+
+The Connect dialog has a **SpaceXAI · grok-4.6** button that fills the same
+values. Paste a key, or export `XAI_API_KEY`. `XAI_API_KEY` is only sent to
+`api.x.ai`, never to another base URL.
+
+Any other OpenAI-compatible endpoint still works:
+
+```sh
+export OPENAI_BASE_URL=https://api.example.com/v1
 export OPENAI_API_KEY=...
 datacharter serve
 ```
 
 - `OPENAI_BASE_URL` defaults to `https://api.openai.com/v1` if unset.
-- `DATACHARTER_MODEL` selects the model (default `gpt-4o-mini`).
+- `DATACHARTER_MODEL` selects the model (default `gpt-4o-mini`, or `grok-4.6`
+  when the base URL is `api.x.ai`).
 - The client is a dependency-free `httpx` wrapper; there is no vendor SDK.
 
 ## Mode 2: fully local with `--local`
@@ -50,6 +65,9 @@ no data leaves your machine:
 datacharter serve --local              # uses qwen3:8b by default
 datacharter serve --local --model ...  # choose another Ollama model
 ```
+
+Personal files on a local model: `datacharter init --template life` then
+`datacharter serve --local`. The agent only sees aggregates.
 
 Easier still: the **Connect an LLM** dialog detects runtimes already running
 on your machine — Ollama, LM Studio, vLLM, llama.cpp — and lists their loaded

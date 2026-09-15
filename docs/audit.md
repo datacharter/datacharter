@@ -1,9 +1,8 @@
 ---
+layout: default
 title: Audit — the flight recorder
 description: A tamper-evident record of every agent data access, with one-command verification and evidence export.
 ---
-
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [Editor](editor.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Guides](guides.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Workspace](workspace.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
 Governance without evidence is a promise. The flight recorder turns it into a
 record: **every agent data access is logged, hash-chained, and verifiable** —
@@ -51,6 +50,25 @@ The export is a zip an auditor can hold: the window's entries, a verification
 statement, the `charter.yaml` that was in force (the policy), and a summary —
 sessions, tools, relations touched, masked-column counts. *Everything any agent
 saw about your data, provable.*
+
+## SIEM JSON and OTLP
+
+The hash chain on disk stays the source of truth. Optionally copy the same
+metadata events to a SIEM. Still never raw rows.
+
+```
+DATACHARTER_AUDIT=json                         # NDJSON on stderr
+DATACHARTER_AUDIT=json:/var/log/datacharter.ndjson
+DATACHARTER_OTLP_ENDPOINT=http://otel-collector:4318
+```
+
+OTLP is HTTP JSON logs at `{endpoint}/v1/logs` (`service.name=datacharter`).
+Both env vars can be set. Unset means no sink. The chain still records.
+
+`datacharter audit siem` reprints the chain as NDJSON for bulk load (stdout, or
+`--out file`). Access events include `principal` (JWT `sub` when OAuth is on)
+and `decision` (`allow`, `deny`, or `error`). Grant denials on MCP HTTP land
+in the chain, so a refused query is visible to IR.
 
 ## In the browser
 

@@ -83,12 +83,27 @@ export default function LLMConfig({
           <p className="hint">One click — local models need no API key. Data stays on this machine.</p>
         </div>
       )}
+      <div className="llm-hosted">
+        <h4>Hosted</h4>
+        <button
+          type="button"
+          className="guides-tab"
+          aria-label="Use SpaceXAI grok-4.6"
+          onClick={() => {
+            setBaseUrl("https://api.x.ai/v1");
+            setModel("grok-4.6");
+          }}
+        >
+          SpaceXAI · grok-4.6
+        </button>
+        <p className="hint">Fills the form. Paste a key from console.x.ai, or set XAI_API_KEY.</p>
+      </div>
       <div className="source-form">
         <label>
           Base URL
           <input
             value={baseUrl}
-            placeholder="https://api.openai.com/v1"
+            placeholder="https://api.x.ai/v1"
             onChange={(e) => setBaseUrl(e.target.value)}
           />
         </label>
@@ -100,7 +115,7 @@ export default function LLMConfig({
           Model
           <input
             value={model}
-            placeholder="gpt-4o-mini"
+            placeholder="grok-4.6"
             onChange={(e) => setModel(e.target.value)}
           />
         </label>
@@ -111,8 +126,9 @@ export default function LLMConfig({
         {msg && <div className={`source-form-msg ${msgKind}`}>{msg}</div>}
       </div>
       <p className="hint">
-        The API key is stored in your OS keyring, never on disk. Or set OPENAI_BASE_URL /
-        OPENAI_API_KEY, or run <code>datacharter serve --local</code>.
+        The API key is stored in your OS keyring, never on disk. SpaceXAI uses{" "}
+        <code>XAI_API_KEY</code> when the base URL is <code>https://api.x.ai/v1</code>.
+        Or set OPENAI_BASE_URL / OPENAI_API_KEY, or run <code>datacharter serve --local</code>.
       </p>
     </div>
   );

@@ -1,9 +1,8 @@
 ---
+layout: default
 title: A governed MCP server for your databases — safe AI access to real data
 description: Give Claude, Cursor, or any MCP client read-only, PII-masked SQL over Postgres, Snowflake, files, and more. Access is declared in a data contract; every query is audit-logged. Local, open source.
 ---
-
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [Editor](editor.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Guides](guides.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Workspace](workspace.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
 Connecting an AI agent straight to your database is a leap of faith: most MCP
 database servers hand the model whatever the connection string can see.

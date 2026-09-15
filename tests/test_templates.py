@@ -1,5 +1,7 @@
 """Template gallery: every starter charter parses and carries its promised governance."""
 
+import json
+
 import pytest
 import yaml
 
@@ -56,3 +58,43 @@ def test_secure_template_loads_with_firewall(tmp_path):
     cli_main(["init", str(tmp_path), "--template", "secure"])
     charter = load_charter(tmp_path, lenient_secrets=True)
     assert charter.firewall_mode == "block" and charter.canary_mode == "block"
+
+
+def test_life_template_is_personal_aggregates_local(tmp_path, capsys):
+    from datacharter.contracts import load_charter
+
+    assert "life" in TEMPLATES
+    assert cli_main(["init", str(tmp_path), "--template", "life"]) == 0
+    out = capsys.readouterr().out
+    assert "--local" in out
+    assert "${ENV}" not in out
+    charter = load_charter(tmp_path)
+    assert charter.sources
+    assert all(s.type.value in {"csv", "parquet", "json"} for s in charter.sources)
+    assert charter.policies
+    assert all(p.aggregate_only for p in charter.policies.values())
+    guide = (tmp_path / "guides" / "overview.md").read_text().lower()
+    assert "ollama" in guide or "--local" in guide
+    assert (tmp_path / "data" / "receipts.csv").is_file()
+    assert (tmp_path / "data" / "contacts.csv").is_file()
+
+
+async def test_life_template_refuses_raw_contact_rows(tmp_path):
+    from datacharter.agent.tools import ToolBox
+    from datacharter.contracts import load_charter
+    from datacharter.engine.session import Engine
+
+    assert cli_main(["init", str(tmp_path), "--template", "life"]) == 0
+    charter = load_charter(tmp_path)
+    eng = Engine(tmp_path, charter.sources).start()
+    box = ToolBox(eng, charter.sources, policies=charter.policies)
+    try:
+        denied = await box.run("query", json.dumps({"sql": "SELECT email FROM contacts"}))
+        assert denied.startswith("Error:")
+        allowed = await box.run(
+            "query", json.dumps({"sql": "SELECT count(*) AS n FROM contacts"})
+        )
+        assert not allowed.startswith("Error:")
+        assert json.loads(allowed)["rows"][0][0] == 2
+    finally:
+        eng.close()

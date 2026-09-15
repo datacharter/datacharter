@@ -35,7 +35,7 @@ from datacharter.models import (
     Source,
 )
 
-__all__ = ["Engine", "EngineError", "QueryTimeout"]
+__all__ = ["Engine", "EngineError", "QueryTimeout", "QueryCancelled"]
 
 STATE_DIR = ".datacharter"
 DEFAULT_ROW_LIMIT = 10_000
@@ -48,6 +48,16 @@ class EngineError(Exception):
 
 class QueryTimeout(EngineError):
     """Query exceeded its timeout and was interrupted."""
+
+
+class QueryCancelled(EngineError):
+    """Query was cancelled by the user."""
+
+
+def _page_sql(sql: str, offset: int) -> str:
+    """Wrap a read so OFFSET applies to its result, not by rewriting user SQL."""
+    inner = sql.strip().rstrip(";")
+    return f"SELECT * FROM ({inner}) AS _dc_page OFFSET {int(offset)}"
 
 
 def _cgroup_memory_bytes() -> int | None:
@@ -147,6 +157,10 @@ class Engine:
         # Reused Snowflake connectors, source name -> (connector, monotonic last-used).
         self._sf_conns: dict[str, object] = {}
         self._sf_last: dict[str, float] = {}
+        # interrupt() bumps this; in-flight queries compare the generation they
+        # started with so a cancel is QueryCancelled, not QueryTimeout.
+        self._cancel_gen = 0
+        self._active_cursors: set = set()
         for src in self.sources:
             self._secret_values.update(str(v) for v in src.credentials.values())
 
@@ -268,9 +282,28 @@ class Engine:
 
     # -- queries -----------------------------------------------------------
 
-    def query_sync(self, sql: str, *, row_limit: int = DEFAULT_ROW_LIMIT) -> QueryResult:
+    def interrupt(self) -> None:
+        """Stop in-flight queries. Safe to call when nothing is running."""
+        self._cancel_gen += 1
+        conn = self._conn
+        if conn is not None:
+            with contextlib.suppress(Exception):
+                conn.interrupt()
+        for cur in list(self._active_cursors):
+            with contextlib.suppress(Exception):
+                cur.interrupt()
+
+    def query_sync(
+        self, sql: str, *, row_limit: int = DEFAULT_ROW_LIMIT, offset: int = 0
+    ) -> QueryResult:
         """Run one guarded statement; returns capped rows with read provenance."""
-        result = self._execute(sql, row_limit=row_limit)
+        gen = self._cancel_gen
+        try:
+            result = self._execute(sql, row_limit=row_limit, offset=offset)
+        except QueryTimeout:
+            if self._cancel_gen > gen:
+                raise QueryCancelled("Query cancelled.") from None
+            raise
         result.provenance = extract_provenance(sql)
         return result
 
@@ -313,9 +346,13 @@ class Engine:
     async def estimated_cost(self, sql: str) -> int | None:
         return await asyncio.to_thread(self.estimated_cost_sync, sql)
 
-    def _execute(self, sql: str, *, row_limit: int = DEFAULT_ROW_LIMIT) -> QueryResult:
+    def _execute(
+        self, sql: str, *, row_limit: int = DEFAULT_ROW_LIMIT, offset: int = 0
+    ) -> QueryResult:
         conn = self._require_conn()
         normalized = ensure_allowed(sql)
+        if offset:
+            normalized = _page_sql(normalized, offset)
         with self._exec_lock:
             if self._connector_aliases:
                 pushed = self._try_remote_aggregation(normalized, row_limit)
@@ -401,6 +438,7 @@ class Engine:
         *,
         timeout_s: float = 60.0,
         row_limit: int = DEFAULT_ROW_LIMIT,
+        offset: int = 0,
     ) -> QueryResult:
         """Async query with an interrupt-based timeout.
 
@@ -411,26 +449,37 @@ class Engine:
         conn = self._require_conn()
         if self._connector_aliases:
             async with self._query_lock:
-                return await self._query_locked(conn, sql, timeout_s, row_limit)
-        return await self._query_concurrent(sql, timeout_s, row_limit)
+                return await self._query_locked(conn, sql, timeout_s, row_limit, offset)
+        return await self._query_concurrent(sql, timeout_s, row_limit, offset)
 
-    async def _query_concurrent(self, sql: str, timeout_s: float, row_limit: int) -> QueryResult:
+    async def _query_concurrent(
+        self, sql: str, timeout_s: float, row_limit: int, offset: int = 0
+    ) -> QueryResult:
         """Run one read on its own cursor (shares the in-memory DB) without the
         exclusive lock, so reads don't serialize. The cursor's own interrupt keeps
         the timeout scoped to this query."""
+        gen = self._cancel_gen
         normalized = ensure_allowed(sql)
+        if offset:
+            normalized = _page_sql(normalized, offset)
         cur = self._require_conn().cursor()
         self._apply_spill(cur)
+        self._active_cursors.add(cur)
         loop = asyncio.get_running_loop()
         timer = loop.call_later(timeout_s, cur.interrupt)
         try:
             result = await asyncio.to_thread(self._run_on_cursor, cur, normalized, row_limit)
+        except QueryCancelled:
+            raise
         except EngineError as exc:
+            if self._cancel_gen > gen:
+                raise QueryCancelled("Query cancelled.") from None
             if timer.cancelled() or not timer.when() > loop.time():
                 raise QueryTimeout(f"Query exceeded {timeout_s}s and was interrupted.") from None
             raise exc
         finally:
             timer.cancel()
+            self._active_cursors.discard(cur)
             cur.close()
         result.provenance = extract_provenance(sql)
         return result
@@ -530,12 +579,20 @@ class Engine:
         sql: str,
         timeout_s: float,
         row_limit: int,
+        offset: int = 0,
     ) -> QueryResult:
+        gen = self._cancel_gen
         loop = asyncio.get_running_loop()
         timer = loop.call_later(timeout_s, conn.interrupt)
         try:
-            return await asyncio.to_thread(self.query_sync, sql, row_limit=row_limit)
+            return await asyncio.to_thread(
+                self.query_sync, sql, row_limit=row_limit, offset=offset
+            )
+        except QueryCancelled:
+            raise
         except EngineError as exc:
+            if self._cancel_gen > gen:
+                raise QueryCancelled("Query cancelled.") from None
             if timer.cancelled() or not timer.when() > loop.time():
                 raise QueryTimeout(f"Query exceeded {timeout_s}s and was interrupted.") from None
             raise exc

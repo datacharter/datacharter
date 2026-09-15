@@ -1,9 +1,8 @@
 ---
+layout: default
 title: Quick-start guide
 description: From zero to querying your own data in a few minutes.
 ---
-
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [Editor](editor.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Guides](guides.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Workspace](workspace.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
 DataCharter is one Python package. `pip install datacharter` (or `uvx` for a
 zero-install try) gives you the engine, the API, and the web UI in one process.
@@ -24,8 +23,24 @@ uvx datacharter serve
 ```
 
 This generates a tiny sample dataset and opens a local workspace. Browse the
-source tree, run a query in the editor, switch to the Chart and Profile tabs,
+source tree, pick a table (it runs for you), switch to Chart, Profile, or SQL,
 and drag a CSV, Parquet, or JSON file onto the window to query it instantly.
+
+If the folder already has files:
+
+```sh
+datacharter init --from
+datacharter serve
+```
+
+That writes `charter.yaml` from the csv/parquet/json/xlsx files it finds, flags
+likely PII, and leaves the file for you to review. In the UI, **Charter files in
+this folder** does the same against the served workspace.
+
+Personal files and a local model: `datacharter init --template life`, then
+`datacharter serve --local`. A company MCP endpoint is
+[Deploy](deploy.html) (Helm, OAuth). Cite a grade with
+[GovBench](govbench.html). Apache-2.0, including for companies.
 
 ![Drop a CSV on the window and it is queryable instantly, listed under uploads](assets/drag-drop.gif)
 

@@ -14,7 +14,7 @@ const maskedTbl = (source: string, table: string, columns: string[], maskedCol: 
 });
 
 describe("exampleFor", () => {
-  it("empty workspace -> starter", () => expect(exampleFor([])).toContain("SELECT 42"));
+  it("empty workspace -> starter", () => expect(exampleFor([])).toContain("Drop a file"));
   it("demo store present -> aggregation", () =>
     expect(exampleFor([tbl("store", "orders")])).toContain("FROM store.orders\nGROUP BY"));
   it("own table -> scan", () =>

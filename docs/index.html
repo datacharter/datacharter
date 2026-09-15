@@ -1,13 +1,17 @@
+---
+title: DataCharter. Your data, locally. Your agents, on a leash.
+layout: null
+---
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DataCharter — your data, explored locally. Your agents, on a leash.</title>
+<title>DataCharter. Your data, locally. Your agents, on a leash.</title>
 <meta name="description" content="A local SQL workspace over every file and database you have, federated by DuckDB and governed by a contract. AI agents get read-only, PII-masked access to exactly what the charter grants. Not one column more.">
 <link rel="canonical" href="https://datacharter.dev/">
 <meta property="og:type" content="website">
-<meta property="og:title" content="DataCharter — your data, explored locally. Your agents, on a leash.">
+<meta property="og:title" content="DataCharter. Your data, locally. Your agents, on a leash.">
 <meta property="og:description" content="One local SQL grid over every source you have, governed by a contract. Agents see exactly what the charter grants. Not one column more.">
 <meta property="og:url" content="https://datacharter.dev/">
 <meta property="og:image" content="https://datacharter.dev/assets/hero.png">
@@ -56,347 +60,16 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --paper: #F3F6F9;
-    --paper-2: #EAEFF4;
-    --ink: #15202B;
-    --muted: #5A6B7C;
-    --line: #D8E0E8;
-    --charter: #3B82C4;
-    --charter-deep: #2E6CA6;
-    --panel: #0F1722;
-    --panel-2: #151F2C;
-    --panel-line: #24303F;
-    --panel-ink: #D8E2EC;
-    --panel-muted: #7E90A3;
-    --pii: #D9822B;
-    --serif: "Newsreader", Georgia, serif;
-    --sans: "Public Sans", -apple-system, "Segoe UI", sans-serif;
-    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-    --maxw: 1104px;
-    --r: 12px;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --paper: #0D141D;
-      --paper-2: #111A25;
-      --ink: #DCE6EF;
-      --muted: #8FA1B3;
-      --line: #223040;
-      --panel: #0A1119;
-      --panel-2: #101A26;
-      --panel-line: #22303F;
-      --charter-deep: #5DA0DC;
-    }
-  }
-
-  * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
-  body {
-    margin: 0; background: var(--paper); color: var(--ink);
-    font-family: var(--sans); font-size: 16.5px; line-height: 1.62;
-    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
-  }
-  a { color: var(--charter); text-decoration: none; }
-  a:hover { text-decoration: underline; text-underline-offset: 3px; }
-  img { max-width: 100%; height: auto; display: block; }
-  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 28px; }
-  :focus-visible { outline: 2px solid var(--charter); outline-offset: 3px; border-radius: 4px; }
-
-  /* nav */
-  .nav-outer { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--paper) 86%, transparent); backdrop-filter: blur(10px) saturate(140%); border-bottom: 1px solid var(--line); }
-  .nav { display: flex; align-items: center; gap: 18px; height: 62px; }
-  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.06rem; letter-spacing: -0.01em; color: var(--ink); }
-  .brand:hover { text-decoration: none; }
-  .brand svg { width: 26px; height: 26px; }
-  .nav-spacer { flex: 1; }
-  .nav a.nl { color: var(--muted); font-size: 0.93rem; font-weight: 500; }
-  .nav a.nl:hover { color: var(--ink); text-decoration: none; }
-  .nav a.gh { color: var(--ink); font-weight: 600; font-size: 0.93rem; }
-  .dd { position: relative; }
-  .dd summary { list-style: none; cursor: pointer; color: var(--muted); font-size: 0.93rem; font-weight: 500; white-space: nowrap; }
-  .dd summary::-webkit-details-marker { display: none; }
-  .dd summary::after { content: " \25BE"; font-size: 0.7em; }
-  .dd summary:hover, .dd[open] summary { color: var(--ink); }
-  .dd-menu { position: absolute; right: 0; top: calc(100% + 12px); background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 7px; min-width: 230px; box-shadow: 0 18px 44px -14px rgba(9, 20, 34, 0.35); display: flex; flex-direction: column; gap: 1px; z-index: 30; }
-  .dd-menu a { padding: 8px 12px; border-radius: 7px; color: var(--muted); font-size: 0.9rem; font-weight: 500; }
-  .dd-menu a:hover { background: var(--paper-2); color: var(--ink); text-decoration: none; }
-  .dd-menu .dd-note { font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 6px 12px 3px; }
-
-  /* hero */
-  .hero { padding: 84px 0 72px; }
-  .hero-grid { display: grid; grid-template-columns: minmax(0, 0.96fr) minmax(0, 1.04fr); gap: 56px; align-items: center; }
-  .kicker { font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 22px; }
-  .kicker b { color: var(--charter); font-weight: 600; }
-  h1 {
-    font-family: var(--serif); font-optical-sizing: auto;
-    font-size: clamp(2.5rem, 5.2vw, 3.55rem); font-weight: 500;
-    line-height: 1.06; letter-spacing: -0.015em; margin: 0 0 20px;
-  }
-  h1 em { font-style: italic; color: var(--charter); font-weight: 500; }
-  .lede { font-size: 1.11rem; color: var(--muted); max-width: 46ch; margin: 0 0 30px; }
-  .lede b { color: var(--ink); font-weight: 600; }
-  .nav a.nl-dl {
-    display: inline-flex; align-items: center; gap: 7px;
-    padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px;
-    color: var(--ink); font-size: 0.88rem; font-weight: 600; white-space: nowrap;
-  }
-  .nav a.nl-dl:hover { border-color: var(--charter); color: var(--charter); text-decoration: none; }
-  .nav a.nl-dl svg { width: 15px; height: 15px; }
-  .dl-beta {
-    font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.06em; text-transform: uppercase;
-    color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 0 5px;
-  }
-  .nav a.nl-dl:hover .dl-beta { color: var(--charter); border-color: currentColor; }
-  .inst a.dl { color: var(--accent, #3B82C4); font-weight: 600; font-size: 0.92rem; }
-  .inst .lab em { font-style: normal; font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.75; border: 1px solid currentColor; border-radius: 999px; padding: 1px 6px; margin-left: 6px; }
-  .gov-body, .gov-scroll { overflow-x: auto; }
-  .cmd { max-width: 100%; }
-  .cta-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; margin-bottom: 18px; }
-  .cmd {
-    display: inline-flex; align-items: center; gap: 14px;
-    font-family: var(--mono); font-size: 0.95rem; font-weight: 500;
-    background: var(--panel); color: var(--panel-ink);
-    border: 1px solid var(--panel-line); border-radius: 10px; padding: 12px 16px;
-  }
-  .cmd .dollar { color: var(--panel-muted); user-select: none; }
-  .cmd button {
-    font: inherit; font-size: 0.78rem; color: var(--panel-muted);
-    background: var(--panel-2); border: 1px solid var(--panel-line); border-radius: 6px;
-    padding: 4px 10px; cursor: pointer;
-  }
-  .cmd button:hover { color: var(--panel-ink); border-color: var(--panel-muted); }
-  .btn-gh {
-    display: inline-flex; align-items: center; gap: 9px; padding: 12px 20px;
-    border: 1px solid var(--line); border-radius: 10px;
-    color: var(--ink); font-weight: 600; font-size: 0.95rem; background: transparent;
-  }
-  .btn-gh:hover { border-color: var(--charter); color: var(--charter); text-decoration: none; }
-  .btn-gh svg { width: 18px; height: 18px; }
-  .hero-note { font-size: 0.87rem; color: var(--muted); margin: 0; }
-  .hero-note b { color: var(--ink); font-weight: 600; }
-
-  /* the governed grid (signature) */
-  .gov { min-width: 0; max-width: 100%; border: 1px solid var(--panel-line); border-radius: var(--r); background: var(--panel); overflow: hidden; box-shadow: 0 24px 60px -18px rgba(9, 20, 34, 0.45); }
-  .gov-top { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--panel-line); background: var(--panel-2); }
-  .gov-title { font-family: var(--mono); font-size: 0.78rem; color: var(--panel-muted); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .switch { display: inline-flex; border: 1px solid var(--panel-line); border-radius: 999px; padding: 3px; background: var(--panel); cursor: pointer; font: inherit; }
-  .switch span {
-    font-family: var(--mono); font-size: 0.76rem; font-weight: 600;
-    padding: 4px 13px; border-radius: 999px; color: var(--panel-muted);
-    transition: background 0.25s, color 0.25s;
-  }
-  .switch span.on { background: var(--charter); color: #fff; }
-  .gov.agent .switch span.you-l { background: transparent; color: var(--panel-muted); }
-  .gov.agent .switch span.agent-l { background: var(--pii); color: #fff; }
-  .gov:not(.agent) .switch span.you-l { background: var(--charter); color: #fff; }
-  .gov:not(.agent) .switch span.agent-l { background: transparent; color: var(--panel-muted); }
-  .gov-sql { font-family: var(--mono); font-size: 0.8rem; line-height: 1.6; color: var(--panel-muted); padding: 13px 16px 11px; border-bottom: 1px solid var(--panel-line); white-space: pre; overflow-x: auto; }
-  .gov-sql .k { color: #6CB6FF; }
-  .gov-sql .t { color: var(--panel-ink); }
-  table.grid { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 0.82rem; }
-  .grid th {
-    text-align: left; font-weight: 500; color: var(--panel-muted);
-    padding: 9px 16px; border-bottom: 1px solid var(--panel-line);
-    font-size: 0.73rem; letter-spacing: 0.04em;
-  }
-  .grid th .tag {
-    display: inline-block; margin-left: 7px; padding: 1px 6px; border-radius: 4px;
-    font-size: 0.62rem; font-weight: 600; letter-spacing: 0.05em;
-    color: var(--pii); border: 1px solid color-mix(in srgb, var(--pii) 45%, transparent);
-  }
-  .grid td { padding: 9px 16px; color: var(--panel-ink); border-bottom: 1px solid color-mix(in srgb, var(--panel-line) 55%, transparent); white-space: nowrap; }
-  .grid tr:last-child td { border-bottom: none; }
-  .grid td.num { text-align: right; }
-  .grid td.pii .real { display: inline; }
-  .grid td.pii .dots { display: none; color: var(--panel-muted); letter-spacing: 0.18em; }
-  .gov.agent td.pii .real { display: none; }
-  .gov.agent td.pii .dots { display: inline; }
-  .gov-foot { display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-top: 1px solid var(--panel-line); background: var(--panel-2); font-family: var(--mono); font-size: 0.74rem; }
-  .gov-foot .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--charter); flex: none; transition: background 0.25s; }
-  .gov.agent .gov-foot .dot { background: var(--pii); }
-  .gov-foot .st { color: var(--panel-muted); flex: 1; }
-  .gov-foot .st b { color: var(--panel-ink); font-weight: 600; }
-  .gov-hint { color: var(--panel-muted); opacity: 0.8; }
-
-  /* clauses */
-  .section { padding: 78px 0; }
-  .section--alt { background: var(--paper-2); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-  .clause { font-family: var(--mono); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.1em; color: var(--charter); text-transform: uppercase; margin: 0 0 14px; }
-  h2 { font-family: var(--serif); font-optical-sizing: auto; font-size: clamp(1.7rem, 3.2vw, 2.3rem); font-weight: 500; letter-spacing: -0.012em; line-height: 1.15; margin: 0 0 14px; }
-  .sub { color: var(--muted); max-width: 62ch; margin: 0 0 36px; }
-  .sub b, .sub code { color: var(--ink); }
-  code.i { font-family: var(--mono); font-size: 0.85em; background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 1px 6px; border-radius: 5px; }
-
-  .panel { background: var(--panel); border: 1px solid var(--panel-line); border-radius: var(--r); overflow: hidden; }
-  .panel pre { margin: 0; padding: 20px 22px; overflow-x: auto; font-family: var(--mono); font-size: 0.85rem; line-height: 1.75; color: var(--panel-ink); }
-  .panel .c { color: var(--panel-muted); }
-  .panel .k { color: #6CB6FF; }
-  .panel .s { color: #9CD1A4; }
-  .panel .y { color: #E3B341; }
-  .panel-cap { font-family: var(--mono); font-size: 0.74rem; color: var(--panel-muted); padding: 10px 16px; border-bottom: 1px solid var(--panel-line); background: var(--panel-2); }
-
-  .fed-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 40px; align-items: start; }
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
-  .chip { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; background: var(--paper); }
-  .fed-points { list-style: none; margin: 0; padding: 0; }
-  .fed-points li { padding: 0 0 18px 30px; position: relative; color: var(--muted); font-size: 0.96rem; }
-  .fed-points li::before { content: "→"; position: absolute; left: 2px; color: var(--charter); font-family: var(--mono); }
-  .fed-points b { color: var(--ink); font-weight: 600; }
-
-  .gov2 { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 40px; align-items: start; }
-  .law { list-style: none; margin: 0; padding: 0; }
-  .law li { padding: 16px 0 16px 34px; position: relative; border-bottom: 1px solid var(--line); }
-  .law li:last-child { border-bottom: none; }
-  .law li::before {
-    content: "§"; position: absolute; left: 0; top: 14px;
-    font-family: var(--serif); font-size: 1.15rem; color: var(--charter);
-  }
-  .law h3 { margin: 0 0 3px; font-size: 1rem; font-weight: 600; }
-  .law p { margin: 0; color: var(--muted); font-size: 0.93rem; }
-
-  .tools { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 0 0 26px; }
-  .tool { border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); padding: 18px 16px; }
-  .section--alt .tool { background: var(--paper); }
-  .tool .tn { font-family: var(--mono); font-size: 0.86rem; font-weight: 600; color: var(--charter); display: block; margin-bottom: 6px; }
-  .tool p { margin: 0; font-size: 0.86rem; color: var(--muted); }
-  .tool .ro { display: inline-block; margin-top: 10px; font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.06em; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; }
-  .mcp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
-  .mcp-row .cmd { font-size: 0.88rem; }
-
-  .work-grid { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 44px; align-items: center; }
-  .shot { border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; box-shadow: 0 24px 60px -20px rgba(9, 20, 34, 0.35); }
-  .checks { list-style: none; margin: 0; padding: 0; columns: 2; column-gap: 28px; }
-  .checks li { padding: 0 0 12px 26px; position: relative; font-size: 0.93rem; color: var(--muted); break-inside: avoid; }
-  .checks li::before { content: "✓"; position: absolute; left: 0; color: var(--charter); font-weight: 700; }
-
-  .install-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 22px; }
-  .inst { border: 1px solid var(--line); border-radius: var(--r); background: var(--paper); padding: 18px; }
-  .inst .lab { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 10px; }
-  .inst code { font-family: var(--mono); font-size: 0.84rem; color: var(--ink); display: block; overflow-x: auto; white-space: nowrap; }
-  .fine { font-size: 0.86rem; color: var(--muted); }
-  .fine a { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
-  .fine a:hover { color: var(--charter); }
-
-  .builton { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 20px; }
-  .note { color: var(--muted); font-size: 0.84rem; max-width: 72ch; }
-
-  .listed { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 34px; padding-top: 26px; border-top: 1px solid var(--line); }
-  .listed-lab { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-right: 6px; }
-  .listed .chip:hover { border-color: var(--charter); color: var(--charter); text-decoration: none; }
-
-  .maker { display: grid; grid-template-columns: auto 1fr; gap: 34px; align-items: start; max-width: 56rem; }
-  .maker-photo { width: 168px; height: 168px; border-radius: 50%; object-fit: cover; border: 3px solid var(--paper); box-shadow: 0 0 0 2px var(--charter), 0 16px 36px -12px rgba(9, 20, 34, 0.35); }
-  .maker-col { text-align: center; }
-  .maker-cap { font-family: var(--serif); font-style: italic; font-size: 0.92rem; color: var(--muted); margin: 54px 0 0; max-width: 186px; line-height: 1.45; position: relative; left: -10px; }
-  .maker p { color: var(--muted); margin: 0 0 14px; max-width: 58ch; }
-  .maker p b { color: var(--ink); font-weight: 600; }
-  .maker-sig { font-family: var(--mono); font-size: 0.82rem; color: var(--muted); margin-top: 20px; }
-  .maker-sig a { color: var(--charter); }
-  .maker-sig .nm { color: var(--ink); font-weight: 600; font-family: var(--sans); font-size: 0.95rem; }
-  @media (max-width: 640px) {
-    .maker { grid-template-columns: 1fr; }
-    .maker-photo { width: 128px; height: 128px; }
-    .maker-col { text-align: left; }
-    .maker-cap { max-width: none; }
-  }
-
-  footer { border-top: 1px solid var(--line); padding: 34px 0 40px; color: var(--muted); font-size: 0.89rem; }
-  .foot { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
-  .foot .spacer { flex: 1; }
-  .foot a { color: var(--muted); }
-  .foot a:hover { color: var(--ink); }
-
-  /* motion */
-  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
-  .hero .rise { animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-  .hero .r1 { animation-delay: 0.05s; } .hero .r2 { animation-delay: 0.14s; }
-  .hero .r3 { animation-delay: 0.23s; } .hero .r4 { animation-delay: 0.32s; }
-  .hero .r5 { animation-delay: 0.41s; } .hero .r6 { animation-delay: 0.28s; }
-  .grid tbody tr { animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-  .grid tbody tr:nth-child(1) { animation-delay: 0.55s; }
-  .grid tbody tr:nth-child(2) { animation-delay: 0.67s; }
-  .grid tbody tr:nth-child(3) { animation-delay: 0.79s; }
-  .grid tbody tr:nth-child(4) { animation-delay: 0.91s; }
-  .js-anim .rv { opacity: 0; transform: translateY(12px); transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1); }
-  .js-anim .rv.in { opacity: 1; transform: none; }
-  @media (prefers-reduced-motion: reduce) {
-    html { scroll-behavior: auto; }
-    .hero .rise, .grid tbody tr { animation: none; }
-    .js-anim .rv { opacity: 1; transform: none; transition: none; }
-    .switch span, .gov-foot .dot { transition: none; }
-  }
-
-  /* responsive */
-  @media (max-width: 980px) {
-    .hero { padding: 56px 0 52px; }
-    .hero-grid { grid-template-columns: minmax(0, 1fr); gap: 40px; }
-    .fed-grid, .gov2, .work-grid { grid-template-columns: minmax(0, 1fr); gap: 28px; }
-    .tools { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .install-cols { grid-template-columns: minmax(0, 1fr); }
-    .checks { columns: 1; }
-  }
-  @media (max-width: 560px) {
-    body { font-size: 16px; }
-    .tools { grid-template-columns: minmax(0, 1fr); }
-    /* Real nav on phones too: brand on its own row, links wrap beneath it. */
-    .nav { flex-wrap: wrap; height: auto; gap: 9px 14px; padding-top: 10px; padding-bottom: 12px; }
-    .nav-spacer { flex-basis: 100%; height: 0; }
-    .nav a.nl, .nav .dd summary, .nav a.gh { font-size: 0.86rem; }
-    .nav a.nl-dl { font-size: 0.82rem; padding: 5px 10px; }
-    .dd-menu { min-width: 190px; max-height: 70vh; overflow-y: auto; }
-    .gov-sql { font-size: 0.72rem; }
-    .grid th, .grid td { padding: 8px 10px; }
-  }
-</style>
+<link rel="stylesheet" href="{{ '/assets/css/site.css' | relative_url }}">
 </head>
 <body>
 
-<div class="nav-outer">
-  <div class="wrap nav">
-    <a class="brand" href="#">
-      <svg viewBox="0 0 128 128" role="img" aria-label="DataCharter mark">
-        <circle cx="64" cy="64" r="56" fill="none" stroke="currentColor" stroke-width="7"/>
-        <path d="M30 84 L52 60 L66 72 L92 42" fill="none" stroke="#3B82C4" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M78 38 L96 38 L96 56" fill="none" stroke="#3B82C4" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      DataCharter
-    </a>
-    <span class="nav-spacer"></span>
-    <a class="nl" href="#federate">Federate</a>
-    <a class="nl" href="#govern">Govern</a>
-    <a class="nl" href="#agents">Agents</a>
-    <a class="nl" href="#install">Install</a>
-    <a class="nl" href="blog/">Blog</a>
-    <a class="nl" href="quickstart.html">Docs</a>
-    <a class="nl" href="desktop.html">Desktop</a>
-    <details class="dd">
-      <summary aria-label="Featured in">Featured in</summary>
-      <div class="dd-menu">
-        <span class="dd-note">Listed in</span>
-        <a href="https://github.com/davidgasquez/awesome-duckdb">awesome-duckdb</a>
-        <a href="https://github.com/punkpeye/awesome-mcp-servers">awesome-mcp-servers</a>
-        <a href="https://pypi.org/project/datacharter/">PyPI</a>
-        <a href="https://github.com/datacharter/homebrew-tap">Homebrew</a>
-        <a href="https://registry.modelcontextprotocol.io">Official MCP Registry</a>
-        <a href="https://glama.ai/mcp/servers/datacharter/datacharter">Glama</a>
-        <a href="https://github.com/marketplace/actions/datacharter-data-checks">GitHub Marketplace</a>
-      </div>
-    </details>
-    <a class="nl" href="#about">About</a>
-    <a class="nl-dl" href="https://github.com/datacharter/datacharter/releases/latest" title="Desktop app for macOS and Windows (beta)">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      Download<span class="dl-beta">beta</span>
-    </a>
-    <a class="gh" href="https://github.com/datacharter/datacharter">GitHub</a>
-  </div>
-</div>
+{% include nav.html %}
 
 <section class="hero">
   <div class="wrap hero-grid">
     <div class="hero-copy">
-      <p class="kicker rise r1"><b>Open source</b> · Apache-2.0 · runs entirely on your machine</p>
+      <p class="kicker rise r1"><b>Open source</b> · Apache-2.0 · free for companies</p>
       <h1 class="rise r2">Your data, explored locally. Your agents, <em>on&nbsp;a&nbsp;leash.</em></h1>
       <p class="lede rise r3">One SQL workspace over every file and database you have, federated by DuckDB and governed by a contract. An AI agent sees exactly what the charter grants it, <b>and not one column more.</b></p>
       <div class="cta-row rise r4">
@@ -406,7 +79,7 @@
           Star on GitHub
         </a>
       </div>
-      <p class="hero-note rise r5"><b>No cloud, no telemetry, no API key required:</b> the chat agent can run on your Claude&nbsp;Code subscription or a fully local model.</p>
+      <p class="hero-note rise r5"><b>No cloud, no telemetry, no paid edition.</b> Chat runs on Claude&nbsp;Code, a local model, or SpaceXAI. Flip the grid: that is the product.</p>
     </div>
 
     <div class="rise r6">
@@ -436,6 +109,61 @@
           <span class="gov-hint">flip it ↑</span>
         </div>
       </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="doors">
+  <div class="wrap rv">
+    <p class="clause">Three doors</p>
+    <h2>Start where you are</h2>
+    <p class="sub">Same kernel. Pick the door that matches the job in front of you.</p>
+    <div class="door-grid">
+      <a class="door" href="#install">
+        <span class="door-k">Explore</span>
+        <h3>I have a file</h3>
+        <p>Drop a CSV, Parquet, or JSON. Query it on your laptop. No warehouse.</p>
+      </a>
+      <a class="door" href="#agents">
+        <span class="door-k">Ask</span>
+        <h3>I have an agent</h3>
+        <p>Four read-only tools. PII comes back as •••. MCP, Claude Code, or a local model.</p>
+      </a>
+      <a class="door" href="#govern">
+        <span class="door-k">Govern</span>
+        <h3>I have a policy</h3>
+        <p>The charter is the law. Apache-2.0, including for companies. No paid edition.</p>
+      </a>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="company">
+  <div class="wrap rv">
+    <p class="clause">Same binary in a cluster</p>
+    <h2>Company depth, Apache-2.0</h2>
+    <p class="sub">OAuth, grants in git, Helm, SIEM, GovBench. No paid edition. No rows on our servers, because we do not run a data plane.</p>
+    <div class="door-grid door-grid-4">
+      <a class="door" href="{{ '/mcp.html' | relative_url }}">
+        <span class="door-k">MCP HTTP</span>
+        <h3>OAuth 2.1</h3>
+        <p><code class="i">POST /mcp</code> on the network only with a bearer JWT.</p>
+      </a>
+      <a class="door" href="{{ '/mcp.html' | relative_url }}">
+        <span class="door-k">charter.yaml</span>
+        <h3>Principals</h3>
+        <p><code class="i">principals:</code> and <code class="i">grants:</code> in git. Default-deny.</p>
+      </a>
+      <a class="door" href="{{ '/deploy.html' | relative_url }}">
+        <span class="door-k">Deploy</span>
+        <h3>Helm + OCI</h3>
+        <p>Non-root, read-only root, probes at <code class="i">/health</code> and <code class="i">/ready</code>.</p>
+      </a>
+      <a class="door" href="{{ '/govbench.html' | relative_url }}">
+        <span class="door-k">Prove it</span>
+        <h3>GovBench</h3>
+        <p>Frozen 28-attack corpus. A grade you can cite.</p>
+      </a>
     </div>
   </div>
 </section>
@@ -473,7 +201,7 @@
 <section class="section" id="govern">
   <div class="wrap rv">
     <p class="clause">§2 · Govern</p>
-    <h2>The contract is the catalog — and the law</h2>
+    <h2>The contract is the catalog, and the law</h2>
     <p class="sub"><code class="i">charter.yaml</code> is the same ODCS-style contract your data team already writes: sources, tables, PII. DataCharter is what makes it <b>enforceable</b>, for humans and agents alike.</p>
     <div class="gov2">
       <div class="panel">
@@ -534,27 +262,17 @@
   <div class="wrap rv">
     <p class="clause">The workspace</p>
     <h2>A workspace, not a dashboard</h2>
-    <p class="sub">Everything you reach for daily, in one local window. And every agent answer is reproducible: the SQL it ran, one click from the editor.</p>
+    <p class="sub">Everything you reach for daily, in one local window. Every agent answer shows the SQL it ran.</p>
     <div class="work-grid">
       <ul class="checks">
-        <li>Workspace guides: agent context, versioned with the contract</li>
-        <li>Agent evals: measure accuracy and your guide-lift</li>
-        <li>Flight recorder: tamper-evident audit of every agent access</li>
-        <li>Desktop app (beta): the same governed explorer, no terminal needed</li>
-        <li>Guides that write themselves from your query history (<code class="i">datacharter suggest</code>) — you review every line before it ships</li>
-        <li>Plain-English policies: aggregates-only + k-anonymity, enforced</li>
-        <li>Monaco SQL editor with catalog autocomplete</li>
-        <li>Live results preview as you type</li>
-        <li>⌘K command palette</li>
-        <li>Auto-charts (Vega-Lite) &amp; profiling with top-value bars</li>
-        <li>Query history &amp; cross-source lineage</li>
-        <li>Cost pre-flight: row estimates before you run</li>
-        <li>Schema &amp; PII drift checks for CI</li>
-        <li>Data tests: <code class="i">datacharter test</code></li>
-        <li>Snapshots &amp; CSV/Parquet/JSON/XLSX export</li>
-        <li>Certified metrics with joins &amp; time grains</li>
+        <li>Drop a file. Query it. Chart it. No YAML required to start.</li>
+        <li>Agent view: see, column by column, what the model receives.</li>
+        <li>Guides, evals, and a tamper-evident flight recorder.</li>
+        <li>Policies in plain English: aggregates-only, k-anonymity.</li>
+        <li>The same tools over MCP, Claude Code, or the built-in chat.</li>
+        <li>Desktop app (beta) if you do not want a terminal.</li>
       </ul>
-      <div class="shot"><img src="assets/screenshot.png" alt="The DataCharter workspace: source tree, SQL editor, and Results, Chart, Profile, and Plan tabs" width="1440" height="900"></div>
+      <div class="shot"><img src="{{ '/assets/workspace.gif' | relative_url }}" alt="DataCharter workspace: live SQL, charts, provenance, and PII masking" width="1440" height="900"></div>
     </div>
   </div>
 </section>
@@ -607,26 +325,7 @@
   </div>
 </section>
 
-<footer>
-  <div class="wrap foot">
-    <span>© DataCharter · <a href="https://github.com/datacharter/datacharter/blob/main/LICENSE">Apache-2.0</a> · <a href="privacy.html">Privacy</a> · <a href="mailto:hello@datacharter.dev" class="copy-mail" title="Click to copy">hello@datacharter.dev</a></span>
-    <span class="spacer"></span>
-    <a href="quickstart.html">Quick start</a>
-    <a href="editor.html">Editor</a>
-    <a href="charter-yaml.html">charter.yaml</a>
-    <a href="sources.html">Sources</a>
-    <a href="agent.html">Agent</a>
-    <a href="guides.html">Guides</a>
-    <a href="cli.html">CLI</a>
-    <a href="mcp.html">MCP</a>
-    <a href="pipeline-gates.html">Pipeline gates</a>
-    <a href="faq.html">FAQ</a>
-    <a href="duckdb-ui.html">DuckDB UI</a>
-    <a href="hex-alternative.html">Hex alternative</a>
-    <a href="mcp-data-governance.html">Governed MCP</a>
-    <a href="https://github.com/datacharter/datacharter">GitHub</a>
-  </div>
-</footer>
+{% include footer.html %}
 
 <script>
 (function () {

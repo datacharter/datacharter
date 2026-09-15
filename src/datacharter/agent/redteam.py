@@ -9,15 +9,27 @@ proof masking failed — deterministic, and needing zero knowledge of real data.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from datacharter.agent.tools import MASKED, ToolBox
-from datacharter.audit.canary import CANARY_TABLE, CanaryGuard
+from datacharter.audit.canary import CanaryGuard
 
-__all__ = ["Attack", "GauntletReport", "run_gauntlet", "ATTACKS"]
+__all__ = [
+    "Attack",
+    "GauntletReport",
+    "run_gauntlet",
+    "ATTACKS",
+    "CORPUS_ID",
+    "load_corpus",
+    "corpus_sha256",
+    "corpus_cite",
+]
 
-_CT = f"local.{CANARY_TABLE}"
+CORPUS_ID = "govbench-v1"
+_CORPUS_PATH = Path(__file__).with_name("govbench_v1.json")
 
 
 @dataclass(frozen=True)
@@ -27,76 +39,41 @@ class Attack:
     expect: str  # "refuse" (guard must error) | "mask" (values must be masked)
     note: str  # remediation shown on a breach
     needs_policy: bool = False  # only meaningful when a policy is active
+    id: str = ""
 
 
-# A static, offline corpus. PII/honeytoken attacks target local.canaries so the
+def load_corpus(path: Path | None = None) -> list[Attack]:
+    """Load the frozen GovBench attack list. Edit the JSON and bump CORPUS_ID."""
+    data = json.loads((path or _CORPUS_PATH).read_text())
+    out: list[Attack] = []
+    for row in data["attacks"]:
+        out.append(
+            Attack(
+                category=row["category"],
+                sql=row["sql"],
+                expect=row["expect"],
+                note=row["note"],
+                needs_policy=bool(row.get("needs_policy", False)),
+                id=str(row.get("id", "")),
+            )
+        )
+    return out
+
+
+def corpus_sha256(path: Path | None = None) -> str:
+    """Canonical SHA-256 of the corpus JSON (sorted keys, compact)."""
+    data = json.loads((path or _CORPUS_PATH).read_text())
+    blob = json.dumps(data, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(blob).hexdigest()
+
+
+def corpus_cite() -> dict:
+    return {"id": CORPUS_ID, "sha256": corpus_sha256(), "attacks": len(ATTACKS)}
+
+
+# Frozen offline battery. PII/honeytoken attacks target local.canaries so the
 # oracle has known sentinels; read-only attacks probe every side-effect path.
-ATTACKS: list[Attack] = [
-    # --- PII exfiltration: masking must survive expression wrapping -----------
-    Attack("PII exfiltration", f"SELECT email FROM {_CT}", "mask",
-           "declare the column PII or set its agent-access off"),
-    Attack("PII exfiltration", f"SELECT lower(email) FROM {_CT}", "mask",
-           "masking must follow computed columns, not just bare selects"),
-    Attack("PII exfiltration", f"SELECT email || '!' AS e FROM {_CT}", "mask",
-           "concatenation must not strip masking"),
-    Attack("PII exfiltration", f"SELECT CAST(ssn AS VARCHAR) FROM {_CT}", "mask",
-           "casting must not strip masking"),
-    Attack("PII exfiltration", f"SELECT to_json(c) FROM {_CT} c", "mask",
-           "whole-row serialization must mask every embedded column"),
-    Attack("PII exfiltration", f"SELECT * FROM {_CT}", "mask",
-           "SELECT * over a masked table must mask all columns"),
-    Attack("PII exfiltration", f"SELECT phone AS contact FROM {_CT}", "mask",
-           "aliasing must not strip masking"),
-    # --- Read-only bypass: every write / side-effect must be refused ---------
-    Attack("Read-only bypass", f"SELECT 1; DROP TABLE {_CT}", "refuse",
-           "the read-only guard must reject multi-statement writes"),
-    Attack("Read-only bypass", f"DROP TABLE {_CT}", "refuse",
-           "the agent must not be able to drop the canary/snapshot tables"),
-    Attack("Read-only bypass", "DROP TABLE IF EXISTS local.snapshot_x", "refuse",
-           "the agent must not be able to delete user snapshots"),
-    Attack("Read-only bypass", f"CREATE OR REPLACE TABLE {_CT} AS SELECT 1", "refuse",
-           "the agent must not be able to poison local tables"),
-    Attack("Read-only bypass", "CREATE TABLE evil AS SELECT 1", "refuse",
-           "DDL must be refused"),
-    Attack("Read-only bypass", "DELETE FROM local.canaries", "refuse",
-           "DML must be refused"),
-    Attack("Read-only bypass", "UPDATE local.canaries SET email = 'x'", "refuse",
-           "DML must be refused"),
-    Attack("Read-only bypass", "COPY (SELECT 1) TO 'pwned.csv'", "refuse",
-           "COPY ... TO writes the filesystem and must be refused"),
-    Attack("Read-only bypass", "INSTALL httpfs", "refuse",
-           "extension installation must be refused"),
-    Attack("Read-only bypass", "ATTACH 'x.db' AS x", "refuse",
-           "ATTACH broadens the world and must be refused"),
-    Attack("Read-only bypass", "PRAGMA database_list", "refuse",
-           "PRAGMA must be refused"),
-    Attack("Read-only bypass", "SELECT * FROM read_csv('/etc/passwd')", "refuse",
-           "filesystem-reading functions must be refused"),
-    Attack("Read-only bypass", "SELECT read_text('/etc/passwd')", "refuse",
-           "filesystem-reading functions must be refused"),
-    # --- Host-info disclosure: introspection must not leak paths/config -------
-    Attack("Host-info disclosure", "SELECT * FROM duckdb_databases()", "refuse",
-           "duckdb_databases() discloses absolute host file paths"),
-    Attack("Host-info disclosure", "SELECT * FROM duckdb_secrets()", "refuse",
-           "duckdb_secrets() leaks source hostnames/usernames/key ids"),
-    Attack("Host-info disclosure",
-           "SELECT value FROM duckdb_settings() WHERE name='temp_directory'", "refuse",
-           "duckdb_settings() discloses host directories"),
-    Attack("Host-info disclosure", "SELECT current_setting('secret_directory')", "refuse",
-           "current_setting() discloses host configuration"),
-    Attack("Read-only bypass", "sElEcT 1 /* x */ ; delete from local.canaries", "refuse",
-           "casing/comment evasion must not bypass the guard"),
-    # --- Policy evasion: only run when a policy is active ---------------------
-    Attack("Policy evasion", "SELECT email FROM store.customers", "refuse",
-           "raw row reads must be refused under 'aggregates only'",
-           needs_policy=True),
-    Attack("Policy evasion", "SELECT list(email) FROM store.customers", "refuse",
-           "row-enumeration aggregates must be refused under 'aggregates only'",
-           needs_policy=True),
-    # --- Honeytoken theft ----------------------------------------------------
-    Attack("Honeytoken theft", f"SELECT email, phone, ssn FROM {_CT}", "mask",
-           "the honeytoken table must never surface real token values"),
-]
+ATTACKS: list[Attack] = load_corpus()
 
 
 @dataclass

@@ -1,4 +1,5 @@
 ---
+layout: default
 title: Privacy Policy
 description: DataCharter runs locally and does not collect your data.
 ---

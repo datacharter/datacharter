@@ -1,9 +1,8 @@
 ---
+layout: default
 title: MCP server — connect Claude, Cursor, or Cline to your data, governed
 description: Expose your workspace to any MCP client — read-only, PII-masked SQL over your files and databases, with per-column access from your data contract.
 ---
-
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [Editor](editor.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Guides](guides.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Workspace](workspace.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
 MCP — the [Model Context Protocol](https://modelcontextprotocol.io) — is the
 open standard AI apps like Claude, Cursor, and Cline use to call external
@@ -25,13 +24,30 @@ as `•••`, which is precisely what `query` returns over MCP.
 ## Run it
 
 ```sh
-datacharter mcp            # serve the workspace in the current directory
+datacharter mcp            # stdio (default). Claude Desktop, Cursor, Cline.
 datacharter mcp /path/to/workspace
+datacharter serve          # also serves MCP Streamable HTTP at /mcp
+datacharter mcp --http     # MCP-only HTTP on http://127.0.0.1:8765/mcp
 ```
 
-The server speaks JSON-RPC 2.0 over stdio (standard input/output). A charter is
-required — run `datacharter init` first if you don't have one. Diagnostics are
-written to standard error; standard output carries only the protocol.
+**stdio** speaks JSON-RPC 2.0 on standard input/output. Diagnostics go to
+standard error. A charter is required (`datacharter init` first).
+
+**`--guard COMMAND`** sits in front of someone else's MCP server. DataCharter
+spawns that command, relays JSON-RPC, and on every `tools/call` result:
+heuristic email/SSN redaction (not charter-grade column masking), canary
+scan if the workspace has tokens, a size cap, and a flight-recorder entry.
+Upstream tool names pass through. Cannot combine with `--http` or
+`--serve-url`.
+
+```sh
+datacharter mcp --guard "npx -y some-mcp-server"
+```
+
+**Streamable HTTP** is the same governed tools on `POST /mcp`, bound to
+loopback. `datacharter serve` mounts it next to the UI so one process holds
+one engine. `datacharter mcp --http` is the MCP-only server (default port
+8765). Non-loopback binds are refused unless OAuth is enabled.
 
 DataCharter is published in the official
 [MCP Registry](https://registry.modelcontextprotocol.io) as
@@ -78,6 +94,26 @@ example:
 }
 ```
 
+HTTP (after `datacharter serve`, or `datacharter mcp --http`):
+
+```json
+{
+  "mcpServers": {
+    "datacharter": {
+      "type": "http",
+      "url": "http://127.0.0.1:8321/mcp"
+    }
+  }
+}
+```
+
+`datacharter connect --serve-url http://127.0.0.1:8321` prints that block with
+`/mcp` already on the URL. Claude Code:
+
+```sh
+claude mcp add --transport http datacharter http://127.0.0.1:8321/mcp
+```
+
 Use the absolute path to your workspace (the directory containing
 `charter.yaml`). If `datacharter` is installed in a virtual environment, use its
 full path (or `uvx datacharter`).
@@ -114,9 +150,34 @@ An MCP client can launch it with `"command": "docker", "args": ["run", "-i",
 
 ## Scope
 
-This is the local, single-user surface: stdio transport, no authentication —
-the same trust model as running `datacharter serve` on your own machine. A
-network-addressable server with per-caller authentication and authorization is a
-separate, enterprise-oriented capability and is not part of this command.
+Default is local and unauthenticated: stdio, or Streamable HTTP on loopback.
+To expose `/mcp` on the network, set all three:
+
+```
+DATACHARTER_OAUTH_ISSUER=https://auth.example.com
+DATACHARTER_OAUTH_AUDIENCE=https://datacharter.example.com/mcp
+DATACHARTER_OAUTH_JWKS_URI=https://auth.example.com/.well-known/jwks.json
+```
+
+Then `POST /mcp` requires `Authorization: Bearer <JWT>` (RS256, matching
+`iss` / `aud` / `exp`). Clients discover the issuer at
+`/.well-known/oauth-protected-resource` (RFC 9728). Off by default.
+
+`principals:` and `grants:` in `charter.yaml` then limit that caller to listed
+relations (default-deny). Unknown `sub` sees an empty catalog. Stdio MCP is
+unchanged (the local owner).
+
+The flight recorder still writes the hash chain. To copy the same metadata
+(who, SQL, allow/deny, never rows) to a SIEM:
+
+```
+DATACHARTER_AUDIT=json:/var/log/datacharter.ndjson
+DATACHARTER_OTLP_ENDPOINT=http://otel-collector:4318
+```
+
+See [Audit](audit.html#siem-json-and-otlp).
+
+To run `/mcp` in a cluster, build `packaging/oci/Dockerfile` and install
+`chart/` with OAuth values. See [Deploy](deploy.html).
 
 Next: [Plain-English policies →](policies.html)

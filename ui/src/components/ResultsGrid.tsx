@@ -18,9 +18,15 @@ const MASKED = "•••";
 export default function ResultsGrid({
   result,
   maskColumns,
+  offset = 0,
+  onPrev,
+  onNext,
 }: {
   result: QueryResult;
   maskColumns?: Set<string>;
+  offset?: number;
+  onPrev?: () => void;
+  onNext?: () => void;
 }) {
   const [sorting, setSorting] = useState<{ id: string; desc: boolean }[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -102,7 +108,7 @@ export default function ResultsGrid({
               const row = rows[vi.index];
               return (
                 <tr key={row.id} style={{ height: ROW_HEIGHT }}>
-                  <td className="rownum">{vi.index + 1}</td>
+                  <td className="rownum">{offset + vi.index + 1}</td>
                   {row.getVisibleCells().map((cell, ci) => {
                     const numeric = !maskIdx.has(ci) && typeof cell.getValue() === "number";
                     return (
@@ -119,8 +125,25 @@ export default function ResultsGrid({
         </table>
       </div>
       <div className="status">
-        {result.row_count.toLocaleString()} rows
-        {result.truncated ? " (truncated — add a WHERE filter or LIMIT to narrow it)" : ""}
+        <span>
+          {result.row_count.toLocaleString()} rows
+          {offset > 0 ? ` (from row ${(offset + 1).toLocaleString()})` : ""}
+          {result.truncated ? " (more rows after this page)" : ""}
+        </span>
+        {(onPrev || onNext) && (
+          <span className="page-btns">
+            {onPrev && (
+              <button type="button" onClick={onPrev} disabled={offset <= 0}>
+                Previous
+              </button>
+            )}
+            {onNext && (
+              <button type="button" onClick={onNext} disabled={!result.truncated}>
+                Next
+              </button>
+            )}
+          </span>
+        )}
       </div>
       {result.warnings?.map((warning) => (
         <div key={warning} className="warning" role="alert">

@@ -3,7 +3,11 @@ import pytest
 from datacharter.contracts.writer import (
     ContractWriteError,
     remove_source,
+    replace_pii,
     set_agent_access,
+    set_pii,
+    set_policy_sentences,
+    set_row_filter,
     upsert_source,
 )
 
@@ -138,3 +142,64 @@ def test_upsert_source_preserves_governance_keys(tmp_path):
     # B-6: the declared PII map is governance too — a connection edit must not
     # silently un-declare which columns are sensitive.
     assert list(body["pii"]["people"]) == ["email", "ssn"]
+
+
+def test_replace_pii_overwrites_instead_of_merging(tmp_path):
+    (tmp_path / "charter.yaml").write_text(BASE)
+    set_pii(tmp_path, "crmpg", "customers", ["email", "phone"])
+    replace_pii(tmp_path, "crmpg", "customers", ["ssn"])
+    body = _reload(tmp_path)["sources"]["crmpg"]
+    assert list(body["pii"]["customers"]) == ["ssn"]
+    assert "${CRMPG_PASSWORD}" in (tmp_path / "charter.yaml").read_text()
+    assert "# our CRM" in (tmp_path / "charter.yaml").read_text()
+
+
+def test_replace_pii_empty_drops_the_table(tmp_path):
+    (tmp_path / "charter.yaml").write_text(BASE)
+    set_pii(tmp_path, "crmpg", "customers", ["email"])
+    replace_pii(tmp_path, "crmpg", "customers", [])
+    body = _reload(tmp_path)["sources"]["crmpg"]
+    assert not (body.get("pii") or {}).get("customers")
+
+
+def test_replace_pii_unknown_source(tmp_path):
+    (tmp_path / "charter.yaml").write_text(BASE)
+    with pytest.raises(ContractWriteError, match="ghost"):
+        replace_pii(tmp_path, "ghost", "t", ["email"])
+
+
+def test_set_row_filter_round_trip_and_clear(tmp_path):
+    (tmp_path / "charter.yaml").write_text(BASE)
+    set_row_filter(tmp_path, "crmpg", "customers", "region = 'US'")
+    text = (tmp_path / "charter.yaml").read_text()
+    assert "region = 'US'" in text
+    assert "${CRMPG_PASSWORD}" in text
+    assert _reload(tmp_path)["sources"]["crmpg"]["row_filters"]["customers"] == "region = 'US'"
+    set_row_filter(tmp_path, "crmpg", "customers", "")
+    body = _reload(tmp_path)["sources"]["crmpg"]
+    assert not (body.get("row_filters") or {}).get("customers")
+
+
+def test_set_row_filter_rejects_invalid_predicate(tmp_path):
+    (tmp_path / "charter.yaml").write_text(BASE)
+    with pytest.raises(ContractWriteError, match="row filter"):
+        set_row_filter(tmp_path, "crmpg", "customers", "this is ) not sql")
+
+
+def test_set_policy_sentences_writes_and_clears(tmp_path):
+    (tmp_path / "charter.yaml").write_text(BASE)
+    set_policy_sentences(tmp_path, "crmpg.customers", ["aggregates only", "groups of at least 10"])
+    text = (tmp_path / "charter.yaml").read_text()
+    assert "aggregates only" in text
+    assert "groups of at least 10" in text
+    assert "${CRMPG_PASSWORD}" in text
+    sentences = list(_reload(tmp_path)["policies"]["crmpg.customers"])
+    assert sentences == ["aggregates only", "groups of at least 10"]
+    set_policy_sentences(tmp_path, "crmpg.customers", [])
+    assert "crmpg.customers" not in (_reload(tmp_path).get("policies") or {})
+
+
+def test_set_policy_sentences_rejects_unknown_english(tmp_path):
+    (tmp_path / "charter.yaml").write_text(BASE)
+    with pytest.raises(ContractWriteError, match="unrecognized"):
+        set_policy_sentences(tmp_path, "crmpg.customers", ["do crimes"])

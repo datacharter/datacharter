@@ -32,7 +32,12 @@ def test_score_range():
 def test_to_dict_shape():
     d = Scorecard(30, 30, [], _posture(4)).to_dict()
     assert d["grade"] == "A" and d["security_pass"] is True
-    assert set(d) == {"grade", "score", "security_pass", "attacks", "breaches", "posture"}
+    assert set(d) == {
+        "grade", "score", "security_pass", "attacks", "breaches", "posture", "corpus",
+    }
+    assert d["corpus"]["id"] == "govbench-v1"
+    assert d["corpus"]["attacks"] == 28
+    assert len(d["corpus"]["sha256"]) == 64
 
 
 def test_cmd_govbench_on_demo(tmp_path, capsys):
@@ -54,6 +59,9 @@ def test_cmd_govbench_json_and_min_grade(tmp_path, capsys):
     assert card["security_pass"] is True
     assert card["grade"] in ("A", "B", "C", "D")
     assert card["attacks"]["withstood"] == card["attacks"]["total"]
+    assert card["corpus"]["id"] == "govbench-v1"
+    assert card["corpus"]["attacks"] == 28
+    assert len(card["corpus"]["sha256"]) == 64
     # Requiring an impossibly-high posture grade can gate; A is the demo's ceiling.
     rc = cli_main(["govbench", str(tmp_path), "--min-grade", "A"])
     assert rc in (0, 1)

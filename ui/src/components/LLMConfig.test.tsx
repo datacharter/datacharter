@@ -56,6 +56,16 @@ describe("LLMConfig local-runtime picker", () => {
     expect(getByText("Base URL")).toBeTruthy();
   });
 
+  it("SpaceXAI preset fills api.x.ai and grok-4.6", async () => {
+    stubFetch({ "/api/llm/local": { runtimes: [] } });
+    const { findByLabelText, getByLabelText } = render(
+      <LLMConfig current={null} onDone={() => {}} onCancel={() => {}} />,
+    );
+    fireEvent.click(await findByLabelText("Use SpaceXAI grok-4.6"));
+    expect((getByLabelText("Base URL") as HTMLInputElement).value).toBe("https://api.x.ai/v1");
+    expect((getByLabelText("Model") as HTMLInputElement).value).toBe("grok-4.6");
+  });
+
   it("shows the endpoint error instead of closing when connect fails", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(
       async (input: RequestInfo | URL, init?: RequestInit) => {

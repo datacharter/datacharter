@@ -13,7 +13,10 @@ def test_server_entry_stdio(tmp_path):
 
 def test_server_entry_http():
     assert connect.server_entry(".", "http://127.0.0.1:8765") == {
-        "type": "http", "url": "http://127.0.0.1:8765"
+        "type": "http", "url": "http://127.0.0.1:8765/mcp"
+    }
+    assert connect.server_entry(".", "http://127.0.0.1:8321/mcp") == {
+        "type": "http", "url": "http://127.0.0.1:8321/mcp"
     }
 
 
@@ -64,5 +67,5 @@ def test_run_single_client_shows_only_it(tmp_path, capsys):
 def test_run_serve_url_emits_http(capsys):
     assert connect.run(None, "claude-code", "http://127.0.0.1:8765") == 0
     out = capsys.readouterr().out
-    assert "claude mcp add --transport http datacharter http://127.0.0.1:8765" in out
+    assert "claude mcp add --transport http datacharter http://127.0.0.1:8765/mcp" in out
     assert "running `datacharter serve`" in out

@@ -23,7 +23,9 @@ def server_entry(workspace: str | None, serve_url: str | None) -> dict:
     local governed stdio server (`datacharter mcp <workspace>`) via an absolute
     binary path (bare `uvx`/`datacharter` fails under a GUI client's minimal PATH)."""
     if serve_url:
-        return {"type": "http", "url": serve_url}
+        from datacharter.mcp.http import mcp_http_url
+
+        return {"type": "http", "url": mcp_http_url(serve_url)}
     from datacharter.agent.claude_code import _dc_bin
 
     return {"command": _dc_bin(), "args": ["mcp", str(Path(workspace or ".").resolve())]}

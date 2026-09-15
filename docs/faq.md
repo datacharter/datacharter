@@ -1,9 +1,8 @@
 ---
+layout: default
 title: FAQ
 description: Telemetry, offline use, model choice, and how DataCharter compares.
 ---
-
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [Editor](editor.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Guides](guides.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Workspace](workspace.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
 ## Does DataCharter collect any telemetry?
 
@@ -89,7 +88,16 @@ The [flight recorder](audit.html). Every agent data access is logged with dual
 attribution (OS user + the MCP client or model), hash-chained so edits and
 deletions are detectable, and exportable as an evidence pack. `datacharter
 audit verify` walks the chain; the Audit panel shows the timeline. Metadata and
-hashes only — the log never stores raw rows.
+hashes only — the log never stores raw rows. Set `DATACHARTER_AUDIT` or
+`DATACHARTER_OTLP_ENDPOINT` to copy those events to a SIEM, or run
+`datacharter audit siem`.
+
+## How do I cite a governance score?
+
+[GovBench](govbench.html). `datacharter govbench` fires a frozen attack
+corpus through the real tools and prints a grade A-F. Cite the corpus id
+and sha256 from the scorecard (or from the GovBench page). Any successful
+attack is an F.
 
 ## How would I know if masking ever failed?
 

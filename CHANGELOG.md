@@ -3,6 +3,55 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+## [0.44.0] - 2026-09-15
+
+### Added
+- **Public copy: two paths, one kernel.** README and the homepage now lead
+  with laptop (`uvx datacharter serve`) and company (MCP HTTP, OAuth, grants,
+  Helm, GovBench). Apache-2.0, including for companies. No paid edition.
+  `docs/trust.md` no longer describes a Team SKU.
+- **MCP Streamable HTTP.** `POST /mcp` on `datacharter serve`, and
+  `datacharter mcp --http` (loopback only). Stdio stays the default. Same
+  governed tools as `datacharter mcp`.
+- **Optional OAuth 2.1 resource server** (off by default). Set issuer,
+  audience, and JWKS URI; `/mcp` then requires a bearer JWT and publishes
+  RFC 9728 protected-resource metadata. Non-loopback bind is allowed only
+  with OAuth on.
+- **`principals:` and `grants:` in charter.yaml.** Git-declared identities
+  (matched to token `sub` / JWT roles). Default-deny on MCP HTTP; local
+  stdio and the UI stay full access.
+- **Life template.** `datacharter init --template life` scaffolds personal
+  CSV sources (receipts, contacts), aggregates-only policies, canaries, and
+  a guide that points at `datacharter serve --local`.
+- **`datacharter mcp --guard COMMAND`.** Prototype firewall in front of any
+  MCP server: relay JSON-RPC, redact emails/SSNs in tool text, scan canaries,
+  cap size, write the flight recorder. Heuristic, not charter-grade masking.
+- **GovBench public page and frozen corpus.** `govbench-v1` is 28 attacks in
+  `src/datacharter/agent/govbench_v1.json`, hashed and listed at
+  [GovBench](https://datacharter.dev/govbench.html). The runner, the file, and
+  the page must match. `--json` scorecards include corpus id and sha256.
+- **Helm chart + MCP HTTP OCI image.** `packaging/oci/Dockerfile` runs
+  `datacharter mcp --http` as uid 10001. `chart/` is a hardened Deployment
+  (read-only root, `/health` + `/ready` probes). Install requires OAuth.
+  Repo-root `Dockerfile` stays the stdio MCP catalog image.
+- **Org audit SIEM export.** The flight-recorder hash chain is unchanged.
+  Optional `DATACHARTER_AUDIT=json` (stderr or `json:/path`) and
+  `DATACHARTER_OTLP_ENDPOINT` copy metadata events (principal, SQL, allow/deny,
+  never rows) to a SIEM. `datacharter audit siem` reprints the chain as NDJSON.
+  MCP HTTP grant denials are recorded with the JWT `sub`.
+- **⌘K reaches every action.** Govern pages, saved queries, Connect an LLM,
+  copy SQL / Markdown / a query link, export formats, upload, charter-from-folder,
+  demo load, audit evidence, data tests. The topbar has a ⌘K button.
+- Desktop **signing and notarization** steps in CI, gated on Apple secrets.
+  Unsigned beta until those secrets exist.
+- **Charter Studio** (Govern → Studio): visual PII, row-filter, and policy
+  editor. YAML is the source of truth; saves round-trip `charter.yaml`.
+- **Query tabs**, **Cancel** (Esc or the Run button while a query is in
+  flight), and **honest pagination** past the 10,000-row cap (Next/Previous
+  send `OFFSET` rather than pretending the cap is the table).
+
 ## [0.43.0] - 2026-08-26
 
 ### Added

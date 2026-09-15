@@ -1,9 +1,8 @@
 ---
+layout: default
 title: Policies — plain English, enforced math
 description: Aggregate-only access, k-anonymity group suppression, and join limits — written the way you'd say them, enforced by query analysis.
 ---
-
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [Editor](editor.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Guides](guides.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Workspace](workspace.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
 Masking hides sensitive *columns*. Sometimes the requirement is stronger: agents
 should never see **individuals at all** — only statistics, only over groups big
@@ -22,6 +21,10 @@ policies:
 
 The sentences compile deterministically — no model, no ambiguity; an
 unrecognized sentence is a load error. Prefer explicit keys? Same meaning:
+
+You can also edit these in the app: **Govern → Studio**. The visual editor
+writes the same `policies:`, `pii:`, and `row_filters:` blocks, and the YAML
+pane is the file that will be saved.
 
 ```yaml
 policies:

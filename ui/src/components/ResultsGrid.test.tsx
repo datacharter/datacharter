@@ -65,3 +65,28 @@ describe("ResultsGrid agent-view masking", () => {
     expect(queryByText("•••")).toBeNull();
   });
 });
+
+describe("ResultsGrid pagination", () => {
+  const truncated: QueryResult = { ...RESULT, truncated: true, row_count: 2 };
+
+  it("says more rows exist and offers Next without an em dash", () => {
+    const onNext = vi.fn();
+    const { getByText, queryByText } = render(
+      <ResultsGrid result={truncated} offset={0} onNext={onNext} onPrev={() => {}} />,
+    );
+    expect(getByText(/more rows after this page/i)).toBeTruthy();
+    expect(queryByText(/—/)).toBeNull();
+    getByText("Next").click();
+    expect(onNext).toHaveBeenCalledOnce();
+  });
+
+  it("offers Previous when offset is past the first page", () => {
+    const onPrev = vi.fn();
+    const { getByText } = render(
+      <ResultsGrid result={truncated} offset={10000} onNext={() => {}} onPrev={onPrev} />,
+    );
+    getByText("Previous").click();
+    expect(onPrev).toHaveBeenCalledOnce();
+  });
+});
+

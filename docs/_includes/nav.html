@@ -1,0 +1,36 @@
+{% assign u = page.url | default: '/' %}
+<div class="nav-outer">
+  <div class="wrap nav">
+    <a class="brand" href="{{ '/' | relative_url }}">
+      {% include mark.svg %}
+      DataCharter
+    </a>
+    <span class="nav-spacer"></span>
+    <a class="nl{% if page.layout == 'default' %}{% unless u contains 'desktop' %} on{% endunless %}{% endif %}" href="{{ '/quickstart.html' | relative_url }}">Docs</a>
+    <a class="nl{% if u contains 'desktop' %} on{% endif %}" href="{{ '/desktop.html' | relative_url }}">Desktop</a>
+    <a class="nl{% if u contains 'blog' %} on{% endif %}" href="{{ '/blog/' | relative_url }}">Blog</a>
+    <a class="nl-dl" href="https://github.com/datacharter/datacharter/releases/latest" title="Desktop app for macOS and Windows (beta)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Download<span class="dl-beta">beta</span>
+    </a>
+    <a class="gh" href="https://github.com/datacharter/datacharter">GitHub</a>
+    <details class="dd mnav">
+      <summary aria-label="Menu">☰</summary>
+      <div class="dd-menu">
+        <a href="{{ '/quickstart.html' | relative_url }}">Docs</a>
+        <a href="{{ '/desktop.html' | relative_url }}">Desktop</a>
+        <a href="{{ '/blog/' | relative_url }}">Blog</a>
+        <a href="https://github.com/datacharter/datacharter/releases/latest">Download</a>
+        <a href="https://github.com/datacharter/datacharter">GitHub</a>
+        <span class="dd-note">Listed in</span>
+        <a href="https://github.com/davidgasquez/awesome-duckdb">awesome-duckdb</a>
+        <a href="https://github.com/punkpeye/awesome-mcp-servers">awesome-mcp-servers</a>
+        <a href="https://pypi.org/project/datacharter/">PyPI</a>
+        <a href="https://github.com/datacharter/homebrew-tap">Homebrew</a>
+        <a href="https://registry.modelcontextprotocol.io">Official MCP Registry</a>
+        <a href="https://glama.ai/mcp/servers/datacharter/datacharter">Glama</a>
+        <a href="https://github.com/marketplace/actions/datacharter-data-checks">GitHub Marketplace</a>
+      </div>
+    </details>
+  </div>
+</div>

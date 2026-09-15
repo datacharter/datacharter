@@ -4,43 +4,52 @@ interface Props {
   onAddSource: () => void;
   onUpload: (file: File) => void;
   onLoadDemo: () => Promise<void>;
+  onCharterFiles?: () => Promise<void>;
 }
 
-export default function EmptyState({ onAddSource, onUpload, onLoadDemo }: Props) {
+export default function EmptyState({ onAddSource, onUpload, onLoadDemo, onCharterFiles }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<"demo" | "charter" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const loadDemo = async () => {
-    setLoading(true);
+  const run = async (kind: "demo" | "charter", fn: () => Promise<void>) => {
+    setLoading(kind);
     setError(null);
     try {
-      await onLoadDemo();
+      await fn();
     } catch (e) {
       setError((e as Error).message);
     } finally {
-      setLoading(false);
+      setLoading(null);
     }
   };
 
   return (
     <div className="empty-state">
-      <h2>No data sources yet</h2>
-      <p>Add a source to start exploring — it stays on your machine.</p>
+      <h2>Drop a file, or charter this folder</h2>
+      <p>It stays on your machine. SQL is a tab once there is data to see.</p>
       <div className="empty-actions">
-        <button className="primary" onClick={onAddSource}>
-          + Add a source
+        <button className="primary" onClick={() => fileRef.current?.click()}>
+          Drop a CSV
         </button>
-        <button onClick={() => fileRef.current?.click()}>Drop a CSV</button>
-        <button onClick={loadDemo} disabled={loading}>
-          {loading ? "Loading…" : "Load the demo dataset"}
+        {onCharterFiles && (
+          <button
+            onClick={() => run("charter", onCharterFiles)}
+            disabled={loading !== null}
+          >
+            {loading === "charter" ? "Scanning…" : "Charter files in this folder"}
+          </button>
+        )}
+        <button onClick={onAddSource}>Add a source</button>
+        <button onClick={() => run("demo", onLoadDemo)} disabled={loading !== null}>
+          {loading === "demo" ? "Loading…" : "Load the demo dataset"}
         </button>
       </div>
       {error && <div className="error-box">{error}</div>}
       <input
         ref={fileRef}
         type="file"
-        accept=".csv,.parquet,.json"
+        accept=".csv,.parquet,.json,.xlsx"
         style={{ display: "none" }}
         onChange={(e) => {
           const f = e.target.files?.[0];

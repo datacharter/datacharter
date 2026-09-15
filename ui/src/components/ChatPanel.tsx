@@ -44,9 +44,11 @@ function downloadReceipt(receipt: Receipt) {
 export default function ChatPanel({
   dark,
   onOpenSql,
+  connectTick,
 }: {
   dark?: boolean;
   onOpenSql?: (sql: string) => void;
+  connectTick?: number;
 }) {
   const [status, setStatus] = useState<AgentStatus | null>(null);
   const [configuring, setConfiguring] = useState(false);
@@ -65,6 +67,9 @@ export default function ChatPanel({
     api.agentStatus().then(setStatus).catch(() => setStatus({ available: false } as AgentStatus));
   }, []);
   useEffect(refresh, [refresh]);
+  useEffect(() => {
+    if (connectTick) setConfiguring(true);
+  }, [connectTick]);
 
   const disconnect = useCallback(async () => {
     await api.setAgentBackend("none").catch(() => undefined);

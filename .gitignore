@@ -36,4 +36,8 @@ src/datacharter/server/static/
 .claude/*
 !.claude/skills/
 .buildenv/
-journey-shots/
+
+# Local Jekyll output (GitHub Pages builds from /docs)
+docs/_site/
+docs/.jekyll-cache/
+docs/.sass-cache/

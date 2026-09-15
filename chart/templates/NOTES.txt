@@ -1,0 +1,10 @@
+DataCharter MCP HTTP is in-cluster at
+  http://{{ include "datacharter.fullname" . }}:{{ .Values.service.port }}/mcp
+
+OAuth is on. Clients send Authorization: Bearer <JWT> matching
+  issuer {{ .Values.oauth.issuer }}
+  audience {{ .Values.oauth.audience }}
+
+The hash-chain audit log is in the pod at /workspace/.datacharter/flight.
+Set extraEnv DATACHARTER_AUDIT / DATACHARTER_OTLP_ENDPOINT to copy events
+to your SIEM.

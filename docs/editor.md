@@ -1,9 +1,8 @@
 ---
+layout: default
 title: The workbench — SQL editor, live results, charts, and profiling
 description: DataCharter's local UI — a Monaco SQL editor with live-as-you-type results, one-click charts, a column profiler, query history, a command palette, drag-and-drop files, and exports.
 ---
-
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [Editor](editor.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Guides](guides.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Workspace](workspace.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
 Everything on this page works with **no AI configured** — the workbench is a
 complete local SQL tool on its own. `datacharter serve`, open the URL, explore.
@@ -13,18 +12,18 @@ complete local SQL tool on its own. `datacharter serve`, open the URL, explore.
 A Monaco editor (the VS Code editor) with DuckDB SQL, catalog-aware
 autocomplete, and **live results**: a beat after you stop typing, the query
 runs automatically (row-capped, silent on error) so results track your typing.
-`Cmd/Ctrl+Enter` or **Run** executes the full query. Every run lands in a
-local **history** you can reopen, and **Save** keeps named queries in your
-workspace's `queries/` directory — plain `.sql` files, committed with the
-contract.
+`Cmd/Ctrl+Enter` or **Run** executes the full query. **Cancel** (or Esc) stops
+a running query. Editor **tabs** hold in-session SQL buffers; **Save** still
+writes named queries to `queries/*.sql`. Every run lands in local **history**.
 
 ## Results show their work
 
 Under every result: the row count and **Reads …** — the exact source columns
 the query touched (provenance), with per-output-column lineage available via
-[`datacharter lineage`](cli.html). Flip **Agent view** to re-render the same
-result exactly as an agent would receive it — masked columns, row filters,
-policies applied.
+[`datacharter lineage`](cli.html). A 10,000-row page is not the end of the
+table: **Next** / **Previous** request the next offset. Flip **Agent view** to
+re-render the same result exactly as an agent would receive it — masked
+columns, row filters, policies applied.
 
 ## Charts
 
@@ -57,9 +56,8 @@ to CSV, Parquet, JSON, or XLSX — in Agent view, exports are masked too.
 
 ## Command palette
 
-`Cmd/Ctrl+K` jumps anywhere: tables, saved queries, panels, actions — and any
-contract-defined [metric](charter-yaml.html#metrics) ("Run metric: revenue"
-compiles it to SQL and runs it). The fastest way around once you know it
-exists.
+`Cmd/Ctrl+K` (or the **⌘K** button) jumps anywhere: tables, saved queries,
+metrics, query tabs, every toolbar action, Govern pages, Connect an LLM,
+copy SQL / Markdown / a `#sql=` link. Type to filter, Enter to run.
 
 Next: [The workspace on disk →](workspace.html)

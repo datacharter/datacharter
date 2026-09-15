@@ -1,9 +1,8 @@
 ---
+layout: default
 title: Desktop app (beta)
 description: DataCharter as a double-clickable app for macOS and Windows — the governed explorer in a native window.
 ---
-
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [Editor](editor.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Guides](guides.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Workspace](workspace.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
 DataCharter as a real application: a native window over the same local server —
 no terminal, no Python, no browser tab. Pick a workspace folder (or start with
@@ -45,8 +44,10 @@ removed the old right-click→Open shortcut. First launch:
 3. You'll see *"DataCharter.app was blocked…"* — click **Open Anyway**, then
    confirm **Open** in the dialog.
 
-That's a one-time step per version. (Signing/notarization is on the roadmap;
-Homebrew and uvx installs have no such friction meanwhile.)
+That's a one-time step per version. Signing and notarization are wired in
+`desktop.yml` and run when `APPLE_CERT_P12` and `APPLE_API_KEY_ID` are set
+on the repo. Until those secrets exist, the download stays an unsigned beta.
+Homebrew and uvx installs have no such friction.
 
 ## Windows note
 

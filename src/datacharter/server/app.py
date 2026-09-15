@@ -27,10 +27,19 @@ from datacharter.audit.canary import CANARY_TABLE
 from datacharter.contracts import Charter, CharterError, load_charter
 from datacharter.engine import history
 from datacharter.engine.guard import QueryNotAllowed
-from datacharter.engine.session import DEFAULT_ROW_LIMIT, Engine, EngineError, QueryTimeout
+from datacharter.engine.session import (
+    DEFAULT_ROW_LIMIT,
+    Engine,
+    EngineError,
+    QueryCancelled,
+    QueryTimeout,
+)
 from datacharter.engine.statekey import resolve_state_key
+from datacharter.mcp.auth import Authenticator
+from datacharter.mcp.http import attach_mcp_routes
 from datacharter.models import ATTACH_TYPES, QueryResult, Source, SourceType
 from datacharter.server import agent_backend, llm_admin, security, source_admin
+from datacharter.server.probes import PROBE_PATHS, attach_probes
 
 HEARTBEAT_S = 1.0
 DEFAULT_TIMEOUT_S = 60.0
@@ -43,6 +52,30 @@ class QueryRequest(BaseModel):
     row_limit: int = Field(default=DEFAULT_ROW_LIMIT, ge=1, le=1_000_000)
     timeout_s: float = Field(default=DEFAULT_TIMEOUT_S, gt=0, le=3600)
     record: bool = False
+    offset: int = Field(default=0, ge=0, le=10_000_000)
+
+
+class StudioPiiPatch(BaseModel):
+    source: str
+    table: str
+    columns: list[str]
+
+
+class StudioFilterPatch(BaseModel):
+    source: str
+    table: str
+    predicate: str = ""
+
+
+class StudioPolicyPatch(BaseModel):
+    relation: str
+    sentences: list[str]
+
+
+class StudioPatch(BaseModel):
+    pii: list[StudioPiiPatch] = Field(default_factory=list)
+    row_filters: list[StudioFilterPatch] = Field(default_factory=list)
+    policies: list[StudioPolicyPatch] = Field(default_factory=list)
 
 
 class ProfileRequest(BaseModel):
@@ -184,6 +217,7 @@ def create_app(
     host: str = "127.0.0.1",
     port: int = 8321,
     offline: bool = False,
+    mcp_authenticator: Authenticator | None = None,
 ) -> FastAPI:
     """Build the app for a workspace; charter may be preloaded (demo mode).
 
@@ -231,15 +265,23 @@ def create_app(
     app.state.cc_deny = None  # effective tool deny-list from the connect-time assertion
     # Offline mode: no LLM is ever constructed, so no data can reach a model.
     app.state.llm = None if offline else llm_admin.load_llm(workspace, llm)
+    from datacharter.contracts.grants import policy_from_charter
+
+    app.state.policy = policy_from_charter(loaded)
+
+    attach_probes(app)
 
     @app.middleware("http")
     async def _origin_guard(request: Request, call_next):
         """Reject DNS-rebinding (bad Host) and cross-site browser requests (CSRF)."""
+        if request.url.path in PROBE_PATHS:
+            return await call_next(request)
         if not security.host_allowed(request, allowed):
             return _error(403, "forbidden_host", "Host not allowed.")
         path = request.url.path
+        mcp = path == "/mcp"
         if (
-            path.startswith("/api/")
+            (path.startswith("/api/") or mcp)
             and path != "/api/health"
             and not security.origin_allowed(request, allowed)
         ):
@@ -253,6 +295,10 @@ def create_app(
     @app.exception_handler(QueryTimeout)
     async def _timeout(_req: Request, exc: QueryTimeout) -> JSONResponse:
         return _error(408, "query_timeout", str(exc))
+
+    @app.exception_handler(QueryCancelled)
+    async def _cancelled(_req: Request, exc: QueryCancelled) -> JSONResponse:
+        return _error(400, "query_cancelled", str(exc))
 
     @app.exception_handler(EngineError)
     async def _engine_error(_req: Request, exc: EngineError) -> JSONResponse:
@@ -289,6 +335,9 @@ def create_app(
             app.state.engine, app.state.charter, auto_pii=app.state.auto_pii,
             recorder=app.state.recorder, canary=app.state.canary,
         )
+        from datacharter.contracts.grants import policy_from_charter
+
+        app.state.policy = policy_from_charter(app.state.charter)
 
     def _require_local():
         if host not in security.LOOPBACK_HOSTS:
@@ -638,6 +687,78 @@ def create_app(
         _refresh_charter()
         return {"name": form.name}
 
+    @app.get("/api/charter")
+    async def get_charter() -> dict:
+        """charter.yaml text plus structured PII, filters, and policy sentences.
+
+        Credentials stay as `${NAME}` refs in the file. This endpoint never
+        resolves them.
+        """
+        from datacharter.contracts.loader import CHARTER_FILE
+        from datacharter.contracts.policies import render_sentences
+
+        path = workspace / CHARTER_FILE
+        yaml_text = path.read_text() if path.exists() else ""
+        sources = [
+            {
+                "name": s.name,
+                "tables": s.tables,
+                "pii": s.pii,
+                "row_filters": s.row_filters,
+            }
+            for s in app.state.charter.sources
+        ]
+        policies = {
+            rel: render_sentences(policy)
+            for rel, policy in (app.state.charter.policies or {}).items()
+        }
+        return {"yaml": yaml_text, "sources": sources, "policies": policies}
+
+    @app.post("/api/charter/studio")
+    async def patch_studio(body: StudioPatch) -> dict:
+        blocked = _require_local()
+        if blocked is not None:
+            return blocked
+        from datacharter.contracts.writer import (
+            ContractWriteError,
+            replace_pii,
+            set_policy_sentences,
+            set_row_filter,
+        )
+
+        try:
+            for item in body.pii:
+                replace_pii(workspace, item.source, item.table, item.columns)
+            for item in body.row_filters:
+                set_row_filter(workspace, item.source, item.table, item.predicate)
+            for item in body.policies:
+                set_policy_sentences(workspace, item.relation, item.sentences)
+        except ContractWriteError as exc:
+            return _error(400, "write_error", str(exc))
+        _refresh_charter()
+        return {"saved": True}
+
+    @app.post("/api/charter/from-files")
+    async def charter_from_files() -> dict:
+        """Scan the workspace for csv/parquet/json/xlsx and upsert them into the charter."""
+        blocked = _require_local()
+        if blocked is not None:
+            return blocked
+        from datacharter.contracts.from_files import FromFilesError, apply_file_sources
+
+        try:
+            result = await asyncio.to_thread(
+                lambda: apply_file_sources(workspace, merge=True, engine=app.state.engine)
+            )
+        except FromFilesError as exc:
+            return _error(400, "no_files", str(exc))
+        _refresh_charter()
+        return {
+            "added": [{"name": p.name, "type": p.type, "path": p.path} for p in result.added],
+            "skipped": result.skipped,
+            "pii": result.pii,
+        }
+
     @app.post("/api/agent-access")
     async def set_agent_access(body: AgentAccessForm) -> dict:
         from datacharter.contracts.writer import ContractWriteError
@@ -676,6 +797,8 @@ def create_app(
         # (same masking / read-only / scrubbing as /api/query).
         result = await app.state.toolbox.run(body.name, body.arguments)
         return {"result": result}
+
+    attach_mcp_routes(app, authenticator=mcp_authenticator)
 
     @app.post("/api/mcp/session")
     async def mcp_session(body: dict) -> dict:
@@ -795,11 +918,19 @@ def create_app(
     @app.post("/api/query")
     async def query(body: QueryRequest) -> QueryResult:
         result = await app.state.engine.query(
-            body.sql, timeout_s=body.timeout_s, row_limit=body.row_limit
+            body.sql,
+            timeout_s=body.timeout_s,
+            row_limit=body.row_limit,
+            offset=body.offset,
         )
         if body.record:
             history.record(workspace, body.sql, len(result.rows), result.provenance)
         return result
+
+    @app.post("/api/query/cancel")
+    async def cancel_query() -> dict:
+        app.state.engine.interrupt()
+        return {"cancelled": True}
 
     @app.get("/api/history")
     async def get_history(limit: int = 50) -> dict:

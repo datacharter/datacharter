@@ -1,3 +1,9 @@
+---
+layout: default
+title: Verifiable answer provenance
+description: Signed receipts for agent answers.
+---
+
 # Verifiable answer provenance
 
 When an AI agent answers a question from your data, the answer is usually just

@@ -1,9 +1,8 @@
 ---
+layout: default
 title: Trust & security — DataCharter
 description: How DataCharter is built to be trustworthy — local-first architecture, a governed read-only surface, verifiable answers, a hardened supply chain, and a clear disclosure path.
 ---
-
-[Home](index.html) &middot; [Security](security.html) &middot; [Provenance](provenance.html) &middot; [Audit](audit.html) &middot; [Privacy](privacy.html) &middot; [About](about.html)
 
 # Trust & security
 
@@ -57,9 +56,9 @@ The repository runs, on every change:
 - **Secret scanning** (gitleaks) across the full history
 - **Dependabot** for pip, npm, and GitHub Actions
 
-The enterprise server image additionally carries an SBOM and SLSA provenance, is
-**signed with Sigstore/cosign**, and is scanned with Trivy for fixable
-HIGH/CRITICAL vulnerabilities.
+The MCP HTTP image (`packaging/oci/Dockerfile`) is the cluster artifact:
+non-root, OAuth required off loopback. Releases on PyPI carry PEP 740
+attestations. See [Deploy](deploy.html).
 
 ## Reporting a vulnerability
 
@@ -70,11 +69,17 @@ machine-readable contact is at
 [`/.well-known/security.txt`](/.well-known/security.txt); the full policy and scope
 live in [Security](security.html).
 
-## Enterprise & compliance
+## In a company
 
-DataCharter Team (the self-hosted enterprise edition) adds per-identity
-authorization, identity-bound provenance receipts, SIEM-ready structured logs, and
-a hardened container. Because it runs entirely inside your infrastructure and holds
-no customer data of its own, the relevant audit boundary is the software and its
-release pipeline. A SOC 2 readiness assessment is complete; reach out for the
-current security package (whitepaper, SBOM, and pen-test summary).
+The same Apache-2.0 kernel. There is no paid edition.
+
+- MCP Streamable HTTP with optional OAuth 2.1
+- `principals:` and `grants:` in `charter.yaml` (identities in git)
+- Helm chart and OCI image
+- Hash-chained audit plus SIEM JSON/OTLP export
+- [GovBench](govbench.html): frozen attack corpus, grade A-F
+
+It runs in your infrastructure. We never see your rows. The audit boundary is
+the software and the release pipeline. A SOC 2 readiness assessment is
+complete; reach out for the current security package (whitepaper, SBOM, and
+pen-test summary).

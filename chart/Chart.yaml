@@ -1,0 +1,11 @@
+apiVersion: v2
+name: datacharter
+description: Contract-governed MCP HTTP server. OAuth is required.
+type: application
+version: 0.1.0
+appVersion: "0.44.0"
+home: https://datacharter.dev
+sources:
+  - https://github.com/datacharter/datacharter
+annotations:
+  licenses: Apache-2.0

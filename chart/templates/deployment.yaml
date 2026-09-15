@@ -1,0 +1,91 @@
+{{- if or (not .Values.oauth.issuer) (not .Values.oauth.audience) (not .Values.oauth.jwksUri) }}
+{{- fail "oauth.issuer, oauth.audience, and oauth.jwksUri are required. MCP HTTP binds non-loopback only with OAuth." }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "datacharter.fullname" . }}
+  labels:
+    {{- include "datacharter.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "datacharter.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "datacharter.selectorLabels" . | nindent 8 }}
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: datacharter
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          command:
+            - datacharter
+            - mcp
+            - --http
+            - --host
+            - "0.0.0.0"
+            - --port
+            - "8765"
+            - /workspace
+          ports:
+            - name: http
+              containerPort: 8765
+              protocol: TCP
+          env:
+            - name: HOME
+              value: /home/charter
+            - name: DATACHARTER_OAUTH_ISSUER
+              value: {{ .Values.oauth.issuer | quote }}
+            - name: DATACHARTER_OAUTH_AUDIENCE
+              value: {{ .Values.oauth.audience | quote }}
+            - name: DATACHARTER_OAUTH_JWKS_URI
+              value: {{ .Values.oauth.jwksUri | quote }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- if .Values.credentialsSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.credentialsSecret }}
+          {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: charter
+              mountPath: /workspace/charter.yaml
+              subPath: charter.yaml
+            - name: tmp
+              mountPath: /tmp
+            - name: home
+              mountPath: /home/charter
+      volumes:
+        - name: workspace
+          emptyDir: {}
+        - name: charter
+          configMap:
+            name: {{ include "datacharter.fullname" . }}
+        - name: tmp
+          emptyDir: {}
+        - name: home
+          emptyDir: {}

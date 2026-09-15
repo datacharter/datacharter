@@ -1,0 +1,53 @@
+replicaCount: 1
+
+image:
+  repository: datacharter
+  # Empty uses Chart.appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8765
+
+# All three required. MCP HTTP refuses non-loopback without OAuth.
+oauth:
+  issuer: ""
+  audience: ""
+  jwksUri: ""
+
+charter: |
+  version: 1
+  sources: {}
+
+# Existing Secret whose keys match ${ENV} refs in charter.yaml.
+credentialsSecret: ""
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+extraEnv: []
+# - name: DATACHARTER_AUDIT
+#   value: json
+# - name: DATACHARTER_OTLP_ENDPOINT
+#   value: http://otel-collector:4318
+# - name: DATACHARTER_DUCKDB_MEMORY_LIMIT
+#   value: 2GB
+
+podSecurityContext:
+  fsGroup: 10001
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL

@@ -32,6 +32,31 @@ GUIDE_TEMPLATE = """\
      - "order_date is when the order was placed; created_at is a system timestamp" -->
 """
 
+LIFE_GUIDE = """\
+This workspace is personal data. The agent only sees aggregates
+(counts, sums, averages), never individual receipts or contacts.
+
+Run the agent fully local. No API key, nothing leaves this machine:
+
+    datacharter serve --local
+
+Needs [Ollama](https://ollama.com) with `qwen3:8b` (or pass `--model`).
+Replace `data/receipts.csv` and `data/contacts.csv` with your own files.
+"""
+
+LIFE_RECEIPTS_CSV = """\
+date,merchant,amount,notes
+2026-01-03,Corner Cafe,12.50,lunch
+2026-01-04,City Transit,3.75,bus
+2026-01-05,Bookstore,22.00,gift
+"""
+
+LIFE_CONTACTS_CSV = """\
+name,email,phone
+Ada,ada@example.test,555-0100
+Sam,sam@example.test,555-0101
+"""
+
 DEMO_CHARTER = """\
 # DataCharter demo workspace. Run: datacharter serve
 version: 1
@@ -127,6 +152,34 @@ sources:
       people: [email, ssn]
 """,
     ),
+    "life": (
+        "Personal files, local model, aggregates-only",
+        """\
+# DataCharter Life. Personal files, local model, aggregates only.
+# Point the paths at your CSVs, then: datacharter serve --local
+version: 1
+
+canary: on
+
+sources:
+  receipts:
+    type: csv
+    path: data/receipts.csv
+    pii:
+      receipts: [notes]
+  contacts:
+    type: csv
+    path: data/contacts.csv
+    pii:
+      contacts: [email, phone]
+
+policies:
+  receipts:
+    - aggregates only
+  contacts:
+    - aggregates only
+""",
+    ),
     "secure": (
         "A fully-hardened charter: firewall, canaries, policies, quarantine",
         """\
@@ -189,6 +242,10 @@ def _cmd_init(args: argparse.Namespace) -> int:
         return 0
 
     template = getattr(args, "template", None)
+    from_files = getattr(args, "from_files", False)
+    if from_files and (args.demo or template is not None):
+        print("init --from cannot combine with --demo or --template.", file=sys.stderr)
+        return 1
     if template is not None and template not in TEMPLATES:
         avail = ", ".join(TEMPLATES)
         print(f"Unknown template '{template}'. Available: {avail}.", file=sys.stderr)
@@ -197,12 +254,15 @@ def _cmd_init(args: argparse.Namespace) -> int:
     ws = Path(args.directory).resolve()
     ws.mkdir(parents=True, exist_ok=True)
     charter = ws / "charter.yaml"
-    if charter.exists() and not args.force:
+    if charter.exists() and not args.force and not from_files:
         print(f"charter.yaml already exists in {ws} (use --force to overwrite).")
         return 1
 
     tour = args.demo and getattr(args, "tour", False)
-    if template is not None:
+    if from_files:
+        if not charter.exists() or args.force:
+            charter.write_text(CHARTER_TEMPLATE)
+    elif template is not None:
         charter.write_text(TEMPLATES[template][1])
     else:
         charter.write_text(
@@ -212,15 +272,46 @@ def _cmd_init(args: argparse.Namespace) -> int:
     (ws / "guides").mkdir(exist_ok=True)
     guide = ws / "guides" / "overview.md"
     if not guide.exists():
-        guide.write_text(GUIDE_TEMPLATE)
+        guide.write_text(LIFE_GUIDE if template == "life" else GUIDE_TEMPLATE)
     _ensure_gitignore(ws)
+    if template == "life":
+        data = ws / "data"
+        data.mkdir(exist_ok=True)
+        receipts = data / "receipts.csv"
+        contacts = data / "contacts.csv"
+        if not receipts.exists():
+            receipts.write_text(LIFE_RECEIPTS_CSV)
+        if not contacts.exists():
+            contacts.write_text(LIFE_CONTACTS_CSV)
     if args.demo:
         write_demo_data(ws, seed_tour=tour)
+    if from_files:
+        from datacharter.contracts.from_files import FromFilesError, apply_file_sources
+
+        try:
+            result = apply_file_sources(ws, merge=True)
+        except FromFilesError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(f"Workspace initialized in {ws}.")
+        if not result.added and result.skipped:
+            print("All discovered files already have sources in charter.yaml.")
+            return 0
+        n = len(result.added)
+        print(f"Chartered {n} file(s). Review charter.yaml, then: datacharter serve")
+        for item in result.added:
+            pii = result.pii.get(item.name) or []
+            extra = f"  pii: {', '.join(pii)}" if pii else ""
+            print(f"  {item.name:20} {item.type:8} {item.path}{extra}")
+        return 0
     print(f"Workspace initialized in {ws}.")
     if template is not None:
         needs_creds = "${" in TEMPLATES[template][1]
-        hint = ("fill in the ${ENV} credentials, then: datacharter serve" if needs_creds
-                else "point the paths at your files, then: datacharter serve")
+        if template == "life":
+            hint = "point the paths at your files, then: datacharter serve --local"
+        else:
+            hint = ("fill in the ${ENV} credentials, then: datacharter serve" if needs_creds
+                    else "point the paths at your files, then: datacharter serve")
         print(f"Template '{template}' — {hint}")
     elif args.demo:
         print("Demo data in demo/ — try: datacharter serve")
@@ -320,6 +411,16 @@ def _cmd_serve(args: argparse.Namespace) -> int:
     # flush: under nohup/CI redirection stdout is block-buffered and uvicorn.run
     # never returns, so an unflushed banner leaves the log empty.
     print(f"DataCharter serving {ws} on http://{args.host}:{args.port}", flush=True)
+    from datacharter.mcp.oauth import OAuthVerifier, authenticator_from_env
+
+    mcp_auth = authenticator_from_env()
+    if isinstance(mcp_auth, OAuthVerifier):
+        print(f"MCP Streamable HTTP: http://{args.host}:{args.port}/mcp (OAuth)", flush=True)
+    else:
+        print(
+            f"MCP Streamable HTTP: http://127.0.0.1:{args.port}/mcp (loopback only)",
+            flush=True,
+        )
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
     return 0
 
@@ -360,6 +461,20 @@ def _cmd_mcp(args: argparse.Namespace) -> int:
 
     from datacharter.mcp.server import serve_stdio
 
+    if args.http and args.serve_url:
+        print("mcp --http cannot combine with --serve-url.", file=sys.stderr)
+        return 1
+    if getattr(args, "guard", None) and args.http:
+        print("mcp --guard cannot combine with --http.", file=sys.stderr)
+        return 1
+    if getattr(args, "guard", None) and args.serve_url:
+        print("mcp --guard cannot combine with --serve-url.", file=sys.stderr)
+        return 1
+    if getattr(args, "guard", None):
+        return _cmd_mcp_guard(args)
+    if args.http:
+        return _cmd_mcp_http(args)
+
     if args.serve_url:
         from datacharter.agent.remote_tools import RemoteToolBox
 
@@ -394,6 +509,81 @@ def _cmd_mcp(args: argparse.Namespace) -> int:
         asyncio.run(serve_stdio(toolbox))
     finally:
         engine.close()
+    return 0
+
+
+def _cmd_mcp_http(args: argparse.Namespace) -> int:
+    import uvicorn
+
+    from datacharter.mcp.http import create_mcp_http_app, mcp_bind_allowed
+    from datacharter.mcp.oauth import authenticator_from_env
+
+    host = args.host
+    auth = authenticator_from_env()
+    if not mcp_bind_allowed(host, auth):
+        print(
+            "mcp --http binds loopback only unless OAuth is enabled "
+            "(DATACHARTER_OAUTH_ISSUER, DATACHARTER_OAUTH_AUDIENCE, "
+            "DATACHARTER_OAUTH_JWKS_URI).",
+            file=sys.stderr,
+        )
+        return 1
+    ws = Path(args.directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+    app = create_mcp_http_app(ws, authenticator=auth)
+    print(
+        f"datacharter MCP Streamable HTTP on http://{host}:{args.port}/mcp ({ws})",
+        file=sys.stderr,
+        flush=True,
+    )
+    uvicorn.run(app, host=host, port=args.port, log_level="warning")
+    return 0
+
+
+def _cmd_mcp_guard(args: argparse.Namespace) -> int:
+    import asyncio
+    import json
+    import shlex
+
+    from datacharter.audit import FlightRecorder
+    from datacharter.audit.canary import CANARY_FILE, CanaryGuard
+    from datacharter.contracts import load_charter
+    from datacharter.mcp.guard import GuardProxy, StdioUpstream, serve_guard
+
+    argv = shlex.split(args.guard)
+    if not argv:
+        print("mcp --guard needs an upstream command.", file=sys.stderr)
+        return 1
+    ws = Path(args.directory).resolve()
+    if not (ws / "charter.yaml").exists():
+        print(f"No charter.yaml in {ws}. Run `datacharter init` first.", file=sys.stderr)
+        return 1
+    charter = load_charter(ws)
+    canary = None
+    token_path = ws / CANARY_FILE
+    if token_path.is_file():
+        try:
+            tokens = json.loads(token_path.read_text()).get("tokens") or []
+        except ValueError:
+            tokens = []
+        if tokens:
+            canary = CanaryGuard(
+                tokens=list(tokens), mode=charter.canary_mode or "log"
+            )
+    recorder = FlightRecorder(ws, enabled=charter.audit_enabled)
+    upstream = StdioUpstream(argv)
+    proxy = GuardProxy(upstream, recorder=recorder, canary=canary)
+    print(
+        f"datacharter MCP guard → {argv} ({ws})  [heuristic redaction]",
+        file=sys.stderr,
+        flush=True,
+    )
+    try:
+        asyncio.run(serve_guard(proxy))
+    finally:
+        upstream.close()
     return 0
 
 
@@ -1577,7 +1767,7 @@ def _cmd_audit(args: argparse.Namespace) -> int:
     action = None
     directory = "."
     for tok in args.tokens:
-        if tok in ("verify", "export", "show") and action is None:
+        if tok in ("verify", "export", "show", "siem") and action is None:
             action = None if tok == "show" else tok
         else:
             directory = tok
@@ -1606,6 +1796,25 @@ def _cmd_audit(args: argparse.Namespace) -> int:
         )
         path = export_pack(ws, out, since=args.since, until=args.until)
         print(f"Evidence pack written: {path}")
+        return 0
+
+    if action == "siem":
+        import json
+
+        from datacharter.audit.sink import siem_event
+
+        entries = read_entries(ws, since=args.since, until=args.until)
+        lines = [
+            json.dumps(siem_event(e), default=str)
+            for e in entries
+            if not e.get("_corrupt")
+        ]
+        text = "\n".join(lines) + ("\n" if lines else "")
+        if args.out:
+            Path(args.out).write_text(text)
+            print(f"SIEM JSON written: {args.out}")
+            return 0
+        sys.stdout.write(text)
         return 0
 
     # default: show recent sessions with access summaries
@@ -2215,6 +2424,12 @@ def main(argv: list[str] | None = None) -> int:
         "--list-templates", action="store_true", dest="list_templates",
         help="List the available starter templates and exit",
     )
+    p_init.add_argument(
+        "--from",
+        action="store_true",
+        dest="from_files",
+        help="Scan this directory for csv/parquet/json/xlsx and write them into charter.yaml",
+    )
     p_init.set_defaults(func=_cmd_init)
 
     p_serve = sub.add_parser("serve", help="Start the local server")
@@ -2264,7 +2479,7 @@ def main(argv: list[str] | None = None) -> int:
     p_connect.add_argument("--client", choices=[*CLIENTS, "all"], default="all")
     p_connect.add_argument(
         "--serve-url", default=None,
-        help="Emit HTTP config for a running `datacharter serve` instead of the local stdio server",
+        help="Emit HTTP config for a running serve (URL gets /mcp if missing)",
     )
     p_connect.set_defaults(func=_cmd_connect)
 
@@ -2289,13 +2504,26 @@ def main(argv: list[str] | None = None) -> int:
     p_eodcs.set_defaults(func=_cmd_export_odcs)
 
     p_mcp = sub.add_parser(
-        "mcp", help="Run an MCP server over stdio exposing the governed query tools"
+        "mcp", help="Run an MCP server over stdio or Streamable HTTP"
     )
     p_mcp.add_argument("directory", nargs="?", default=".")
     p_mcp.add_argument(
         "--serve-url",
         default=None,
         help="Proxy tools to a running `datacharter serve` instead of opening a local engine",
+    )
+    p_mcp.add_argument(
+        "--http",
+        action="store_true",
+        help="Serve MCP over Streamable HTTP (loopback only) instead of stdio",
+    )
+    p_mcp.add_argument("--host", default="127.0.0.1", help="Bind address for --http")
+    p_mcp.add_argument("--port", type=int, default=8765, help="Port for --http (default 8765)")
+    p_mcp.add_argument(
+        "--guard",
+        metavar="COMMAND",
+        default=None,
+        help="Proxy an upstream MCP server command; redact and audit its tool results",
     )
     p_mcp.set_defaults(func=_cmd_mcp)
 
@@ -2515,15 +2743,15 @@ def main(argv: list[str] | None = None) -> int:
     p_audit = sub.add_parser(
         "audit",
         help="Show, verify, or export the agent data-access audit log",
-        description="Usage: datacharter audit [WORKSPACE] [verify|export]",
+        description="Usage: datacharter audit [WORKSPACE] [verify|export|siem]",
     )
     p_audit.add_argument(
         "tokens", nargs="*",
-        help="Optional workspace path and/or action (verify, export) in either order",
+        help="Optional workspace path and/or action (verify, export, siem) in either order",
     )
-    p_audit.add_argument("--since", help="ISO timestamp lower bound (export)")
-    p_audit.add_argument("--until", help="ISO timestamp upper bound (export)")
-    p_audit.add_argument("--out", help="Output zip path (export)")
+    p_audit.add_argument("--since", help="ISO timestamp lower bound (export, siem)")
+    p_audit.add_argument("--until", help="ISO timestamp upper bound (export, siem)")
+    p_audit.add_argument("--out", help="Output zip (export) or NDJSON path (siem)")
     p_audit.set_defaults(func=_cmd_audit)
 
     p_suggest = sub.add_parser(

@@ -1,23 +1,26 @@
 ---
+layout: default
 title: CLI reference
 description: Every datacharter command, with usage and options.
 ---
-
-[Home](index.html) &middot; [Quick start](quickstart.html) &middot; [Editor](editor.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [Agent](agent.html) &middot; [Guides](guides.html) &middot; [Evals](evals.html) &middot; [Audit](audit.html) &middot; [Policies](policies.html) &middot; [CLI](cli.html) &middot; [MCP](mcp.html) &middot; [Workspace](workspace.html) &middot; [Desktop](desktop.html) &middot; [About](about.html) &middot; [FAQ](faq.html)
 
 Every command takes an optional workspace `directory` (default: the current one).
 Run `datacharter <command> --help` for the exact flags.
 
 ## Setup
 
-### `init [directory] [--demo] [--force] [--template NAME] [--list-templates]`
+### `init [directory] [--demo] [--force] [--from] [--template NAME] [--list-templates]`
 Scaffold a workspace: `charter.yaml`, `queries/`, `.env.example`, `.gitignore`.
 `--demo` includes a generated demo dataset; `--force` overwrites an existing
-`charter.yaml`. **`--template NAME`** starts from a gallery starter with governance
-already wired — `postgres` (PII + a row filter), `warehouse` (Snowflake with
-aggregate-only + k-anonymity policies), `files` (local CSV/Parquet), or `secure`
+`charter.yaml`. **`--from`** scans the directory for csv, parquet, json, and xlsx
+files, writes them as sources, and flags likely PII. Review `charter.yaml`, then
+serve. **`--template NAME`** starts from a gallery starter with governance
+already wired: `postgres` (PII + a row filter), `warehouse` (Snowflake with
+aggregate-only + k-anonymity policies), `files` (local CSV/Parquet), `life`
+(personal files, local model, aggregates-only), or `secure`
 (the whole stack: firewall, canaries, policies, quarantine). `--list-templates`
 prints them. Fill in the `${ENV}` credentials and run `datacharter serve`.
+`--from` cannot combine with `--demo` or `--template`.
 
 ### `demo [directory]`
 A zero-config, narrated walkthrough of the governance — no server, no account.
@@ -86,13 +89,18 @@ Manage `${NAME}` secrets in the OS keyring. `set` prompts without echo (or pass
 
 ## Explore and govern
 
-### `mcp [directory] [--serve-url URL]`
-Run a [Model Context Protocol](mcp.html) server over stdio, exposing the four
-governed query tools to any MCP client — read-only, PII-masked. With
-`--serve-url`, the server proxies tool calls to an already-running
-`datacharter serve` instead of opening its own engine (this is how the in-app
-Claude Code integration bridges to the governed toolbox); without it, it opens
-the workspace directly.
+### `mcp [directory] [--serve-url URL] [--http] [--host] [--port] [--guard COMMAND]`
+Run a [Model Context Protocol](mcp.html) server. Default is stdio. `--http`
+serves Streamable HTTP on loopback (`http://127.0.0.1:8765/mcp` by default).
+`datacharter serve` also mounts `POST /mcp` on the UI process. `--serve-url`
+proxies stdio tool calls to a running `serve` (the in-app Claude Code bridge)
+and cannot combine with `--http`. `--guard COMMAND` proxies an upstream MCP
+server: heuristic redaction, canary scan, size cap, audit log. Not
+contract-grade masking. Cannot combine with `--http` or `--serve-url`.
+Non-loopback `--http` binds are refused unless OAuth env is set
+(`DATACHARTER_OAUTH_ISSUER`, `DATACHARTER_OAUTH_AUDIENCE`,
+`DATACHARTER_OAUTH_JWKS_URI`). Cluster install is the Helm chart in `chart/`
+([Deploy](deploy.html)).
 
 ### `diff <left> <right> [directory] [--key cols]`
 Diff two relations across sources: rows only in each side plus the common count.
@@ -317,11 +325,13 @@ runs each case with and without your guides and reports the lift;
 `--threshold 0.8` exits non-zero below 80% (CI gate); `--history` shows past
 runs.
 
-### `audit [directory] [verify|export] [--since T] [--until T]`
+### `audit [directory] [verify|export|siem] [--since T] [--until T]`
 Read the [flight recorder](audit.html). Bare `audit` lists recorded agent
 sessions; `audit verify` re-checks the hash chain and names the exact entry if
 anything was tampered with; `audit export` writes a self-contained evidence
-pack (entries, verification result, the charter at export time, summary).
+pack (entries, verification result, the charter at export time, summary);
+`audit siem` reprints the chain as NDJSON for a SIEM (`--out file`, or stdout).
+Live JSON/OTLP sinks are env (`DATACHARTER_AUDIT`, `DATACHARTER_OTLP_ENDPOINT`).
 
 ### `canary [directory] [drill]`
 Show [canary tripwire](audit.html#canary-tripwires) status — whether honeytokens are
@@ -349,9 +359,8 @@ declared PII, contract tests. **Any breach fails the grade outright**: you can't
 score well while an attack succeeds. Among charters that withstand everything, the
 grade rewards how much protection is actually configured. Prints a scorecard with
 score, per-attack result, and posture, or `--json`. `--min-grade B` exits 1 below
-that grade — a governance-posture gate for CI. The battery is offline and
-deterministic, so the number is reproducible anywhere: the yardstick every buyer
-can run.
+that grade — a governance-posture gate for CI. The battery is the frozen
+[GovBench corpus](govbench.html) (`govbench-v1`). Offline and deterministic.
 
 ### `suggest [directory] [--apply]`
 Mine your workspace's query history for repeated habits your

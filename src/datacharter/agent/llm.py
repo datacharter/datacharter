@@ -47,7 +47,17 @@ class LLMClient:
             base_url or os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
         ).rstrip("/")
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
-        self.model = model or os.environ.get("DATACHARTER_MODEL", "gpt-4o-mini")
+        # XAI_API_KEY is the SpaceXAI key; only send it to api.x.ai.
+        if not self.api_key and "api.x.ai" in self.base_url:
+            self.api_key = os.environ.get("XAI_API_KEY", "")
+        if model:
+            self.model = model
+        elif os.environ.get("DATACHARTER_MODEL"):
+            self.model = os.environ["DATACHARTER_MODEL"]
+        elif "api.x.ai" in self.base_url:
+            self.model = "grok-4.6"
+        else:
+            self.model = "gpt-4o-mini"
         self.timeout_s = timeout_s
 
     async def stream(

@@ -1,9 +1,8 @@
 ---
+layout: default
 title: Governance gates for data pipelines
 description: Enforce your data contract inside Dagster, Airflow, or any CI — fail the run when the data drifts, an assertion breaks, or a change widens what an agent can see.
 ---
-
-[Home](index.html) &middot; [charter.yaml](charter-yaml.html) &middot; [Sources](sources.html) &middot; [CLI](cli.html) &middot; [Security](security.html) &middot; [Provenance](provenance.html)
 
 # Governance gates for data pipelines
 

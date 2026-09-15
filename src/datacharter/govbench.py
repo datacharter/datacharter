@@ -65,6 +65,8 @@ class Scorecard:
         return 50 + round(posture * 50)
 
     def to_dict(self) -> dict:
+        from datacharter.agent.redteam import corpus_cite
+
         return {
             "grade": self.grade,
             "score": self.score,
@@ -74,6 +76,7 @@ class Scorecard:
             "breaches": list(self.breaches),
             "posture": [{"name": c.name, "passed": c.passed, "detail": c.detail}
                         for c in self.posture],
+            "corpus": corpus_cite(),
         }
 
 
@@ -103,6 +106,11 @@ def render_scorecard(card: Scorecard) -> str:
     for c in card.posture:
         lines.append(f"    {'✓' if c.passed else '·'} {c.name}: {c.detail}")
     lines.append("")
-    lines.append("Reproduce anywhere: `datacharter govbench`. The battery is offline "
-                 "and deterministic.")
+    from datacharter.agent.redteam import corpus_cite
+
+    cite = corpus_cite()
+    lines.append(
+        "Reproduce anywhere: `datacharter govbench`. "
+        f"Corpus {cite['id']} ({cite['attacks']} attacks, sha256 {cite['sha256'][:12]})."
+    )
     return "\n".join(lines)

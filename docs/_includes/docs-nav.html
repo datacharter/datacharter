@@ -1,0 +1,39 @@
+{% assign u = page.url | default: '' %}
+<details class="docs-nav-wrap" open>
+  <summary class="docs-nav-sum">On this site</summary>
+  <nav class="docs-side" aria-label="Docs">
+    <p class="docs-k">Start</p>
+    <a href="{{ '/quickstart.html' | relative_url }}"{% if u contains 'quickstart' %} class="on"{% endif %}>Quick start</a>
+    <a href="{{ '/desktop.html' | relative_url }}"{% if u contains 'desktop' %} class="on"{% endif %}>Desktop</a>
+    <a href="{{ '/editor.html' | relative_url }}"{% if u contains 'editor' %} class="on"{% endif %}>Editor</a>
+    <a href="{{ '/faq.html' | relative_url }}"{% if u contains 'faq' %} class="on"{% endif %}>FAQ</a>
+    <a href="{{ '/about.html' | relative_url }}"{% if u contains 'about' %} class="on"{% endif %}>About</a>
+
+    <p class="docs-k">Charter</p>
+    <a href="{{ '/charter-yaml.html' | relative_url }}"{% if u contains 'charter-yaml' %} class="on"{% endif %}>charter.yaml</a>
+    <a href="{{ '/sources.html' | relative_url }}"{% if u contains 'sources' %} class="on"{% endif %}>Sources</a>
+    <a href="{{ '/workspace.html' | relative_url }}"{% if u contains 'workspace' %} class="on"{% endif %}>Workspace</a>
+    <a href="{{ '/policies.html' | relative_url }}"{% if u contains 'policies' %} class="on"{% endif %}>Policies</a>
+    <a href="{{ '/pipeline-gates.html' | relative_url }}"{% if u contains 'pipeline' %} class="on"{% endif %}>Pipeline gates</a>
+    <a href="{{ '/security.html' | relative_url }}"{% if u contains 'security' %} class="on"{% endif %}>Security</a>
+    <a href="{{ '/deploy.html' | relative_url }}"{% if u contains 'deploy' %} class="on"{% endif %}>Deploy</a>
+
+    <p class="docs-k">Agents</p>
+    <a href="{{ '/agent.html' | relative_url }}"{% if u contains 'agent.html' %} class="on"{% endif %}>Agent</a>
+    <a href="{{ '/mcp.html' | relative_url }}"{% if u contains 'mcp.html' %} class="on"{% endif %}>MCP</a>
+    <a href="{{ '/guides.html' | relative_url }}"{% if u contains 'guides' %} class="on"{% endif %}>Guides</a>
+    <a href="{{ '/evals.html' | relative_url }}"{% if u contains 'evals' %} class="on"{% endif %}>Evals</a>
+    <a href="{{ '/govbench.html' | relative_url }}"{% if u contains 'govbench' %} class="on"{% endif %}>GovBench</a>
+    <a href="{{ '/audit.html' | relative_url }}"{% if u contains 'audit' %} class="on"{% endif %}>Audit</a>
+    <a href="{{ '/provenance.html' | relative_url }}"{% if u contains 'provenance' %} class="on"{% endif %}>Provenance</a>
+    <a href="{{ '/trust.html' | relative_url }}"{% if u contains 'trust' %} class="on"{% endif %}>Trust</a>
+
+    <p class="docs-k">CLI</p>
+    <a href="{{ '/cli.html' | relative_url }}"{% if u contains 'cli' %} class="on"{% endif %}>Command reference</a>
+
+    <p class="docs-k">Compare</p>
+    <a href="{{ '/duckdb-ui.html' | relative_url }}"{% if u contains 'duckdb-ui' %} class="on"{% endif %}>DuckDB UI</a>
+    <a href="{{ '/hex-alternative.html' | relative_url }}"{% if u contains 'hex' %} class="on"{% endif %}>Hex alternative</a>
+    <a href="{{ '/mcp-data-governance.html' | relative_url }}"{% if u contains 'mcp-data' %} class="on"{% endif %}>Governed MCP</a>
+  </nav>
+</details>

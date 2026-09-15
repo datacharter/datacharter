@@ -1,6 +1,6 @@
 import type { TableInfo } from "./api";
 
-export const STARTER = "-- Cmd/Ctrl+Enter to run\nSELECT 42 AS answer;\n";
+export const STARTER = "-- Drop a file onto this window, or add a source.\n-- Cmd/Ctrl+Enter runs a query.\n";
 const EXAMPLE_SQL =
   "SELECT customer_id, count(*) AS orders, round(sum(total), 2) AS revenue\n" +
   "FROM store.orders\nGROUP BY customer_id\nORDER BY revenue DESC;\n";
