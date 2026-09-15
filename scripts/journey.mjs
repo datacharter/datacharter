@@ -131,7 +131,7 @@ try {
         .first()
         .waitFor({ timeout: 10000 });
     }
-    await page.getByRole("button", { name: "Results", exact: true }).click();
+    await page.getByRole("button", { name: "Data", exact: true }).click();
   });
 
   await step("export", async () => {
